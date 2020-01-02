@@ -35,14 +35,15 @@ class MatrixLog(DynamicDocument, TimeStampedModel):
             object_id = obj.id
 
         product_type = None
-        if obj.__class__.__name__ == 'OpdAppointment':
-            product_type = 1
-        elif obj.__class__.__name__ == 'LabAppointment':
-            product_type = 2
-        elif obj.__class__.__name__ == 'PlusUser':
-            product_type = 11
-        elif obj.__class__.__name__ == 'UserInsurance':
-            product_type = 3
+        if obj:
+            if obj.__class__.__name__ == 'OpdAppointment':
+                product_type = 1
+            elif obj.__class__.__name__ == 'LabAppointment':
+                product_type = 2
+            elif obj.__class__.__name__ == 'PlusUser':
+                product_type = 11
+            elif obj.__class__.__name__ == 'UserInsurance':
+                product_type = 3
 
         matrix_log_obj = cls(object_id=object_id, content_type_id=content_type_id, product_type=product_type,
                              request_payload=str(request_payload), request_response=str(request_response),

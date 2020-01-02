@@ -167,6 +167,13 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         if settings.IS_INSURANCE_ACTIVE:
+
+            if request.user.is_anonymous or not request.user.is_authenticated:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            insurance_obj = request.user.active_insurance
+            if not insurance_obj or not insurance_obj.is_valid():
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
             resp = {}
             user = request.user
             if not user.is_anonymous:
@@ -202,6 +209,13 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
     def memberlist(self, request):
         if settings.IS_INSURANCE_ACTIVE:
+
+            if request.user.is_anonymous or not request.user.is_authenticated:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            insurance_obj = request.user.active_insurance
+            if not insurance_obj or not insurance_obj.is_valid():
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
             data = {}
             result = {}
             data['id'] = request.query_params.get('id')
@@ -448,6 +462,14 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
 
     def profile(self, request):
         if settings.IS_INSURANCE_ACTIVE:
+
+            if request.user.is_anonymous or not request.user.is_authenticated:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            insurance_obj = request.user.active_insurance
+            if not insurance_obj or not insurance_obj.is_valid():
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
+
             user_id = request.user.pk
             resp = {}
             if user_id:

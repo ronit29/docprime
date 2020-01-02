@@ -8,6 +8,8 @@ import math
 import traceback
 from collections import OrderedDict
 from io import BytesIO
+
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 import pytz
@@ -17,7 +19,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from ondoc.api.v1.utils import aware_time_zone, log_requests_on, pg_seamless_hash
-from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate
+from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate, Address
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.matrix.mongo_models import MatrixLog
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -37,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 @task
-def send_lab_notifications_refactored(data):
+def send_lab_notifications_refactored(data, *args, **kwargs):
     from ondoc.diagnostic import models as lab_models
     from ondoc.communications.models import LabNotification
     appointment_id = data.get('appointment_id', None)
@@ -46,6 +48,7 @@ def send_lab_notifications_refactored(data):
     if not instance or not instance.user:
         return
     try:
+        test_list = []
         instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
@@ -61,10 +64,36 @@ def send_lab_notifications_refactored(data):
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'LAB_APPOINTMENT', 'appointment': instance}))
         lab_notification = LabNotification(instance)
-        lab_notification.send(is_valid_for_provider)
+        context = lab_notification.get_context()
+        if lab_notification.notification_type not in (NotificationAction.LAB_APPOINTMENT_BOOKED, NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
+                                                      NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT):
+            lab_notification.send(is_valid_for_provider)
+        else:
+            # notification_type = lab_notification.notification_type
+            # receivers = lab_notification.get_receivers(is_valid_for_provider)
+            # from ondoc.communications.models import SMSNotification
+            # sms_notification = SMSNotification(notification_type, context)
+            # sms_notification.send(receivers.get('sms_receivers', []))
+
+            content_type = ContentType.objects.get_for_model(instance)
+            mask_no_obj = AppointmentMaskNumber.objects.filter(object_id=instance.id, content_type_id=content_type.id)
+            app_test_mapping = instance.test_mappings.all()
+            est = pytz.timezone(settings.TIME_ZONE)
+            time_slot_start = instance.time_slot_start.astimezone(est)
+            for data in app_test_mapping:
+                if data.test:
+                    test_list.append({'name': data.test.name, 'reference_code': data.test.reference_code})
+            context = {'id': instance.id, 'lab_name': instance.lab.name if instance.lab else '',
+                                'Patient_name': instance.profile_detail.get('name'), 'Gender':instance.profile_detail.get('gender'),
+                                'DOB': instance.profile_detail.get('dob'), 'pickup_address': instance.get_pickup_address() if instance.is_home_pickup else None,
+                                'lab_address': instance.lab.get_lab_address(), 'time_slot': time_slot_start.strftime("%I:%M%p"),
+                                'Date':time_slot_start.date(), 'mask_number': mask_no_obj[0].mask_number if mask_no_obj and mask_no_obj[0].mask_number
+                        else instance.address.get('phone_number'), 'test_list': test_list, 'client_code': 'CH343' if instance and instance.lab and instance.lab.network and instance.lab.network.id == 195 else '', 'lab_network_id': instance.lab.network.id if instance and instance.lab and instance.lab.network else None}
+
+            lab_notification.send(is_valid_for_provider, overrided_context=context, email_obj=instance)
+
     except Exception as e:
         logger.error(str(e))
-
 
 @task
 def send_ipd_procedure_lead_mail(data):
@@ -936,10 +965,12 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
     except Exception as e:
         logger.error(str(e))
 
+
 @task()
 def send_lab_reports(appointment_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.communications.models import LabNotification
+    from ondoc.matrix.tasks import create_prescription_lead_to_matrix
     try:
         instance = LabAppointment.objects.filter(id=appointment_id).first()
         if not instance:
@@ -947,8 +978,13 @@ def send_lab_reports(appointment_id):
         lab_notification = LabNotification(instance, NotificationAction.LAB_REPORT_SEND_VIA_CRM)
         is_valid_for_provider = True
         lab_notification.send(is_valid_for_provider)
+        try:
+            create_prescription_lead_to_matrix.apply_async(({'appointment_id': instance.id},), countdown=1)
+        except Exception as e:
+            logger.error(str(e))
     except Exception as e:
         logger.error(str(e))
+
 
 @task()
 def upload_doctor_data(obj_id):
@@ -1013,7 +1049,7 @@ def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
             else:
                 print("Payment acknowledged")
         json_url = '{"url": "%s"}' % url
-        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, None, json_url, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1575,8 +1611,9 @@ def save_pg_response(self, log_type, order_id, txn_id, response, request, user_i
                 response.pop('created_at', None)
             PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
     except Exception as e:
-        logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
-        # self.retry([txn_id, response], countdown=300)
+        # todo - temporary commented to avoid error logs in sentry
+        # logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+        pass
 
 
 @task(bind=True)
@@ -1695,8 +1732,8 @@ def save_matrix_logs(self, id, obj_type, request_data, response):
         elif obj_type == 'general_leads':
             object = GeneralMatrixLeads.objects.filter(id=id).first()
 
-        if object:
-            MatrixLog.create_matrix_logs(object, request_data, response)
+        MatrixLog.create_matrix_logs(object, request_data, response)
+
     except Exception as e:
         logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
 

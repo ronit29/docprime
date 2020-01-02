@@ -133,6 +133,7 @@ class DoctorQualificationInline(ReadOnlyInline):
 
 class DoctorClinicTimingForm(forms.ModelForm):
 
+
     def __init__(self, data=None, files=None, auto_id='id_%s', prefix=None, initial=None, error_class=ErrorList,
                  label_suffix=None, empty_permitted=False, instance=None, use_required_attribute=None):
         super().__init__(data, files, auto_id, prefix, initial, error_class, label_suffix, empty_permitted, instance,
@@ -1496,6 +1497,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
             raise forms.ValidationError("Please select Appointment type for Follow up Appointment!!")
 
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
+            if self.request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+                raise forms.ValidationError("You cannot change appointment date time.")
+            else:
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
                 time_slot_start = make_aware(dt_field)
@@ -1880,6 +1884,9 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
 
         if obj and obj.status is not OpdAppointment.CREATED:
             read_only = read_only + ('status_change_comments',)
+
+        if request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+            read_only = read_only + ['status', 'status_change_comments']
 
         return read_only
         # else:

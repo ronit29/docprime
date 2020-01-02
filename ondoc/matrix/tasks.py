@@ -349,6 +349,9 @@ def push_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.notification.tasks import save_matrix_logs
+    from ondoc.common.models import GeneralMatrixLeads
+    from ondoc.common.lead_engine import lead_class_referance
+
     log_requests_on()
     try:
         appointment_id = data.get('appointment_id', None)
@@ -370,6 +373,16 @@ def push_appointment_to_matrix(self, data):
             appointment = LabAppointment.objects.filter(pk=appointment_id).first()
             if not appointment:
                 raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        appointment_user = appointment.user
+        if appointment_user:
+            last_24_time = datetime.datetime.now() - datetime.timedelta(days=1)
+            if GeneralMatrixLeads.objects.filter(created_at__gte=last_24_time, phone_number=int(appointment_user.phone_number), lead_type__in=['DROPOFF', 'LABADS']).exists():
+
+                lead_engine_obj = lead_class_referance("CANCELDROPOFFLEADVIAAPPOINTMENT", appointment)
+                success = lead_engine_obj.process_lead()
+                if not success:
+                    print("Could not able to publish the lead to matrix for cancel dropoff for phone number %s" % str(appointment_user.phone_number))
 
         appointment_order = Order.objects.filter(product_id=order_product_id, reference_id=appointment_id).first()
         request_data = appointment.get_matrix_data(appointment_order, product_id, sub_product_id)
@@ -1449,3 +1462,56 @@ def push_order_to_spo(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))
+
+
+@task(bind=True, max_retries=2)
+def create_prescription_lead_to_matrix(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.notification.tasks import save_matrix_logs
+    try:
+        appointment_id = data.get('appointment_id', None)
+        if not appointment_id:
+            raise Exception("Appointment id not found, could not push prescription lead to Matrix")
+
+        appointment = LabAppointment.objects.filter(id=appointment_id).first()
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        booking_url = '%s/admin/diagnostic/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
+        if appointment.profile.phone_number:
+            phone_number = appointment.profile.phone_number
+        else:
+            phone_number = appointment.user.phone_number
+
+        request_data = {
+            "Name": appointment.profile.name if appointment.profile else "",
+            "ProductId": 14,
+            "PrimaryNo": phone_number,
+            "LeadSource": "Prescriptions",
+            "ExitPointUrl": booking_url
+        }
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        save_matrix_logs.apply_async((appointment.id, 'lab_appointment', request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info(json.dumps(request_data))
+            logger.info("[ERROR] Appointment Prescription could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logger.error("Appointment Prescription syc with the Matrix System failed with response - " + str(response))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+        resp_data = response.json()
+        print(resp_data)
+
+        if not resp_data.get('Id', None):
+            return
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Appointment Prescription lead to matrix- " + str(e))

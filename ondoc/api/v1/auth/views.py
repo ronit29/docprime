@@ -1352,8 +1352,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save(self, request):
-        print("Pg data for testing.\n")
-        print(json.dumps(request.data))
         try:
             response = None
             coded_response = None
@@ -1449,8 +1447,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         if chat_order:
                             CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
                             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
-                            log_created_at = datetime.datetime.now()
-                            save_pg_response.apply_async((PgLogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                            log_created_at = str(datetime.datetime.now())
+                            save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                         return CHAT_REDIRECT_URL
                     else:
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
@@ -1513,11 +1511,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
             try:
                 if response and response.get("orderNo") and response.get("orderId") and response.get(
-                        'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
-                    send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                if response and response.get("orderNo") and response.get("orderId") and response.get(
-                        'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
-                    send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                        'txStatus'):
+                    if response.get('txStatus') == 'TXN_FAILURE':
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                    if response.get('txStatus') == 'TXN_PENDING' and pg_resp_code == 5:
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
             except Exception as e:
                 logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1557,7 +1555,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         if order_obj.product_id == Order.CHAT_PRODUCT_ID:
             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
-            log_created_at = datetime.datetime.now()
+            log_created_at = str(datetime.datetime.now())
             save_pg_response.apply_async(
                 (mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
                 eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
@@ -1740,7 +1738,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
                         if response and response.get("orderNo") and response.get("orderId") and response.get(
                                 'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
-                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                            send_pg_acknowledge.apply_async((int(item.get('orderId')), response.get("orderNo"),),
                                                             countdown=1)
                     except Exception as e:
                         logger.error("Error in sending pg acknowledge - " + str(e))
@@ -1774,7 +1772,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
             try:
                 if response and response.get("orderNo"):
-                    pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                    pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo"), order__id=int(item.get('orderId'))).first()
                     if pg_txn:
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
             except Exception as e:

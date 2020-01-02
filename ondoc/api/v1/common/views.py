@@ -1336,6 +1336,10 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         resp = {}
         data = request.data
+        user = request.user
+        if user and not user.is_anonymous and user.is_authenticated and user.active_insurance:
+            resp = {'vip_plans': []}
+            return Response(data=resp)
         if service_type == "opd":
             resp = {'vip_plans': []}
             serializer = serializers.OpdPriceUtilitySerializer(data=data, context={'request': request})
@@ -1360,6 +1364,8 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
                     price_data['convenience_charge'] = convenience_charge
                     price_data['gold_price'] = int(price)
                     res['opd'] = price_data
+                    if price_data['convenience_charge']  and price_data['gold_price']  + price_data['convenience_charge']  > price_data['deal_price']:
+                        continue
                     resp['vip_plans'].append(res)
 
         if service_type == "lab":
@@ -1375,6 +1381,7 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
                     res = {'tests': {}}
                     plan_data = PlusPlansSerializer(gold_vip_plan, context={'request': request}).data
                     res.update(plan_data)
+                    price_data = {}
                     for test in validated_data.get('lab_tests', []):
                         avt_obj = AvailableLabTest.objects.filter(lab_pricing_group=validated_data.get('lab').lab_pricing_group, test__id=test).first()
 
@@ -1386,7 +1393,8 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
                             "custom_deal_price" : avt_obj.custom_deal_price,
                             "supplier_price" : avt_obj.supplier_price,
                             "insurance_agreed_price" : avt_obj.insurance_agreed_price,
-                            "fees": avt_obj.custom_agreed_price if avt_obj.custom_agreed_price else avt_obj.computed_agreed_price
+                            "fees": avt_obj.custom_agreed_price if avt_obj.custom_agreed_price else avt_obj.computed_agreed_price,
+                            "deal_price": avt_obj.custom_deal_price if avt_obj.custom_deal_price else avt_obj.computed_deal_price
                         }
 
                         price = price_engine.get_price(price_data)
@@ -1394,6 +1402,9 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
                         price_data['gold_price'] = price if price else None
                         price_data['convenience_charge'] = convenience_charge
                         res['tests'][test] = price_data
+
+                    if price_data and price_data['convenience_charge'] and price_data['gold_price'] + price_data['convenience_charge'] > price_data['deal_price']:
+                        continue
 
                     resp['vip_plans'].append(res)
 

@@ -1921,6 +1921,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 res['vip'] = deepcopy(vip_data_dict)
                 all_tests_under_lab = res.get('tests', [])
                 bool_array = list()
+                gold_bool_array = list()
 
                 # For Insurance. Checking the eligibility of test to be booked under Insurance.
                 if all_tests_under_lab and res['is_insurance_enabled']:
@@ -1957,11 +1958,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
                             # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
-                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0), price_engine_price=price)
+                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0), price_engine_price=price, calculated_convenience_amount=res['vip']['vip_convenience_amount'])
                             coverage = engine_response.get('is_covered', False)
-                        bool_array.append(coverage)
+                        gold_bool_array.append(coverage)
 
-                    if False not in bool_array and len(bool_array) > 0:
+                    if False not in gold_bool_array and len(gold_bool_array) > 0:
                         res['vip']['covered_under_vip'] = True
                         res['vip']['vip_amount'] = engine_response.get('amount_to_be_paid', 0) if engine_response else 0
 
@@ -2022,14 +2023,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if not lab_obj:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+        utilization = {}
+        vip_object = None
         user = request.user
-        if profile_id and user and user.is_authenticated:
-            profile = UserProfile.objects.filter(pk=profile_id).first()
-            if not profile:
-                return Response(status=status.HTTP_404_NOT_FOUND)
+        if user and user.is_authenticated:
 
-            if not profile in user.profiles.all():
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+            if profile_id:
+                profile = UserProfile.objects.filter(pk=profile_id).first()
+                if not profile:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+                if not profile in user.profiles.all():
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            vip_object = user.active_plus_user
+            if vip_object and not vip_object.plan.is_gold:
+                utilization = vip_object.get_utilization
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=lab_id,
@@ -2109,6 +2118,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_serializer_data = test_serializer.data
         is_prescription_needed = False
+        deep_utilization = copy.deepcopy(utilization)
+
         if request.user and request.user.is_authenticated:
             insurance = request.user.active_insurance
             if insurance and test_serializer_data:
@@ -2129,7 +2140,36 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count
 
-        # disable home pickup for insured customers if lab charges home collection
+        if vip_object and deep_utilization:
+            counter = 0
+            for single_test_serializer_data in temp_data['tests']:
+                price_data = {"mrp": single_test_serializer_data.get('mrp'), "deal_price": single_test_serializer_data.get('deal_price'), "cod_deal_price": single_test_serializer_data.get('deal_price'), "fees": single_test_serializer_data.get('agreed_price')}
+
+                entity = "LABTEST" if not single_test_serializer_data.get('is_package') else "PACKAGE"
+                price_engine = get_price_reference(vip_object, entity)
+                if not price_engine:
+                    price = Decimal(single_test_serializer_data.get('mrp'))
+                else:
+                    price = Decimal(price_engine.get_price(price_data))
+
+                engine = get_class_reference(vip_object, entity)
+                if engine:
+                    engine_response = engine.validate_booking_entity(cost=price, id=single_test_serializer_data.get('test_id'),
+                                                   mrp=Decimal(single_test_serializer_data.get('mrp')),
+                                                   deal_price=single_test_serializer_data.get('deal_price'),
+                                                   utilization=deep_utilization, price_engine_price=price)
+
+                    single_test_serializer_data['vip']['covered_under_vip'] = engine_response['is_covered']
+                    single_test_serializer_data['vip']['vip_amount'] = engine_response['amount_to_be_paid']
+
+                    if engine_response['is_covered'] and engine_response['vip_amount_deducted']:
+                        engine.update_utilization(deep_utilization, engine_response['vip_amount_deducted'])
+
+                    temp_data['tests'][counter] = single_test_serializer_data
+
+                counter = counter + 1
+
+    # disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and temp_data.get('lab'):
             active_insurance = request.user.active_insurance
             threshold = None
@@ -2580,16 +2620,17 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
             data['insurance_message'] = insurance_validate_dict['insurance_message']
+            data['payment_type'] = OpdAppointment.INSURANCE if insurance_validate_dict.get('is_insured') else validated_data['payment_type']
 
-            if data['is_appointment_insured']:
-                data['payment_type'] = OpdAppointment.INSURANCE
-                appointment_test_ids = validated_data.get('test_ids', [])
-                if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
-                    return Response(status=status.HTTP_400_BAD_REQUEST,
-                                    data={'error': 'Some error occured. Please try again after some time.',
-                                          'request_errors': {
-                                              'message': 'Some error occured. Please try again after some time.'
-                                          }})
+            # if data['is_appointment_insured']:
+            #     data['payment_type'] = OpdAppointment.INSURANCE
+            #     appointment_test_ids = validated_data.get('test_ids', [])
+            #     if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
+            #         return Response(status=status.HTTP_400_BAD_REQUEST,
+            #                         data={'error': 'Some error occured. Please try again after some time.',
+            #                               'request_errors': {
+            #                                   'message': 'Some error occured. Please try again after some time.'
+            #                               }})
         elif plus_user:
             plus_user_dict = plus_user.validate_plus_appointment(validated_data)
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
@@ -2602,7 +2643,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
                     data['payment_type'] = OpdAppointment.GOLD
                 else:
                     data['payment_type'] = OpdAppointment.VIP
-
+                validated_data['payment_type'] = data['payment_type']
+            else:
+                validated_data['payment_type'] = validated_data.get('payment_type')
         else:
             data['is_appointment_insured'], data['insurance_id'], data['insurance_message'], data['is_vip_member'],\
             data['cover_under_vip'], data['plus_user_id'], data['vip_amount'] = False, None, "", False, False, None, 0

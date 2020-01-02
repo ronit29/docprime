@@ -1502,12 +1502,26 @@ class AvailableLabTest(TimeStampedModel):
     desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
     insurance_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    convenience_pricing = JSONField(null=True, blank=True)
 
     def __str__(self):
         return "{}-{}".format(self.lab, self.test)
 
     def get_deal_price(self):
         return self.custom_deal_price if self.custom_deal_price else self.computed_deal_price
+
+    def calculate_convenience_charge(self, plan):
+        if not plan:
+            plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+            if not plan:
+                plan = PlusPlans.objects.filter(is_gold=True).first()
+                if not plan:
+                    return 0
+
+        if not self.convenience_pricing:
+            return 0
+
+        return self.convenience_pricing.get(str(plan.id), 0)
 
     def update_deal_price(self):
         # will update only this available lab test prices and will be called on save
@@ -2074,7 +2088,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             if self.is_part_of_integration() and self.can_push_to_integrator():
                 try:
                     if old_instance:
-                        if (old_instance.status != self.CANCELLED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
+                        if (old_instance.status != self.CANCELLED and old_instance.status != self.CREATED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
                             push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                     else:
                         push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
@@ -2088,7 +2102,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #     except Exception as e:
         #         logger.error(str(e))
 
-        if self.is_to_send_notification(old_instance):
+        if  ((self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED) or (not old_instance and self.status == self.BOOKED) or (self.is_to_send_notification(old_instance))):
+        # if self.is_to_send_notification(old_instance):
             sent_to_provider = True
             if old_instance:
                 sent_to_provider = self.is_provider_notification_allowed(old_instance)
@@ -2657,7 +2672,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         return None
 
     @classmethod
-    def get_price_details(cls, data):
+    def get_price_details(cls, data, plus_user=None):
+        import functools
 
         deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
                                       When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
@@ -2671,6 +2687,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                                                                      total_agreed_price=Sum(
                                                                                          agreed_price_calculation),
                                                                                      total_insurance_agreed_price=Sum('insurance_agreed_price'))
+        total_convenience_charge = None
+        if plus_user:
+            convenience_charge_list = list(map(lambda x: x.calculate_convenience_charge(plus_user.plan), lab_test_queryset))
+            total_convenience_charge = functools.reduce(lambda a, b: a+b, convenience_charge_list)
+
         total_insurance_agreed_price = total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
@@ -2725,6 +2746,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     effective_price = effective_price
             else:
                 effective_price = effective_price
+
+            effective_price += vip_convenience_amount
             # coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, effective_price)
 
@@ -2732,8 +2755,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 effective_price = 0
             else:
                 effective_price = effective_price - coupon_discount
-
-            effective_price += vip_convenience_amount
 
         return {
             "deal_price" : total_deal_price,
@@ -2744,7 +2765,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "coupon_cashback" : coupon_cashback,
             "coupon_list" : coupon_list,
             "home_pickup_charges" : home_pickup_charges,
-            "coupon_data" : { "random_coupon_list" : random_coupon_list }
+            "coupon_data" : { "random_coupon_list" : random_coupon_list },
+            "total_convenience_charge": total_convenience_charge
         }
 
     @classmethod
@@ -2875,6 +2897,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
             vip_amount_utilized = plus_user_resp.get('vip_amount_deducted')
             plus_user_id = plus_user_resp.get('plus_user_id', None)
+            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
 
         if cover_under_vip and vip_amount_utilized > 0:
             # payment_type = OpdAppointment.VIP
@@ -2885,12 +2908,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 payment_type = OpdAppointment.VIP
 
             plus_user_id = plus_user_resp.get('plus_user_id', None)
-        # if cover_under_vip and cart_data and cart_data.get('cover_under_vip', None):
+            # if cover_under_vip and cart_data and cart_data.get('cover_under_vip', None):
             # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
             # convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
-            convenience_amount = plus_user_resp.get('vip_convenience_amount')
-            effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
+            effective_price = plus_user_resp['amount_to_be_paid']
+            # if not convenience_amount:
+            #     convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
+            #                                                                   default_plan_query=plus_user.plan)
+            #     effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
+
             # utilization = plus_user.get_utilization
             # available_amount = int(utilization.get('available_package_amount', 0))
             # mrp = int(price_data.get('mrp'))
