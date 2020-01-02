@@ -215,7 +215,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                   "insurance_status", "is_vip_member", "is_vip_gold_member")
 
     def validate(self, attrs):
-        if attrs.get('profile'):
+        if self.instance:
             if self.instance.is_gold_profile:
                 raise serializers.ValidationError("Gold Member Profile can not be editable.")
             if self.instance.is_insured_profile:
