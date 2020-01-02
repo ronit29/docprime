@@ -680,7 +680,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             hosp_is_gold = search_criteria.search_value
         plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
         plan = plus_user.plan if plus_user else None
-        calculated_convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
+        calculated_convenience_charge = obj.calculate_convenience_charge(plan)
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
                 "vip_convenience_amount": calculated_convenience_charge,
                 "vip_gold_price": 0, 'hosp_is_gold': False, "is_gold_member": False}
@@ -721,7 +721,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 # max_price = max_price_engine.get_price(price_data)
                 # convenience_charge = plus_user.plan.get_convenience_charge(max_price, min_price, "DOCTOR")
                 # resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
-                convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
+                convenience_charge = obj.calculate_convenience_charge(plus_user.plan)
                 resp['vip_convenience_amount'] = convenience_charge
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
@@ -1683,6 +1683,23 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     cancellation_reason = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
     appointment_via_sbi = serializers.SerializerMethodField()
+    gold = serializers.SerializerMethodField()
+
+    def get_gold(self, obj):
+        from ondoc.api.v1.plus.serializers import PlusUserModelSerializer
+        request = self.context.get('request')
+        data = {'is_gold': False, 'members': [], 'is_single_flow': False}
+
+        plus_plan = obj.plus_plan
+        if plus_plan:
+            data['is_gold'] = plus_plan.plan.is_gold
+            data['members'] = PlusUserModelSerializer(plus_plan, context={'request': request}).data
+
+            appointment_order = Order.objects.filter(reference_id=obj.id).first()
+            if appointment_order and appointment_order.single_booking:
+                data['is_single_flow'] = True
+
+        return data
 
     class Meta:
         model = OpdAppointment
@@ -1690,7 +1707,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                   'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
-                  'report_files', 'vip', 'appointment_via_sbi')
+                  'report_files', 'vip', 'appointment_via_sbi', 'gold')
 
     def get_insurance(self, obj):
         request = self.context.get("request")

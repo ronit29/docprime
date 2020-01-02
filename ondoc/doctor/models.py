@@ -619,7 +619,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         content_type = ContentType.objects.get_for_model(Hospital)
         if content_type:
             cid = content_type.id
-            query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
+            query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where rr.appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
             cursor.execute(query)
 
     @classmethod
@@ -1785,6 +1785,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     cod_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     insurance_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     custom_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
+    convenience_pricing = JSONField(null=True, blank=True)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
@@ -1794,6 +1795,19 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
 
     def is_enabled_for_cod(self):
         return self.doctor_clinic.is_enabled_for_cod()
+
+    def calculate_convenience_charge(self, plan):
+        if not plan:
+            plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+            if not plan:
+                plan = PlusPlans.objects.filter(is_gold=True).first()
+                if not plan:
+                    return 0
+
+        if not self.convenience_pricing:
+            return None
+
+        return self.convenience_pricing.get(str(plan.id), 0)
 
     def dct_cod_deal_price(self):
         if self.is_enabled_for_cod():
@@ -3547,7 +3561,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return None
 
     @classmethod
-    def get_price_details(cls, data):
+    def get_price_details(cls, data, plus_user=None):
+        import functools
 
         procedures = data.get('procedure_ids', [])
         selected_hospital = data.get('hospital')
@@ -3567,6 +3582,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
                 day=time_slot_start.weekday(), start__lte=data.get("start_time"),
                 end__gte=data.get("start_time")).first()
+
+        total_convenience_charge = None
+        if plus_user:
+            total_convenience_charge = doctor_clinic_timing.calculate_convenience_charge(plus_user.plan)
 
         effective_price = 0
         prepaid_deal_price = 0
@@ -3667,7 +3686,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list },
-            "prepaid_deal_price": prepaid_deal_price
+            "prepaid_deal_price": prepaid_deal_price,
+            "total_convenience_charge": total_convenience_charge
         }
 
     @classmethod
