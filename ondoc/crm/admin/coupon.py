@@ -254,7 +254,7 @@ class CouponForm(forms.ModelForm):
     create_random_coupon = forms.BooleanField(required=False)
 
     class Media:
-        extend = False
+        extend = True
         js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'coupon/js/init.js')
         css = {'all': ('coupon/css/style.css',)}
 

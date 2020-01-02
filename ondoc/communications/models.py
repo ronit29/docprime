@@ -1135,12 +1135,9 @@ class EMAILNotification:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Lensfit_email", approved=True).first()
         if notification_type == NotificationAction.IPDIntimateEmailNotification:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="EMail_to_provider_for_ipd_hospitals_for_request_query", approved=True).first()
-        # todo - below code commented of branch 'lab_email_provider'
-        # if notification_type in (NotificationAction.LAB_APPOINTMENT_ACCEPTED, NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
-        #                         NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB, NotificationAction.LAB_APPOINTMENT_BOOKED,
-        #                         NotificationAction.LAB_APPOINTMENT_CANCELLED, NotificationAction.LAB_INVOICE):
-        #     obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Email_to_lab_on_appointment_booked",
-        #                                           approved=True).first()
+        if notification_type in (NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT, NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB, NotificationAction.LAB_APPOINTMENT_BOOKED) and (not user or user.user_type == User.DOCTOR):
+            obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Email_to_lab_on_appointment_booked",
+                                                  approved=True).first()
         return obj
 
     def get_template(self, user):
@@ -1882,8 +1879,10 @@ class LabNotification(Notification):
         }
         return context
 
-    def send(self, is_valid_for_provider=True):
+    def send(self, is_valid_for_provider=True, *args, **kwargs):
         context = self.get_context()
+        if kwargs.get('overrided_context'):
+            context.update(kwargs.get('overrided_context'))
         notification_type = self.notification_type
         all_receivers = self.get_receivers(is_valid_for_provider)
 
@@ -1920,7 +1919,7 @@ class LabNotification(Notification):
             push_notification = PUSHNotification(notification_type, context)
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
-            email_notification.send(all_receivers.get('email_receivers', []))
+            email_notification.send(all_receivers.get('email_receivers', []), *args, **kwargs)
             sms_notification.send(all_receivers.get('sms_receivers', []))
             app_notification.send(all_receivers.get('app_receivers', []))
             push_notification.send(all_receivers.get('push_receivers', []))

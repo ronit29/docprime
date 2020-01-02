@@ -1032,11 +1032,10 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         if recipient_obj and recipient_obj.to:
             obj = None
             content_type = None
-            # todo - below code commented of branch 'lab_email_provider'
-            # if kwargs.get('email_obj'):
-            #     obj = kwargs.get('email_obj')
-            if kwargs.get('ipd_email_obj'):
-                obj = kwargs.get('ipd_email_obj')
+            # if kwargs.get('ipd_email_obj'):
+            #     obj = kwargs.get('ipd_email_obj')
+            if kwargs.get('email_obj'):
+                obj = kwargs.get('email_obj')
                 content_type = ContentType.objects.get_for_model(obj)
 
             if kwargs.get('is_preview', False):
@@ -1544,6 +1543,7 @@ class DynamicTemplates(TimeStampedModel):
 
     def send_notification(self, context, recipient_obj, notification_type, *args, **kwargs):
         rendered_content = self.render_template(context)
+
         if rendered_content is None:
             logger.error("Could not generate content. Dynamic temlplate id %s" % str(self.id))
             return None
@@ -1554,8 +1554,9 @@ class DynamicTemplates(TimeStampedModel):
 
             recipient_obj.add_cc(self.get_cc())
             recipient_obj.add_bcc(self.get_bcc())
+            rendered_subject = self.render_template_subject(context)
 
-            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type, *args, **kwargs)
+            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, rendered_subject, notification_type, *args, **kwargs)
         elif self.template_type == self.TemplateType.SMS:
             SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type, *args, **kwargs)
 
@@ -1566,6 +1567,19 @@ class DynamicTemplates(TimeStampedModel):
 
         try:
             file_content = self.content
+            t = Template(file_content)
+            c = Context(context)
+            rendered_data = t.render(c)
+        except Exception as e:
+            logger.error(str(e))
+
+        return rendered_data
+
+    def render_template_subject(self, context):
+        rendered_data = None
+
+        try:
+            file_content = self.subject
             t = Template(file_content)
             c = Context(context)
             rendered_data = t.render(c)
@@ -1730,10 +1744,9 @@ class IPDIntimateEmailNotification(TimeStampedModel):
                 email_notification = EMAILNotification(notification_type=NotificationAction.IPDIntimateEmailNotification,
                                                        context={'doctor_name': data.doctor.name, 'dob': data.dob,
                                                                 'Mobile': data.phone_number, 'date_time': str(data.preferred_date) + " " + str(data.time_slot),                                                                         'Hospital_Name': data.hospital.name , 'Patient_name': data.profile.name})
-                # todo - below code commented of branch 'lab_email_provider'
-                # kwargs['email_obj'] = data
+
+                kwargs['email_obj'] = data
                 kwargs['ipd_email_obj'] = data
                 email_notification.send(receivers, *args, **kwargs)
                 IPDIntimateEmailNotification.objects.filter(user=data.user).update(is_sent=True)
-                # print("ipd_obj: " + str(data.id))
-                print("ipd_obj: " + data.id)
+                print("ipd_obj: " + str(data.id))
