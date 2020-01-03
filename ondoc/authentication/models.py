@@ -1454,8 +1454,12 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
         ).distinct('user')
         admin_users = []
         for admin in admins:
-            if admin.user:
-                admin_users.append(admin.user)
+            try:
+                if admin.user:
+                    admin_users.append(admin.user)
+            except Exception as e:
+                continue
+                # pass
         return admin_users
 
     @staticmethod
