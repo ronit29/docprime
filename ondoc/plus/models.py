@@ -721,8 +721,11 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         appointment_type = OPD if "doctor" in appointment_data else LAB
         deep_utilization = deepcopy(self.get_utilization)
         for item in cart_items:
-            validated_item = item.validate(request)
-            self.validate_plus_appointment(validated_item, utilization=deep_utilization)
+            try:
+                validated_item = item.validate(request)
+                self.validate_plus_appointment(validated_item, utilization=deep_utilization)
+            except Exception as e:
+                pass
         current_item_price_data = OpdAppointment.get_price_details(
             appointment_data, self) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data, self)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
