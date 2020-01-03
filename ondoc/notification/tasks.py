@@ -1786,14 +1786,14 @@ def process_leads_to_matrix(self, data):
 
 
 @task()
-def opd_send_completion_notification_before_appointment(appointment_id, payment_type):
+def opd_send_completion_notification(appointment_id, payment_type):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
         instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
-        if payment_type == OpdAppointment.PREPAID:
+        if payment_type in (OpdAppointment.PREPAID, OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD, OpdAppointment.PLAN):
             opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT)
             opd_notification.send()
         if payment_type == OpdAppointment.COD:
@@ -1803,7 +1803,7 @@ def opd_send_completion_notification_before_appointment(appointment_id, payment_
         logger.error(str(e))
 
 @task()
-def opd_send_confirmation_notification_before_appointment(data):
+def opd_send_confirmation_notification(data):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
@@ -1811,7 +1811,7 @@ def opd_send_confirmation_notification_before_appointment(data):
         if not instance or not instance.user:
             return
 
-        if data.get('payment_type') == OpdAppointment.PREPAID:
+        if data.get('payment_type') in (OpdAppointment.PREPAID, OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD, OpdAppointment.PLAN):
             opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
             opd_notification.send()
         if data.get('payment_type') == OpdAppointment.COD:
