@@ -592,7 +592,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         if obj.doctor_clinic:
             doctor_clinic = obj.doctor_clinic
             if obj.doctor_clinic.hospital and obj.doctor_clinic.doctor:
-                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking and (doctor_clinic.hospital.enabled_for_cod or doctor_clinic.hospital.enabled_for_prepaid):
                    enable_for_online_booking = True
         return enable_for_online_booking
 
