@@ -420,7 +420,9 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         payload, status = self.check_payload_v2(token)
         uid = payload if status == 0 else payload.get('user_id')
         if not WhiteListedLoginTokens.objects.filter(token=token, user_id=uid).exists():
-            raise serializers.ValidationError("No Last Active sesssion found!")
+            attrs['active_session_error'] = True
+            return attrs
+        #     raise serializers.ValidationError("No Last Active sesssion found!")
         if status == 1:
             '''FAke Refresh, Return the original data [As required]'''
             return {
