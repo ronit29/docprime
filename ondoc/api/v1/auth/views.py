@@ -57,7 +57,7 @@ from ondoc.api.v1.insurance.serializers import (InsuranceTransactionSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
-from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication, SbiGAuthentication
+from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication, SbiGAuthentication, RefreshAuthentication
 from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
                                 ErrorCodeMapping, IsNotAgent, GenericAdminEntity, generate_short_url, form_time_slot)
 from django.conf import settings
@@ -2290,7 +2290,8 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
 
 class RefreshJSONWebToken(GenericViewSet):
 
-    authentication_classes = []
+    authentication_classes = (RefreshAuthentication,)
+
     def refresh(self, request):
         data = {}
         if hasattr(request, 'agent') and request.agent is not None:

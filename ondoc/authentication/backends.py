@@ -197,6 +197,38 @@ class JWTAuthentication(authentication.BaseAuthentication):
         }
 
 
+class RefreshAuthentication(JWTAuthentication):
+
+    def authenticate(self, request):
+
+        request.user = None
+
+        auth_header = authentication.get_authorization_header(request).split()
+        auth_header_prefix = self.authentication_header_prefix.lower()
+
+        if not auth_header:
+            return None
+
+        prefix = auth_header[0].decode('utf-8')
+        token = auth_header[1].decode('utf-8')
+
+        return self._authenticate_credentials(request, token)
+
+    @staticmethod
+    def get_unverified_user(token):
+        unverified_payload = jwt.decode(token, verify=False)
+
+        return unverified_payload.get('user_id', None), unverified_payload.get('agent_id', None)
+
+    def _authenticate_credentials(self, request, token):
+        user_key = None
+        user_id, is_agent = self.get_unverified_user(token)
+        if is_agent:
+            request.agent = True
+        user = User.objects.get(pk=user_id)
+        return (user, token)
+
+
 class WhatsappAuthentication(authentication.BaseAuthentication):
     authentication_header_prefix = "Token"
 
