@@ -2293,6 +2293,8 @@ class RefreshJSONWebToken(GenericViewSet):
     authentication_classes = []
     def refresh(self, request):
         data = {}
+        if hasattr(request, 'agent') and request.agent is not None:
+            return Response({})
         serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         # if not serializer.is_valid():
