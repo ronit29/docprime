@@ -34,7 +34,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from num2words import num2words
 # from hardcopy import bytestring_to_pdf
-import math
+import math, uuid
 import reversion
 import numbers
 from ondoc.account.models import Order, Merchant, MerchantPayout, PgTransaction, PayoutMapping
@@ -961,7 +961,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin, Transactio
         html_body = render_to_string("pdfbody.html", context=context)
         policy_number = self.policy_number
         certificate_number = policy_number.split('/')[-1]
-        filename = "{}.pdf".format(str(certificate_number))
+        filename = "{}-{}.pdf".format(str(certificate_number), uuid.uuid4().hex)
         #
         # extra_args = {
         #     'virtual-time-budget': 6000
