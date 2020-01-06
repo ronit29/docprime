@@ -1761,6 +1761,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         entity = EntityUrls.objects.filter(entity_id__in=ids, url_type='PAGEURL', is_valid='t',
                                            entity_type__iexact='Lab').values('entity_id', 'url')
+        test_obj = None
         id_url_dict = dict()
         for data in entity:
             id_url_dict[data['entity_id']] = data['url']
@@ -1779,6 +1780,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     to_attr="selected_group"
                 )
             )
+            test_obj = LabTest.objects.filter(id__in=test_ids).first()
+
         labs = labs.filter(id__in=ids)
         # resp_queryset = list()
         temp_var = dict()
@@ -1792,7 +1795,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             is_gold = search_criteria.search_value
 
         for obj in labs:
-            if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
+            if insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
                 obj.is_home_collection_enabled = False
             temp_var[obj.id] = obj
             tests[obj.id] = list()
@@ -1877,20 +1880,35 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             # {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}, {
             #     'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
             # lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict = lab_obj.lab_timings_today_and_next()[0:4]
-            lab_timing_temp_dict = lab_obj.lab_timings_today_and_next()
+            lab_timing_temp_dict = lab_obj.lab_timings_today_and_next(test_obj=test_obj)
             lab_timing, lab_timing_data = lab_timing_temp_dict['lab_timing'], lab_timing_temp_dict['lab_timing_data']
             next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict['next_lab_timing_dict'], \
                                                               lab_timing_temp_dict['next_lab_timing_data_dict']
+
+            radiology_lab_timing, radiology_lab_timing_data = lab_timing_temp_dict['radiology_lab_timing'], \
+                                                              lab_timing_temp_dict['radiology_lab_timing_data']
+            radiology_next_lab_timing_dict, radiology_next_lab_timing_data_dict = lab_timing_temp_dict[
+                                                                                  'radiology_next_lab_timing_dict'], \
+                                                                                  lab_timing_temp_dict[
+                                                                                  'radiology_next_lab_timing_data_dict']
 
             if lab_obj.home_collection_charges.exists():
                 row["distance_related_charges"] = 1
             else:
                 row["distance_related_charges"] = 0
 
+            row["is_radiology_test"] = False
+            if test_obj and test_obj.test_type == 1:
+                row["is_radiology_test"] = True
+
             row["lab_timing"] = lab_timing
             row["lab_timing_data"] = lab_timing_data
             row["next_lab_timing"] = next_lab_timing_dict
             row["next_lab_timing_data"] = next_lab_timing_data_dict
+            row["radiology_lab_timing"] = radiology_lab_timing
+            row["radiology_lab_timing_data"] = radiology_lab_timing_data
+            row["radiology_next_lab_timing"] = radiology_next_lab_timing_dict
+            row["radiology_next_lab_timing_data"] = radiology_next_lab_timing_data_dict
             row["tests"] = tests.get(row["id"])
             row["city"] = lab_obj.city
             row["certifications"] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in lab_obj.lab_certificate.all() if data.certification]
