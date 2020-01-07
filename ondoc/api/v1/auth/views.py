@@ -258,6 +258,7 @@ class UserViewset(GenericViewSet):
 
         response = {
             "login": 1,
+            "user_id": user.id,
             "token": token_object['token'],
             "expiration_time": token_object['payload']['exp']
         }
