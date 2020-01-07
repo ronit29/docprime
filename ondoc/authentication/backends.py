@@ -137,10 +137,12 @@ class JWTAuthentication(authentication.BaseAuthentication):
         return self.authentication_header_prefix
 
     @classmethod
-    def jwt_payload_handler(cls, user):
+    def jwt_payload_handler(cls, user, exp=None):
+        if not exp:
+            exp = datetime.datetime.utcnow() + settings.JWT_AUTH['JWT_EXPIRATION_DELTA']
         return {
             'user_id': user.pk,
-            'exp': datetime.datetime.utcnow() + settings.JWT_AUTH['JWT_EXPIRATION_DELTA'],
+            'exp': exp,
             'orig_iat': calendar.timegm(
                 datetime.datetime.utcnow().utctimetuple()
             )
@@ -172,15 +174,18 @@ class JWTAuthentication(authentication.BaseAuthentication):
     @staticmethod
     def generate_token(user, request=None):
         user_key = UserSecretKey.objects.get_or_create(user=user)
-        payload = JWTAuthentication.jwt_payload_handler(user)
+        if request and (('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2') or \
+                (request.META.get("HTTP_APP_NAME")== "doc_prime_partner" and
+                 (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15') or
+                  (request.META.get('HTTP_APP_VERSION') > parse('2.200.11') and request.META.get('HTTP_PLATFORM') == 'ios')
+                 )
+                )
+        ):
+            payload = JWTAuthentication.jwt_payload_handler(user)
+        else:
+            exp = datetime.datetime.utcnow() + datetime.timedelta(days=365)
+            payload = JWTAuthentication.jwt_payload_handler(user, exp)
         token = jwt.encode(payload, user_key[0].key)
-        # if request and (('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2') or \
-        #         (request.META.get("HTTP_APP_NAME")== "doc_prime_partner" and
-        #          (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15') or
-        #           (request.META.get('HTTP_APP_VERSION') > parse('2.200.11') and request.META.get('HTTP_PLATFORM') == 'ios')
-        #          )
-        #         )
-        # ):
         whitelist = WhiteListedLoginTokens.objects.create(token=token.decode('utf-8'), user=user)
         return {'token': token,
                 'payload': payload}

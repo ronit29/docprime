@@ -170,7 +170,6 @@ class UserViewset(GenericViewSet):
             # for new user, create a referral coupon entry
             self.set_referral(user)
 
-
         self.set_coupons(user)
 
         token_object = JWTAuthentication.generate_token(user, request)
