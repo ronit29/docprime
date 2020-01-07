@@ -400,7 +400,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
             am_pm = 'AM'
         else:
             am_pm = 'PM'
-            hour -= 12
+            if not hour == 12:
+                hour -= 12
         min_str = self.convert_min(min)
         return str(hour) + ":" + min_str + " " + am_pm
 
