@@ -8,9 +8,8 @@ class CsrfGetParamMiddleware:
         # the view (and later middleware) are called.
         if request.GET.get('csrf_token'):
             request.META['HTTP_X_CSRFTOKEN'] = request.GET.get('csrf_token')
-
         response = self.get_response(request)
-
+        response["Cache-Control"]= "no-store, no-cache"
         # Code to be executed for each request/response after
         # the view is called.
 
