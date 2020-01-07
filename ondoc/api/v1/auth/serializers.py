@@ -411,26 +411,28 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
 
     token = serializers.CharField()
     reset = serializers.CharField(required=False)
+    force_update = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
         import hashlib
         token = attrs.get('token')
         reset = attrs.get('reset')
+        force_update = True if (attrs.get('force_update') and attrs['force_update']) else False
         request = self.context.get('request')
         payload, status = self.check_payload_v2(token)
         uid = payload if status == 0 else payload.get('user_id')
-        if not WhiteListedLoginTokens.objects.filter(token=token, user_id=uid).exists():
-            attrs['active_session_error'] = True
-            return attrs
+        # if not WhiteListedLoginTokens.objects.filter(token=token, user_id=uid).exists():
+        #     attrs['active_session_error'] = True
+        #     return attrs
         #     raise serializers.ValidationError("No Last Active sesssion found!")
-        if status == 1:
-            '''FAke Refresh, Return the original data [As required]'''
+        if status == 1 and not force_update:
+            '''FAke Refresh, Return the original data [As required by Rohit Dhall]'''
             return {
                     'token': token,
                     'user': payload.get('user_id'),
                     'payload': payload
             }
-        elif status == 0 and reset:
+        elif force_update or (status == 0 and reset):
             try:
                 passphrase = hashlib.md5("hpDqwzdpoQY8ymm5".encode())
                 passphrase = passphrase.hexdigest()[:16]

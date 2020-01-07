@@ -2299,8 +2299,8 @@ class RefreshJSONWebToken(GenericViewSet):
         serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        if 'active_session_error' in valid_data and valid_data['active_session_error']:
-            return Response({'error': 'No Last Acctive Session Found'}, status=status.HTTP_401_UNAUTHORIZED)
+        # if 'active_session_error' in valid_data and valid_data['active_session_error']:
+        #     return Response({'error': 'No Last Acctive Session Found'}, status=status.HTTP_401_UNAUTHORIZED)
         # if not serializer.is_valid():
         #     return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_400_BAD_REQUEST)
         data['token'] = valid_data['token']
