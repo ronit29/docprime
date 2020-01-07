@@ -697,7 +697,11 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             resp['is_enable_for_vip'] = True
             resp['vip_gold_price'] = obj.fees
             if not plus_user:
-                if resp['vip_gold_price'] + calculated_convenience_charge >= obj.deal_price:
+                vip_gold_price = resp['vip_gold_price'] if (
+                            resp.get('vip_gold_price') and resp['vip_gold_price']) else 0
+                calculated_convenience_charge = calculated_convenience_charge if calculated_convenience_charge else 0
+                calc_deal_price = obj.deal_price if obj.deal_price else 0
+                if vip_gold_price + calculated_convenience_charge >= calc_deal_price:
                     resp['is_enable_for_vip'] = False
                 return resp
             utilization = plus_user.get_utilization
