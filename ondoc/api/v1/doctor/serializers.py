@@ -3018,7 +3018,10 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         return None
 
     def get_insurance_provider(self, obj):
-        return [x.name for x in obj.hospital.health_insurance_providers.all()]
+        if obj.hospital and obj.hospital.health_insurance_providers:
+            return [x.name for x in obj.hospital.health_insurance_providers.all()]
+
+        return []
 
     def get_multi_speciality(self, obj):
         result1 = len(obj.hospital.hospitalspeciality_set.all()) > 1 if obj.hospital else False
