@@ -726,7 +726,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
                 convenience_charge = convenience_charge if convenience_charge is not None else 0
-                vip_amount = resp['vip_amount'] if (resp.get('vip_amount') and resp['vip_amount'] is not None) else 0
+                vip_amount = resp['vip_amount'] if ('vip_amount' in resp and resp['vip_amount'] is not None) else 0
                 if vip_amount + convenience_charge >= obj.deal_price:
                     resp['is_enable_for_vip'] = False
             # amount = plus_user.get_vip_amount(utilization, mrp)
