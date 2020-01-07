@@ -459,10 +459,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         lab_timing_data = list()
         next_lab_timing_dict = {}
         next_lab_timing_data_dict = {}
-        radiology_lab_timing = ""
-        radiology_lab_timing_data = list()
-        radiology_next_lab_timing_dict = {}
-        radiology_next_lab_timing_data_dict = {}
         data_array = [list() for i in range(7)]
         days_array = [i for i in range(7)]
         rotated_days_array = days_array[day_now:] + days_array[:day_now]
@@ -478,7 +474,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 "end": 23.75
             }}
         else:
-            timing_queryset = self.lab_timings.all()
+            if test_obj and test_obj.test_type == 1:
+                timing_queryset = self.test_group_timings.all()
+                if not timing_queryset.exists():
+                    timing_queryset = self.lab_timings.all()
+            else:
+                timing_queryset = self.lab_timings.all()
+
             for data in timing_queryset:
                 data_array[data.day].append(data)
             rotated_data_array = data_array[day_now:] + data_array[:day_now]
@@ -499,40 +501,9 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                     next_lab_timing_data_dict[day] = next_lab_timing_data
                     break
 
-            if test_obj and test_obj.test_type == 1:
-                data_array = [list() for i in range(7)]
-                days_array = [i for i in range(7)]
-                rotated_days_array = days_array[day_now:] + days_array[:day_now]
-                radiology_timing_queryset = self.test_group_timings.all()
-
-                for data in radiology_timing_queryset:
-                    data_array[data.day].append(data)
-                rotated_data_array = data_array[day_now:] + data_array[:day_now]
-
-                for count, timing_data in enumerate(rotated_data_array):
-                    day = rotated_days_array[count]
-                    if count == 0:
-                        radiology_timing_dict = self.get_lab_timing(timing_data)
-                        radiology_lab_timing, radiology_lab_timing_data = radiology_timing_dict['lab_timing'], \
-                                                                          radiology_timing_dict['lab_timing_data']
-                        radiology_lab_timing_data = sorted(radiology_lab_timing_data, key=lambda k: k["start"])
-                    elif timing_data:
-                        radiology_next_timing_dict = self.get_lab_timing(timing_data)
-                        radiology_next_lab_timing, radiology_next_lab_timing_data = radiology_next_timing_dict[
-                                                                                        'lab_timing'], \
-                                                                                    radiology_next_timing_dict[
-                                                                                        'lab_timing_data']
-                        radiology_next_lab_timing_data = sorted(radiology_next_lab_timing_data, key=lambda k: k["start"])
-                        radiology_next_lab_timing_dict[day] = radiology_next_lab_timing
-                        radiology_next_lab_timing_data_dict[day] = radiology_next_lab_timing_data
-                        break
-
         return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data,
-                'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict,
-                'radiology_lab_timing': radiology_lab_timing, 'radiology_lab_timing_data': radiology_lab_timing_data,
-                'radiology_next_lab_timing_dict': radiology_next_lab_timing_dict,
-                'radiology_next_lab_timing_data_dict': radiology_next_lab_timing_data_dict
-                }
+                'next_lab_timing_dict': next_lab_timing_dict,
+                'next_lab_timing_data_dict': next_lab_timing_data_dict}
 
     def get_ratings(self):
         return self.rating.all()

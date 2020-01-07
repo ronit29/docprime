@@ -1885,13 +1885,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict['next_lab_timing_dict'], \
                                                               lab_timing_temp_dict['next_lab_timing_data_dict']
 
-            radiology_lab_timing, radiology_lab_timing_data = lab_timing_temp_dict['radiology_lab_timing'], \
-                                                              lab_timing_temp_dict['radiology_lab_timing_data']
-            radiology_next_lab_timing_dict, radiology_next_lab_timing_data_dict = lab_timing_temp_dict[
-                                                                                  'radiology_next_lab_timing_dict'], \
-                                                                                  lab_timing_temp_dict[
-                                                                                  'radiology_next_lab_timing_data_dict']
-
             if lab_obj.home_collection_charges.exists():
                 row["distance_related_charges"] = 1
             else:
@@ -1905,10 +1898,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["lab_timing_data"] = lab_timing_data
             row["next_lab_timing"] = next_lab_timing_dict
             row["next_lab_timing_data"] = next_lab_timing_data_dict
-            row["radiology_lab_timing"] = radiology_lab_timing
-            row["radiology_lab_timing_data"] = radiology_lab_timing_data
-            row["radiology_next_lab_timing"] = radiology_next_lab_timing_dict
-            row["radiology_next_lab_timing_data"] = radiology_next_lab_timing_data_dict
             row["tests"] = tests.get(row["id"])
             row["city"] = lab_obj.city
             row["certifications"] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in lab_obj.lab_certificate.all() if data.certification]
@@ -1951,7 +1940,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         res['insurance']['is_insurance_covered'] = True
                 elif res['is_insurance_enabled'] and not all_tests_under_lab:
                     res['insurance']['is_insurance_covered'] = True
-
 
                 # For Vip. Checking the eligibility of test to be booked under VIP.
                 engine_response = {}
