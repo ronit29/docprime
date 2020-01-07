@@ -956,8 +956,11 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
     def activate_care_membership(self):
         from ondoc.subscription_plan.models import Plan, UserPlanMapping
 
-        if UserPlanMapping.objects.filter(user=self.user).exists():
-            return
+        active_care_obj = UserPlanMapping.objects.filter(user=self.user, is_active=True).order('-id').first()
+
+        if active_care_obj:
+            active_care_obj.is_active = False
+            active_care_obj.save()
 
         plan = Plan.objects.filter(id=settings.CARE_PLAN_FOR_VIP).first()
         if not plan:
