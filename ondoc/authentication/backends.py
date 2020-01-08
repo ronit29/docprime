@@ -96,7 +96,8 @@ class JWTAuthentication(authentication.BaseAuthentication):
                             (request.META.get("HTTP_APP_NAME") == 'docprime_consumer_app' and parse(
                                 request.META.get('HTTP_APP_VERSION')) > parse('2.7.2')) or \
                             (request.META.get("HTTP_APP_NAME") == "doc_prime_partner" and
-                             (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15') or
+                             (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15' and request.META.get(
+                                  'HTTP_PLATFORM') == 'android') or
                               (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.200.11') and request.META.get(
                                   'HTTP_PLATFORM') == 'ios')
                              )
@@ -177,9 +178,11 @@ class JWTAuthentication(authentication.BaseAuthentication):
         user_key = UserSecretKey.objects.get_or_create(user=user)
         if request and (('HTTP_APP_VERSION' not in request.META) or
                         (request.META.get("HTTP_APP_NAME")== 'docprime_consumer_app' and parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2')) or \
-                        (request.META.get("HTTP_APP_NAME")== "doc_prime_partner" and
-                         (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15') or
-                          (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.200.11') and request.META.get('HTTP_PLATFORM') == 'ios')
+                        (request.META.get("HTTP_APP_NAME") == "doc_prime_partner" and
+                         (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15' and request.META.get(
+                             'HTTP_PLATFORM') == 'android') or
+                          (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.200.11') and request.META.get(
+                              'HTTP_PLATFORM') == 'ios')
                          )
                         )
         ):
