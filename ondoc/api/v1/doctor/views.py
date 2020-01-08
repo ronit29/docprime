@@ -1669,8 +1669,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                         context={'entity_dict': ipd_entity_dict,
                                                                                  'request': request})
 
-        top_hospitals_data = []
-        # top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
         categories = []
         # need_to_hit_query = True
