@@ -1467,10 +1467,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         convert_cod_to_prepaid = False
         pg_response_amount = response.get('txAmount', None)
         if pg_response_amount:
-            pg_response_amount = int(pg_response_amount)
+            pg_response_amount = float(pg_response_amount)
         else:
-            pg_response_amount = 0
-        if int(order_obj.amount) != pg_response_amount:
+            pg_response_amount = 0.0
+        if float(order_obj.amount) != pg_response_amount:
             raise Exception('amount mismatched for the transaction')
         try:
             # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
@@ -1610,9 +1610,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 amount = item.get('txAmount', None)
                 pg_response_amount = amount
                 if pg_response_amount:
-                    pg_response_amount = int(pg_response_amount)
+                    pg_response_amount = float(pg_response_amount)
                 else:
-                    pg_response_amount = 0
+                    pg_response_amount = 0.0
                 # log pg data
                 try:
                     args = {'order_id': order_id, 'status_code': pg_resp_code, 'source': response.get("source")}
@@ -1668,7 +1668,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                 order_obj = Order.objects.select_for_update().filter(pk=order_id).first()
                 convert_cod_to_prepaid = False
-                if int(order_obj.amount) != pg_response_amount:
+                if float(order_obj.amount) != pg_response_amount:
                     raise Exception('amount mismatched for the transaction')
                 try:
                     # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
