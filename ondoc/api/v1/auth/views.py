@@ -1696,6 +1696,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             virtual_response = copy.deepcopy(response)
                             del virtual_response['items']
                             virtual_response['orderId'] = item['orderId']
+                            virtual_response['txAmount'] = item['txAmount']
 
                         resp_serializer = serializers.TransactionSerializer(data=virtual_response)
                         if resp_serializer.is_valid():
