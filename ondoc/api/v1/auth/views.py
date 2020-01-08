@@ -1793,8 +1793,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['order_id'] = order_obj.id
         data['reference_id'] = order_obj.reference_id
         data['type'] = PgTransaction.CREDIT
-        data['amount'] = order_obj.amount
-
+        # data['amount'] = order_obj.amount
+        data['amount'] = response.get('txAmount')
         data['payment_mode'] = format_return_value(response.get('paymentMode'))
         data['response_code'] = response.get('responseCode')
         data['bank_id'] = format_return_value(response.get('bankTxId'))
