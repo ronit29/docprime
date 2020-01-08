@@ -831,9 +831,12 @@ class LabAppointmentForm(RefundableAppointmentForm):
         # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
         #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
-            date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
-            dt_field = parse_datetime(date_time_field)
-            time_slot_start = make_aware(dt_field)
+            if self.request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+                raise forms.ValidationError("You cannot change appointment date time.")
+            else:
+                date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
+                dt_field = parse_datetime(date_time_field)
+                time_slot_start = make_aware(dt_field)
         else:
             raise forms.ValidationError("Enter valid start date and time.")
         if time_slot_start:
@@ -1160,6 +1163,10 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CompareVersionAdmin):
 
         if obj and obj.status is not LabAppointment.CREATED:
             read_only = read_only + ['status_change_comments']
+
+        if request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+            read_only = read_only + ['status', 'status_change_comments']
+
         return read_only
 
     def refund_initiated(self, obj):
@@ -1488,9 +1495,12 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         all_parent_categories = []
         count_is_primary = 0
         for value in self.cleaned_data:
-            if value and not value.get("DELETE"):
-                all_parent_categories.append(value.get('parent_category'))
-                if value.get('is_primary', False):
+            if value:
+                if not value.get("DELETE"):
+                    all_parent_categories.append(value.get('parent_category'))
+                    if value.get('is_primary', False):
+                        count_is_primary += 1
+                else:
                     count_is_primary += 1
         # If lab test is a package its parent can only be package category.
         if self.instance.is_package:
@@ -1550,11 +1560,11 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('min_age cannot be more than max_age')
         else:
             if cleaned_data.get('min_age'):
-                raise forms.ValidationError('Please dont enter min_age')
+                raise forms.ValidationError('Please do not enter min_age')
             if cleaned_data.get('max_age'):
-                raise forms.ValidationError('Please dont enter max_age')
+                raise forms.ValidationError('Please do not enter max_age')
             if cleaned_data.get('gender_type'):
-                raise forms.ValidationError('Please dont enter gender_type')
+                raise forms.ValidationError('Please do not enter gender_type')
             # if cleaned_data.get('reference_code'):
             #     raise forms.ValidationError('Please dont enter reference code for a test')
 

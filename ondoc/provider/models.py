@@ -157,7 +157,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel, Tr
 
     def send_sms_link(self, patient, patient_number):
         from ondoc.authentication.backends import JWTAuthentication
-        from ondoc.communications.models import  SMSNotification, NotificationAction
+        from ondoc.communications.models import SMSNotification, NotificationAction
 
         link = None
 

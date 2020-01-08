@@ -4,6 +4,7 @@ from ondoc.diagnostic.models import LabTestCategory
 from ondoc.doctor.models import OpdAppointmentProcedureMapping, CommonHospital
 from ondoc.procedure.models import Procedure, DoctorClinicProcedure, ProcedureToCategoryMapping, \
     CommonProcedureCategory, CommonProcedure, CommonIpdProcedure
+import newrelic.agent
 
 
 class ProcedureSerializer(serializers.ModelSerializer):
@@ -101,7 +102,7 @@ class CommonProcedureSerializer(serializers.ModelSerializer):
         model = CommonProcedure
         fields = ['id', 'name']
 
-
+@newrelic.agent.function_trace()
 class CommonIpdProcedureSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='ipd_procedure.id')
     name = serializers.ReadOnlyField(source='ipd_procedure.name')

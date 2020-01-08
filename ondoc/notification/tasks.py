@@ -965,10 +965,12 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
     except Exception as e:
         logger.error(str(e))
 
+
 @task()
 def send_lab_reports(appointment_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.communications.models import LabNotification
+    from ondoc.matrix.tasks import create_prescription_lead_to_matrix
     try:
         instance = LabAppointment.objects.filter(id=appointment_id).first()
         if not instance:
@@ -976,8 +978,13 @@ def send_lab_reports(appointment_id):
         lab_notification = LabNotification(instance, NotificationAction.LAB_REPORT_SEND_VIA_CRM)
         is_valid_for_provider = True
         lab_notification.send(is_valid_for_provider)
+        try:
+            create_prescription_lead_to_matrix.apply_async(({'appointment_id': instance.id},), countdown=1)
+        except Exception as e:
+            logger.error(str(e))
     except Exception as e:
         logger.error(str(e))
+
 
 @task()
 def upload_doctor_data(obj_id):

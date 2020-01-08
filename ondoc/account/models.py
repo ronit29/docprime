@@ -239,8 +239,10 @@ class Order(TimeStampedModel):
         from ondoc.plus.models import PlusAppointmentMapping, TempPlusUser
 
         appointment_data = self.action_data
-        consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
+        # consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
+        # consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
+        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
 
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         cod_to_prepaid_app = None
@@ -268,6 +270,8 @@ class Order(TimeStampedModel):
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
             if appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -288,7 +292,9 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
-            elif appointment_data['payment_type'] == OpdAppointment.VIP:
+            elif appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -722,7 +728,7 @@ class Order(TimeStampedModel):
         process_immediately = False
         if total_balance >= payable_amount:
             cashback_amount = min(cashback_balance, payable_amount)
-            wallet_amount = max(0, payable_amount - cashback_amount)
+            wallet_amount = max(0, int(payable_amount) - int(cashback_amount))
             pg_order = cls.objects.create(
                 amount= 0,
                 wallet_amount= wallet_amount,
@@ -1852,10 +1858,14 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                 cashback_txn = True
             elif ref_txn_obj.action == ConsumerTransaction.SALE and ref_txn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
                 cashback_txn = True
-            if ref_txn_obj.ref_txns:
+            if ref_txn_obj.ref_txns or ref_txn_obj.action == ConsumerTransaction.PAYMENT:
                 ref_refund_amount = min(decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0)), refund_amount)
                 refund_amount -= ref_refund_amount
-                ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, False, 1, 0, reference_id)
+                if ref_txn_obj.action == ConsumerTransaction.PAYMENT:
+                    ref_txn_obj.balance += ref_refund_amount
+                    ctx_obj = ref_txn_obj.debit_from_balance(consumer_account, reference_id)
+                else:
+                    ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, False, 1, 0, reference_id)
             else:
                 ref_refund_amount = refund_amount
                 if not cashback_txn and ref_refund_amount:
