@@ -3014,6 +3014,15 @@ class LabAppointmentView(mixins.CreateModelMixin,
         else:
             return False
 
+    def retrieve_detail(self, request, pk=None):
+        user = request.user
+        queryset = LabAppointment.objects.filter(pk=pk)[0]
+        if queryset:
+            serializer = serializers.LabAppointmentRetrieveSerializer(queryset, context={'request': request})
+            return Response(serializer.data)
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
 
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
