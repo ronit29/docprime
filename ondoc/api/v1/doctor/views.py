@@ -101,6 +101,7 @@ from packaging.version import parse
 from django.http import HttpResponse, HttpResponseRedirect
 from geopy.geocoders import Nominatim
 from django.shortcuts import render
+import newrelic.agent
 
 geolocator = Nominatim()
 
@@ -837,7 +838,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
             resp_data['is_provider_signup_lead'] = True
         else:
             resp_data['is_provider_signup_lead'] = False
-
+        resp_data['user_id'] = request.user.id
         return Response(resp_data)
 
     def licence_update(self, request):
@@ -1609,6 +1610,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     @use_slave
+    @newrelic.agent.function_trace()
     def common_conditions(self, request):
         city = None
         serializer = CommonConditionsSerializer(data=request.query_params)

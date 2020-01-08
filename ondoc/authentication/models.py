@@ -358,7 +358,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return inactive_plus_user if inactive_plus_user else None
 
     @classmethod
-    def get_external_login_data(cls, data):
+    def get_external_login_data(cls, data, request=None):
         from ondoc.authentication.backends import JWTAuthentication
         profile_data = {}
         source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
@@ -418,7 +418,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             profile_data.pop('hospital', None)
             UserProfile.objects.create(**profile_data)
 
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
         result = dict()
         result['token'] = token_object
         result['user_id'] = user.id
@@ -1460,8 +1460,12 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
         ).distinct('user')
         admin_users = []
         for admin in admins:
-            if admin.user:
-                admin_users.append(admin.user)
+            try:
+                if admin.user:
+                    admin_users.append(admin.user)
+            except Exception as e:
+                continue
+                # pass
         return admin_users
 
     @staticmethod
@@ -2413,3 +2417,12 @@ class GenericQuestionAnswer(TimeStampedModel):
 
     class Meta:
         db_table = "generic_question_answer"
+
+
+class WhiteListedLoginTokens(TimeStampedModel):
+
+    token = models.CharField(max_length=180)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'whitelisted_login_tokens'

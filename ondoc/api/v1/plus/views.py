@@ -269,8 +269,19 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 payment_status=account_models.Order.PAYMENT_PENDING,
                 # visitor_info=visitor_info
             )
-            resp["status"] = 1
-            resp['data'], resp["payment_required"] = payment_details(request, order)
+            if payable_amount > 0:
+                resp["status"] = 1
+                resp['data'], resp["payment_required"] = payment_details(request, order)
+            else:
+                plus_object, wallet_amount, cashback_amount = order.process_order()
+                resp["status"] = 1
+                resp["payment_required"] = False
+                resp["data"] = {'id': plus_object.id}
+                resp["data"] = {
+                    "orderId": order.id,
+                    "type": "plus_membership",
+                    "id": plus_object.id if plus_object else None
+                }
             # else:
             #     wallet_amount = amount
             #
