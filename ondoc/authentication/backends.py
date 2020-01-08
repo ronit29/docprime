@@ -92,7 +92,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         user_id, is_agent = JWTAuthentication.get_unverified_user(token)
 
         if user_id:
-            if not is_agent and (('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse(
+            if not is_agent and request and (('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse(
                     '2.7.2') or \
                     (request.META.get("HTTP_APP_NAME") == "doc_prime_partner" and
                      (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15') or
