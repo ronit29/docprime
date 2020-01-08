@@ -1465,6 +1465,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
         convert_cod_to_prepaid = False
+        if int(order_obj.amount) != int(response.get('txAmount')):
+            raise Exception('amount mismatched for the transaction')
         try:
             # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
             if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(
@@ -1656,6 +1658,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                 order_obj = Order.objects.select_for_update().filter(pk=order_id).first()
                 convert_cod_to_prepaid = False
+                if int(order_obj.amount) != int(response.get('txAmount')):
+                    raise Exception('amount mismatched for the transaction')
                 try:
                     # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
                     if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(amount):
