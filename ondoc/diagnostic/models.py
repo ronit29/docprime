@@ -2747,7 +2747,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             else:
                 effective_price = effective_price
 
-            effective_price += vip_convenience_amount
+            if vip_convenience_amount:
+                effective_price += vip_convenience_amount
             # coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, effective_price)
 

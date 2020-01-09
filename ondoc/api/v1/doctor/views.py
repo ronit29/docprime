@@ -7,7 +7,7 @@ from django.contrib.gis.measure import D
 
 from config.settings.db_router import DatabaseInfo
 from ondoc.account.models import Order, ConsumerAccount, PgTransaction
-from ondoc.api.v1.auth.serializers import UserProfileSerializer
+# from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
     OfflinePatientSerializer, CommonConditionsSerializer, RecordSerializer
