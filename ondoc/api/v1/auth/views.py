@@ -1474,7 +1474,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         try:
             if float(order_obj.amount) != pg_response_amount:
                 send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                return ERROR_REDIRECT_URL
+                return REDIRECT_URL
         except Exception as e:
             logger.error("Error in sending pg acknowledge - after transaction amount mismatch " + str(e))
 
@@ -1678,7 +1678,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 try:
                     if float(order_obj.amount) != pg_response_amount:
                         send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
-                        return ERROR_REDIRECT_URL
+                        return REDIRECT_URL
                 except Exception as e:
                     logger.error("Error in sending pg acknowledge - after transaction amount mismatch" + str(e))
 
