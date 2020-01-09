@@ -1699,6 +1699,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             virtual_response['txAmount'] = item['txAmount']
 
                         resp_serializer = serializers.TransactionSerializer(data=virtual_response)
+                        virtual_response.pop('txAmount', None)
                         if resp_serializer.is_valid():
                             response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                             # For Testing
