@@ -1472,11 +1472,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
             pg_response_amount = 0.0
 
         try:
-            with transaction.atomic():
-                if float(order_obj.amount) != pg_response_amount:
-                    raise Exception('amount mismatched for the transaction ')
+            if float(order_obj.amount) != pg_response_amount:
+                send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                return ERROR_REDIRECT_URL
         except Exception as e:
-            logger.error("amount mismatched for the transaction - " + str(e))
+            logger.error("Error in sending pg acknowledge - after transaction amount mismatch " + str(e))
 
         try:
             # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
@@ -1674,12 +1674,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                 order_obj = Order.objects.select_for_update().filter(pk=order_id).first()
                 convert_cod_to_prepaid = False
+
                 try:
-                    with transaction.atomic():
-                        if float(order_obj.amount) != pg_response_amount:
-                            raise Exception('amount mismatched for the transaction ')
+                    if float(order_obj.amount) != pg_response_amount:
+                        send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
+                        return ERROR_REDIRECT_URL
                 except Exception as e:
-                        logger.error("amount mismatched for the transaction - " + str(e))
+                    logger.error("Error in sending pg acknowledge - " + str(e))
+
                 try:
                     # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
                     if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(amount):
