@@ -1472,8 +1472,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
             pg_response_amount = 0.0
 
         try:
-            if float(order_obj.amount) != pg_response_amount:
-                raise Exception('amount mismatched for the transaction ')
+            with transaction.atomic():
+                if float(order_obj.amount) != pg_response_amount:
+                    raise Exception('amount mismatched for the transaction ')
         except Exception as e:
             logger.error("amount mismatched for the transaction - " + str(e))
 
@@ -1674,8 +1675,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 order_obj = Order.objects.select_for_update().filter(pk=order_id).first()
                 convert_cod_to_prepaid = False
                 try:
-                    if float(order_obj.amount) != pg_response_amount:
-                        raise Exception('amount mismatched for the transaction ')
+                    with transaction.atomic():
+                        if float(order_obj.amount) != pg_response_amount:
+                            raise Exception('amount mismatched for the transaction ')
                 except Exception as e:
                         logger.error("amount mismatched for the transaction - " + str(e))
                 try:
