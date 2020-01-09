@@ -1474,8 +1474,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
         try:
             if float(order_obj.amount) != pg_response_amount:
                 raise Exception('amount mismatched for the transaction ')
-        except:
-            logger.error("amount mismatched for the transaction")
+        except Exception as e:
+            logger.error("amount mismatched for the transaction - " + str(e))
 
         try:
             # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
@@ -1676,8 +1676,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 try:
                     if float(order_obj.amount) != pg_response_amount:
                         raise Exception('amount mismatched for the transaction ')
-                except:
-                    logger.error("amount mismatched for the transaction")
+                except Exception as e:
+                        logger.error("amount mismatched for the transaction - " + str(e))
                 try:
                     # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
                     if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(amount):
