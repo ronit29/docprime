@@ -284,6 +284,19 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             "random_coupon_list": random_coupon_list
         }
 
+    @classmethod
+    def get_gold_plan(cls):
+        plus_plans = cls.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(
+            is_gold=True)
+        plan = None
+        for plan in plus_plans:
+            if plan.is_selected:
+                plan = plan
+                break
+        if not plan:
+            plan = plus_plans.first()
+        return plan
+
     class Meta:
         db_table = 'plus_plans'
         # unique_together = (('is_selected', 'is_gold'), )
