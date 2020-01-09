@@ -1699,7 +1699,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             virtual_response['txAmount'] = item['txAmount']
 
                         resp_serializer = serializers.TransactionSerializer(data=virtual_response)
-                        virtual_response.pop('txAmount', None)
+
                         if resp_serializer.is_valid():
                             response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                             # For Testing
@@ -1730,6 +1730,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                                 virtual_response['items'] = stringify_item
                                 del virtual_response['orderId']
+                                virtual_response.pop('txAmount', None)
 
                                 if PgTransaction.is_valid_hash(virtual_response, product_id=order_obj.product_id):
                                     pg_tx_queryset = None
