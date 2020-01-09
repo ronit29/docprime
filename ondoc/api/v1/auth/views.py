@@ -1680,7 +1680,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
                         return ERROR_REDIRECT_URL
                 except Exception as e:
-                    logger.error("Error in sending pg acknowledge - " + str(e))
+                    logger.error("Error in sending pg acknowledge - after transaction amount mismatch" + str(e))
 
                 try:
                     # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
