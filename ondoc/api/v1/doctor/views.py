@@ -7,7 +7,7 @@ from django.contrib.gis.measure import D
 
 from config.settings.db_router import DatabaseInfo
 from ondoc.account.models import Order, ConsumerAccount, PgTransaction
-from ondoc.api.v1.auth.serializers import UserProfileSerializer
+# from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
     OfflinePatientSerializer, CommonConditionsSerializer, RecordSerializer
@@ -472,8 +472,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data['cover_under_vip']:
                 if plus_user.plan.is_gold:
                     data['payment_type'] = OpdAppointment.GOLD
+                    data['is_gold_member'] = True
                 else:
                     data['payment_type'] = OpdAppointment.VIP
+                    data['is_gold_member'] = False
                 validated_data['payment_type'] = data['payment_type']
             else:
                 validated_data['payment_type'] = validated_data.get('payment_type')
