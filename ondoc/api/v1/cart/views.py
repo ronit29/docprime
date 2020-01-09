@@ -21,8 +21,10 @@ from ondoc.insurance.models import InsuranceDoctorSpecializations, UserInsurance
 from ondoc.subscription_plan.models import UserPlanMapping
 from ondoc.doctor.models import OpdAppointment
 
+# Cart view.
 class CartViewSet(viewsets.GenericViewSet):
 
+    # Api for add items to cart.
     def add(self, request, *args, **kwargs):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.insurance.models import UserInsurance
@@ -154,6 +156,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
         return Response({"status": 1, "message": "Saved in cart"}, status.HTTP_200_OK)
 
+    # update plan for Care product.
     @staticmethod
     def update_plan_details(request, serialized_data, valid_data):
         from ondoc.doctor.models import OpdAppointment
@@ -181,6 +184,7 @@ class CartViewSet(viewsets.GenericViewSet):
             if payment_type == OpdAppointment.PLAN and valid_data.get('data')['included_in_user_plan'] == False:
                 valid_data.get('data')['payment_type'] = OpdAppointment.PREPAID
 
+    # Api for list of items in the cart.
     @transaction.non_atomic_requests()
     def list(self, request, *args, **kwargs):
         from ondoc.insurance.models import UserInsurance
@@ -358,6 +362,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
         return Response({"cart_items" : items, "status": 1})
 
+    # process cart for purchase.
     def process(self, request, *args, **kwargs):
 
         user = request.user
@@ -419,7 +424,7 @@ class CartViewSet(viewsets.GenericViewSet):
             error = {"code": "invalid", "message": error}
             return Response(status=400, data={"request_errors": error})
 
-
+    # remove item from the cart.
     def remove(self, request, *args, **kwargs):
         user = request.user
         if not user.is_authenticated:

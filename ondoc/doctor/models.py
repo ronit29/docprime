@@ -97,6 +97,7 @@ import newrelic.agent
 logger = logging.getLogger(__name__)
 
 
+# get doctor mobile otp validity.
 def doctor_mobile_otp_validity():
     return timezone.now() + timezone.timedelta(hours=2)
 
@@ -293,6 +294,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         return self.city
     #     return None
 
+    # Get all cities.
     def get_all_cities(self):
         result = []
         q = MatrixMappedCity.objects.prefetch_related('state').all().order_by('name')
@@ -303,6 +305,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         result.extend([{'id': x.id, 'name': x.name, 'state': x.state.name if x.state else None} for x in q])
         return result
 
+    # get top hospital data
     @staticmethod
     def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
@@ -450,7 +453,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         #                                                                                  'new_dynamic_dict': new_dynamic_dict}).data
 
 
-
+    # update hospital google avg rating.
     @classmethod
     def update_hosp_google_avg_rating(cls):
         update_hosp_google_ratings = RawSql('''update hospital h set google_avg_rating = (select (reviews->>'user_avg_rating')::float from hospital_place_details 
@@ -459,6 +462,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         update_hosp_google_ratings_count = RawSql(''' update hospital h set google_ratings_count = (select (reviews->>'user_ratings_total')::int from hospital_place_details 
                                                  where hospital_id=h.id limit 1)''', []).execute()
 
+    # get active opd appointments of a user.
     def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
 
         appointments = OpdAppointment.objects.filter(hospital_id=self.id)\
@@ -482,6 +486,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #     return False
 
 
+    # get hospital and locality data
     @classmethod
     def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
         if not temp_hospital_ids:
@@ -511,6 +516,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hosp_entity_qs if x.sublocality_value and x.locality_value}
         return hosp_entity_dict, hosp_locality_entity_dict
 
+    # update hospital seo urls.
     @classmethod
     def update_hospital_seo_urls(cls):
 
