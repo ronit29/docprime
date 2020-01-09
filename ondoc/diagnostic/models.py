@@ -146,6 +146,7 @@ class LabPricingGroup(TimeStampedModel, CreatedByModel):
                     update(
                     computed_deal_price=F('computed_agreed_price'))
 
+
 class LabTestPricingGroup(LabPricingGroup):
 
     class Meta:
@@ -289,7 +290,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         # create lab search urls
         map_lab_search_urls.map_lab_search_urls()
 
-
     @cached_property
     def is_enabled_for_insurance(self):
         return self.is_insurance_enabled
@@ -313,24 +313,28 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                     )x '''
         update_insured_labs = RawSql(query, []).execute()
 
+    # Check lab or lab network is open for communication or not.
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
             return True
 
         return False
 
+    # Check lab or lab network is enable for VIP plans.
     def is_enabled_for_plus_plans(self):
         if (self.network and self.network.enabled_for_plus_plans) or (not self.network and self.enabled_for_plus_plans):
             return True
 
         return False
 
+    # Check if lab or lab network can accept appointment through ivr or not.
     def is_auto_ivr_enabled(self):
         if (self.network and self.network.auto_ivr_enabled) or (not self.network and self.auto_ivr_enabled):
             return True
 
         return False
 
+    # This method is use to get user insurance related data.
     @classmethod
     def get_insurance_details(cls, user, ins_threshold_amt=None):
 
@@ -357,6 +361,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         return resp
 
+    # This method is use to get user vip plan details.
     @classmethod
     def get_vip_details(cls, user, search_criteria_query=None):
 
@@ -404,6 +409,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         min_str = self.convert_min(min)
         return str(hour) + ":" + min_str + " " + am_pm
 
+    # To get formatted lab timing for lab listing page.
     def get_lab_timing(self, queryset):
         lab_timing = ''
         lab_timing_data = list()
@@ -454,6 +460,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
     # Lab.lab_timings_today = get_lab_timings_today
 
+    # Get lab timings for current and next day for lab listing page.
     def lab_timings_today_and_next(self, day_now=timezone.now().weekday()):
 
         lab_timing = ""
@@ -498,9 +505,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data,
             'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
 
+    # This method provides ratings of a lab.
     def get_ratings(self):
         return self.rating.all()
 
+    # To get lab logo.
     def get_thumbnail(self):
         all_documents = self.lab_documents.all()
         for document in all_documents:
@@ -509,6 +518,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         return None
         # return static('lab_images/lab_default.png')
 
+    # To get lab's full address.
     def get_lab_address(self):
         address = []
 
@@ -537,6 +547,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     def ad_str(self, string):
         return str(string).strip().replace(',', '')
 
+    # To change is_live status of a lab as per onboarding and qc status.
     def update_live_status(self):
 
         if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
@@ -547,12 +558,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
             self.is_live = False
 
+    # To check if we need to display rating or not.
     def display_rating_on_list(self):
         if self.rating_data and ((self.rating_data.get('rating_count') and self.rating_data['rating_count'] > 5) or \
                                  (self.rating_data.get('avg_rating') and self.rating_data['avg_rating'] > 4)):
             return True
         return False
 
+    # To create SEO urls
     def create_entity_url(self):
         if not self.is_live:
             return
@@ -638,6 +651,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     #     if push_to_matrix:
     #         push_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
     #                                                         ,), countdown=5)
+
+    # To get SPOC details for notifications.
     def get_managers_for_communication(self):
         result = []
         result.extend(list(self.labmanager_set.filter(contact_type__in=[LabManager.SPOC, LabManager.MANAGER])))
@@ -666,6 +681,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                      '''.format(cid)
             cursor.execute(query)
 
+    # To get lab available slots - Old
     def get_timing(self, is_home_pickup):
         from ondoc.api.v1.common import serializers as common_serializers
         date = datetime.datetime.today().strftime('%Y-%m-%d')
@@ -724,6 +740,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         res_data = {"time_slots": resp_list, "upcoming_slots": upcoming_slots, "is_thyrocare": False}
         return res_data
 
+    # To get pathology test available slots
     def get_timing_v2(self, is_home_pickup, total_leaves=None):
         is_thyrocare = False
         if not is_home_pickup and self.always_open:
@@ -745,6 +762,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         timing_response = {"time_slots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
         return timing_response
 
+    # To get time slots of radiology tests
     def get_radiology_timing(self, test, total_leaves=None):
         is_thyrocare = False
         lab_test_group_timing = []
@@ -767,7 +785,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         timing_response = {"time_slots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
         return timing_response
 
-
+    # Pathology available slots
     def get_available_slots(self, is_home_pickup, pincode, date):
         from ondoc.integrations.models import IntegratorTestMapping
         from ondoc.integrations import service
@@ -793,6 +811,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         return available_slots
 
+    # Radiology available slots
     def get_radiology_available_slots(self, test, is_home_pickup, pincode, date):
         from ondoc.integrations.models import IntegratorTestMapping
         from ondoc.integrations import service
@@ -818,6 +837,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         return available_slots
 
+    # To check if lab is integrated or not
     def is_integrated(self):
         from ondoc.integrations.models import IntegratorTestMapping
 
