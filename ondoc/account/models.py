@@ -52,6 +52,7 @@ class Order(TimeStampedModel):
     PROVIDER_ECONSULT_PAY = 8
     VIP_CREATE = 11
     GOLD_CREATE = 12
+    CORP_VIP_CREATE = 13
 
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
@@ -80,6 +81,7 @@ class Order(TimeStampedModel):
     PROVIDER_ECONSULT_PRODUCT_ID = 6
     VIP_PRODUCT_ID = 11
     GOLD_PRODUCT_ID = 8
+    CORP_VIP_PRODUCT_ID = 9
     PARTNER_LAB_ORDER_PRODUCT_ID = 13
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
                    (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),
@@ -118,19 +120,65 @@ class Order(TimeStampedModel):
             return None
         return plus_user
 
-    def get_insurance_data_for_pg(self):
+    def is_vip_appointment(self):
+        appt = self.getAppointment()
+        if appt.plus_plan and appt.plus_plan.plan and not appt.plus_plan.plan.is_gold:
+            return True
+        return False
+
+    def get_vip_amount_to_be_paid(self):
+        appt = self.getAppointment()
+        if self.product_id == self.LAB_PRODUCT_ID:
+            return appt.price
+        elif self.product_id == self.DOCTOR_PRODUCT_ID:
+            return appt.fees
+        else:
+            return (self.amount or 0) + (self.wallet_amount or 0)
+
+    # def get_insurance_data_for_pg(self):
+    #     from ondoc.insurance.models import UserInsurance
+    #
+    #     data = {}
+    #     user_insurance = None
+    #     if self.product_id == Order.INSURANCE_PRODUCT_ID:
+    #         user_insurance = UserInsurance.objects.filter(order=self).first()
+    #         if user_insurance:
+    #             data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+    #     elif (self.product_id in (self.DOCTOR_PRODUCT_ID,self.LAB_PRODUCT_ID)):
+    #         if not self.is_parent() and self.booked_using_insurance():
+    #         # if self.is_parent():
+    #         #     raise Exception('cannot get insurance for parent order')
+    #             appt = self.getAppointment()
+    #             if appt and appt.insurance:
+    #                 user_insurance = appt.insurance
+    #                 transactions = user_insurance.order.getTransactions()
+    #                 if not transactions:
+    #                     raise Exception('No transactions found for appointment insurance.')
+    #                 insurance_order_transaction = transactions[0]
+    #                 data['refOrderId'] = str(insurance_order_transaction.order_id)
+    #                 data['refOrderNo'] = str(insurance_order_transaction.order_no)
+    #                 #data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+    #                 #data['insurerCode'] = "advancePay"
+    #
+    #     return data
+
+    def get_additional_data_for_pg(self):
         from ondoc.insurance.models import UserInsurance
+        from ondoc.plus.models import PlusUser
 
         data = {}
         user_insurance = None
+        plus_user = None
         if self.product_id == Order.INSURANCE_PRODUCT_ID:
             user_insurance = UserInsurance.objects.filter(order=self).first()
             if user_insurance:
                 data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+        elif self.product_id in [Order.CORP_VIP_PRODUCT_ID]:
+            plus_user = PlusUser.objects.filter(order=self).first()
+            if plus_user:
+                data['insurerCode'] = "vipPurchase"
         elif (self.product_id in (self.DOCTOR_PRODUCT_ID,self.LAB_PRODUCT_ID)):
             if not self.is_parent() and self.booked_using_insurance():
-            # if self.is_parent():
-            #     raise Exception('cannot get insurance for parent order')
                 appt = self.getAppointment()
                 if appt and appt.insurance:
                     user_insurance = appt.insurance
@@ -140,8 +188,18 @@ class Order(TimeStampedModel):
                     insurance_order_transaction = transactions[0]
                     data['refOrderId'] = str(insurance_order_transaction.order_id)
                     data['refOrderNo'] = str(insurance_order_transaction.order_no)
-                    #data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
-                    #data['insurerCode'] = "advancePay"
+            if not self.is_parent() and self.booking_using_vip_plan():
+                appt = self.getAppointment()
+                if appt and appt.plus_plan:
+                    plus_user = appt.plus_plan
+                    transactions = plus_user.order.getTransactions()
+                    parent_product_id = self.CORP_VIP_PRODUCT_ID if appt.plus_plan.plan.is_corporate else self.VIP_PRODUCT_ID
+                    if not transactions:
+                        raise Exception("No transaction found for appointment vip")
+                    vip_order_transaction = transactions[0]
+                    data['refOrderId'] = str(vip_order_transaction.order_id)
+                    data['refOrderNo'] = str(vip_order_transaction.order_no)
+                    data['parentProductId'] = str(parent_product_id)
 
         return data
 
@@ -156,6 +214,14 @@ class Order(TimeStampedModel):
             raise Exception('Not implemented for parent orders')
         appt = self.getAppointment()
         if appt and hasattr(appt, 'insurance_id') and appt.insurance_id:
+            return True
+        return False
+
+    def booking_using_vip_plan(self):
+        if self.parent():
+            raise Exception("Not implemented for parent")
+        appt = self.getAppointment()
+        if appt and appt.plus_plan and appt.plus_plan.plan and not appt.plus_plan.plan.is_gold:
             return True
         return False
 
@@ -667,6 +733,10 @@ class Order(TimeStampedModel):
 
         if self.is_corporate_plus_plan():
             return 0
+
+        if self.is_vip_appointment():
+            total_price = self.get_vip_amount_to_be_paid()
+            return total_price
 
         if self.parent:
             raise Exception("Cannot calculate price on a child order")

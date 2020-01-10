@@ -346,10 +346,11 @@ def set_order_dummy_transaction(self, order_id, user_id):
             "Content-Type": "application/json"
         }
         url = settings.PG_DUMMY_TRANSACTION_URL
-        insurance_data = order_row.get_insurance_data_for_pg()
+        # insurance_data = order_row.get_insurance_data_for_pg()
+        additional_data = order_row.get_additional_data_for_pg()
 
         if appointment.__class__.__name__ in ['LabAppointment', 'OpdAppointment']:
-            if appointment.insurance and not order_row.is_parent() and not insurance_data:
+            if appointment.insurance and not order_row.is_parent() and not additional_data:
                 MerchantPayoutLog.create_log(None, "refOrderId, insurerCode and refOrderNo not found for order id {}".format(order_row.id))
                 raise Exception("refOrderId, insurerCode, refOrderNo details not found for order id {}".format(order_row.id))
 
@@ -376,8 +377,8 @@ def set_order_dummy_transaction(self, order_id, user_id):
             "buCallbackFailureUrl": ""
         }
 
-        req_data.update(insurance_data)
-
+        # req_data.update(insurance_data)
+        req_data.update(additional_data)
         for key in req_data:
             req_data[key] = str(req_data[key])
 

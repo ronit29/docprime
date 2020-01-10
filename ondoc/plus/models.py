@@ -1885,8 +1885,8 @@ class PlusUserUpload(auth_model.TimeStampedModel):
         visitor_info = None
 
         order = account_models.Order.objects.create(
-            product_id=account_models.Order.GOLD_PRODUCT_ID,
-            action=account_models.Order.GOLD_CREATE,
+            product_id=account_models.Order.CORP_VIP_PRODUCT_ID,
+            action=account_models.Order.CORP_VIP_CREATE,
             action_data=plus_user_data,
             amount=amount,
             cashback_amount=0,
