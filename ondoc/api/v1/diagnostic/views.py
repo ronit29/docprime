@@ -4101,6 +4101,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
         return discounted_price
 
+
 class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
 
     def category_landing_url(self, request):
@@ -4199,7 +4200,6 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
         else:
             city = MatrixMappedCity.objects.filter(name=city_name).first()
 
-
         ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, matrix_city=city, lead_source=lead_source)
         try:
             ipd_med_page_object.save()
@@ -4208,6 +4208,7 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
         except Exception as e:
             logger.error(str(e))
             return Response({'message': 'Lead is not created.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class AllMatrixCitiesViewSet(viewsets.GenericViewSet):
 
