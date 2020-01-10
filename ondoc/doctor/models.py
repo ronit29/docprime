@@ -92,6 +92,7 @@ from django.utils.functional import cached_property
 from ondoc.crm.constants import constants
 from django.utils.text import slugify
 from ondoc.plus import models as plus_model
+import newrelic.agent
 
 logger = logging.getLogger(__name__)
 
@@ -275,6 +276,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     search_url_locality_radius = models.FloatField(blank=True, null=True)
     search_url_sublocality_radius = models.FloatField( blank=True, null=True)
     google_ratings_count = models.PositiveIntegerField(null=True, blank=True)
+    enabled_for_gold = models.NullBooleanField()
 
     def __str__(self):
         return '{}-{}'.format(self.id, self.name)
@@ -302,29 +304,56 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     @staticmethod
-    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None, from_vip_page=False):
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
+        from numpy.distutils.fcompiler import str2bool
         result = []
+        query_params = request.query_params
+        try:
+            gold_request = str2bool(query_params.get('is_gold', 0))
+        except:
+            gold_request = 0
+
+        try:
+            vip_request = str2bool(query_params.get('is_vip', 0))
+        except:
+            vip_request = 0
+
         day = datetime.datetime.today().weekday()
-        common_hosp_queryset = CommonHospital.objects.all().prefetch_related('hospital', 'hospital__health_insurance_providers',
+        vip_user = None
+        common_hosp_queryset = CommonHospital.objects.prefetch_related('hospital', 'hospital__health_insurance_providers',
                                                                 'hospital__hospital_documents', 'hospital__imagehospital', 'hospital__network',
                                                                 'hospital__network__hospitalnetworkspeciality_set',
                                                                 'hospital__hospital_services', 'hospital__hosp_availability',
-                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set').order_by('priority')
+                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set')
 
-        if vip_user or from_vip_page:
+        if request.user.is_authenticated and not request.user.is_anonymous:
+            vip_user = request.user.active_plus_user
+
+        # if vip_user:
+        if gold_request:
+            common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_gold=True)
+        elif vip_request:
+            common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_plus_plans=True)
+        elif vip_user:
             common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
-        common_hosp_queryset = common_hosp_queryset[:20]
+
+        common_hosp_queryset = common_hosp_queryset.order_by('priority')[:20]
+        # common_hosp_queryset = common_hosp_queryset[:20]
 
         # common_hosp_percentage_dict = dict()
         # for data in common_hosp_queryset:
         #     common_hosp_percentage_dict[data.id] = data.percentage
 
-        plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True,
-                                                                                                          is_selected=True).first()
-        if not plan:
-            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+        plus_plans = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True)
+        selected_plus_plans = list(filter(lambda x: x.is_selected is True, plus_plans))
+        if selected_plus_plans:
+            plan = selected_plus_plans[0]
+        else:
+            plan = plus_plans.first()
+        # if not plan:
+        #     plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
         # if plan:
         #
@@ -590,7 +619,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         content_type = ContentType.objects.get_for_model(Hospital)
         if content_type:
             cid = content_type.id
-            query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
+            query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where rr.appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
             cursor.execute(query)
 
     @classmethod
@@ -1756,6 +1785,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     cod_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     insurance_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     custom_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
+    convenience_pricing = JSONField(null=True, blank=True)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
@@ -1765,6 +1795,19 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
 
     def is_enabled_for_cod(self):
         return self.doctor_clinic.is_enabled_for_cod()
+
+    def calculate_convenience_charge(self, plan):
+        if not plan:
+            plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+            if not plan:
+                plan = PlusPlans.objects.filter(is_gold=True).first()
+                if not plan:
+                    return 0
+
+        if not self.convenience_pricing:
+            return None
+
+        return self.convenience_pricing.get(str(plan.id), 0)
 
     def dct_cod_deal_price(self):
         if self.is_enabled_for_cod():
@@ -3499,7 +3542,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return None
 
     @classmethod
-    def get_price_details(cls, data):
+    def get_price_details(cls, data, plus_user=None):
+        import functools
 
         procedures = data.get('procedure_ids', [])
         selected_hospital = data.get('hospital')
@@ -3519,6 +3563,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
                 day=time_slot_start.weekday(), start__lte=data.get("start_time"),
                 end__gte=data.get("start_time")).first()
+
+        total_convenience_charge = None
+        if plus_user:
+            total_convenience_charge = doctor_clinic_timing.calculate_convenience_charge(plus_user.plan)
 
         effective_price = 0
         prepaid_deal_price = 0
@@ -3619,7 +3667,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list },
-            "prepaid_deal_price": prepaid_deal_price
+            "prepaid_deal_price": prepaid_deal_price,
+            "total_convenience_charge": total_convenience_charge
         }
 
     @classmethod
@@ -4359,6 +4408,7 @@ class CommonSpecialization(auth_model.TimeStampedModel):
         db_table = "common_specializations"
 
     @classmethod
+    @newrelic.agent.function_trace()
     def get_specializations(cls, count):
         specializations = cls.objects.select_related('specialization').all().order_by("-priority")[:count]
         return specializations

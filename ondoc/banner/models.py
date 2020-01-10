@@ -18,7 +18,7 @@ from ondoc.doctor.models import OpdAppointment
 from ondoc.notification.models import NotificationAction
 from django.contrib.postgres.fields import ArrayField
 from multiselectfield import MultiSelectField
-
+from ondoc.api.v1 import utils as v1_utils
 
 class SliderLocation(models.Model):
     name = models.CharField(max_length=1000, null=True, default='Home_Page')
@@ -130,6 +130,8 @@ class Banner(auth_model.TimeStampedModel):
                      (SPECIALIZATION, 'Specialization'), (CONDITION, 'Condition')]
     user_choices = [('logged_in', 'Logged In'), ('logged_out', 'Logged Out'), ('all', 'All')]
     insurance_choices = [('insured', 'Insured User'), ('non_insured', 'Non Insured'), ('all', 'All')]
+    vip_choices = [('vip', 'VIP User'), ('non_vip', 'Non VIP User'), ('all', 'All')]
+    gold_choices = [('gold', 'Gold User'), ('non_gold', 'Non Gold User'), ('all', 'All')]
     HOME_PAGE = 1
     DOCTOR_RESULT = 2
     LAB_RESULT = 3
@@ -158,9 +160,11 @@ class Banner(auth_model.TimeStampedModel):
     show_in_app = models.BooleanField(default=True)
     show_to_users = models.CharField(max_length=100, null=False, blank=False, choices=user_choices, default='all')
     insurance_check = models.CharField(max_length=100, null=False, blank=False, choices=insurance_choices, default='all')
+    vip_check = models.CharField(max_length=100, null=False, blank=False, choices=vip_choices, default='all')
+    gold_check = models.CharField(max_length=100, null=False, blank=False, choices=gold_choices, default='all')
     app_screen = models.CharField(max_length=1000, null=True, blank=True)
     app_params = JSONField(null=True, blank=True)
-
+    body = models.CharField(blank=True, null=True, max_length=200000)
 
     def __str__(self):
         return self.title
@@ -180,16 +184,22 @@ class Banner(auth_model.TimeStampedModel):
 
 
     @staticmethod
-    def get_all_banners(request, latitude=None, longitude=None, from_app=False):
-
-        queryset = Banner.objects.prefetch_related('banner_location','location').filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
+    def get_all_banners(request, latitude=None, longitude=None, from_app=False, queryset=None):
+        if not queryset:
+            queryset = Banner.objects.prefetch_related('banner_location','location').filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
         #queryset = Banner.objects.filter(enable=True)
         slider_locate = dict(Banner.slider_location)
         final_result = []
         user = request.user
         active_insurance = None
+        is_gold_user = False
+        is_vip_user = False
         if user and user.is_authenticated:
             active_insurance = user.active_insurance
+            active_plus_user = user.active_plus_user
+            if active_plus_user:
+                is_gold_user = True if (active_plus_user.plan and active_plus_user.plan.is_gold) else False
+                is_vip_user = not is_gold_user
         for data in queryset:
             locations = data.banner_location.all()
             append_banner=True
@@ -218,6 +228,18 @@ class Banner(auth_model.TimeStampedModel):
                 if data.insurance_check == 'insured' and not active_insurance:
                     append_banner = False
                 if data.insurance_check == 'non_insured' and active_insurance:
+                    append_banner = False
+
+            if append_banner and data.vip_check and data.vip_check != 'all':
+                if data.vip_check == 'vip' and not is_vip_user:
+                    append_banner = False
+                if data.vip_check == 'non_vip' and is_vip_user:
+                    append_banner = False
+
+            if append_banner and data.gold_check and data.gold_check != 'all':
+                if data.gold_check == 'gold' and not is_gold_user:
+                    append_banner = False
+                if data.gold_check == 'non_gold' and is_gold_user:
                     append_banner = False
 
             if append_banner:
@@ -264,6 +286,7 @@ class Banner(auth_model.TimeStampedModel):
 
                     resp['url_details'] = qd
                 resp['image'] = request.build_absolute_uri(data.image.url)
+                resp['body'] = data.body
 
                 final_result.append(resp)
 

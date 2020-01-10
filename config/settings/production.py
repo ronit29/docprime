@@ -30,11 +30,11 @@ EMAIL_BACKEND = 'ondoc.sendemail.backends.backend.MailgunEmailBackend'
 # https://docs.djangoproject.com/en/dev/topics/security/#ssl-https
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-seconds
 # TODO: set this to 60 seconds first and then to 518400 once you prove the former works
-#SECURE_HSTS_SECONDS = 60
+SECURE_HSTS_SECONDS = 360000
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-include-subdomains
-#SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-preload
-#SECURE_HSTS_PRELOAD = env.bool('DJANGO_SECURE_HSTS_PRELOAD', default=True)
+SECURE_HSTS_PRELOAD = True
 # https://docs.djangoproject.com/en/dev/ref/middleware/#x-content-type-options-nosniff
 SECURE_CONTENT_TYPE_NOSNIFF = env.bool('DJANGO_SECURE_CONTENT_TYPE_NOSNIFF', default=True)
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-browser-xss-filter
@@ -102,7 +102,7 @@ LOGGING = {
 }
 SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
-if env('ENABLE_SENTRY', default=False):
+if env.bool('ENABLE_SENTRY', default=False):
     LOGGING['disable_existing_loggers'] = True
     LOGGING['handlers']['sentry'] = {
         'level': 'ERROR',

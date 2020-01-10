@@ -245,7 +245,7 @@ class ChatUserViewSet(viewsets.GenericViewSet):
         consumer_account = ConsumerAccount.objects.get_or_create(user=user)
         wallet_balance = consumer_account[0].get_total_balance()
 
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
 
         response = {
             "token": token_object['token'],

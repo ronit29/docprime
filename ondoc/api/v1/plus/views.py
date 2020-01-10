@@ -196,6 +196,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                         user_profile = {"name": member.get('first_name') + " " + last_name, "email":
                             member.get('email'), "dob": member.get('dob'), "gender": member.get('gender')}
 
+            if not user_profile['dob']:
+                return Response({"message": "DOB for primary user is not updated"}, status=status.HTTP_400_BAD_REQUEST)
+
             utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
             utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
             utm_campaign = request.data.get('utm_spo_tags', {}).get('utm_campaign', None)
@@ -266,8 +269,19 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 payment_status=account_models.Order.PAYMENT_PENDING,
                 # visitor_info=visitor_info
             )
-            resp["status"] = 1
-            resp['data'], resp["payment_required"] = payment_details(request, order)
+            if payable_amount > 0:
+                resp["status"] = 1
+                resp['data'], resp["payment_required"] = payment_details(request, order)
+            else:
+                plus_object, wallet_amount, cashback_amount = order.process_order()
+                resp["status"] = 1
+                resp["payment_required"] = False
+                resp["data"] = {'id': plus_object.id}
+                resp["data"] = {
+                    "orderId": order.id,
+                    "type": "plus_membership",
+                    "id": plus_object.id if plus_object else None
+                }
             # else:
             #     wallet_amount = amount
             #

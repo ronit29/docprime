@@ -35,7 +35,7 @@ from django.contrib.contenttypes.models import ContentType
 import string
 import random
 import decimal
-
+from django.conf import settings
 from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
@@ -246,8 +246,11 @@ class Order(TimeStampedModel):
         from ondoc.plus.models import PlusAppointmentMapping, TempPlusUser
 
         appointment_data = self.action_data
-        consumer_account = ConsumerAccount.objects.get_or_create(user_id=appointment_data['user'])
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user_id=appointment_data['user'])
+        # consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
+        # consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
+        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+
 
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         cod_to_prepaid_app = None
@@ -275,6 +278,8 @@ class Order(TimeStampedModel):
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
             if appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -295,7 +300,9 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
-            elif appointment_data['payment_type'] == OpdAppointment.VIP:
+            elif appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -768,7 +775,7 @@ class Order(TimeStampedModel):
         process_immediately = False
         if total_balance >= payable_amount:
             cashback_amount = min(cashback_balance, payable_amount)
-            wallet_amount = max(0, payable_amount - cashback_amount)
+            wallet_amount = max(0, int(payable_amount) - int(cashback_amount))
             pg_order = cls.objects.create(
                 amount= 0,
                 wallet_amount= wallet_amount,
@@ -1634,9 +1641,12 @@ class ConsumerAccount(TimeStampedModel):
             parent_ref = True
 
             if ctx_sale_objs:
+                balance_refund = False
+                reference_id = txn_entity_obj.id
                 for ctx_sale_obj in ctx_sale_objs:
                     if ctx_sale_obj.ref_txns:
-                        ctx_objs.append(ctx_sale_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund))
+                        ctx_objs.append(ctx_sale_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund,
+                                                                        balance_refund, reference_id))
                     if ctx_sale_obj.balance and ctx_sale_obj.balance > 0:
                         if ctx_sale_obj.source == ConsumerTransaction.WALLET_SOURCE:
                             ctx_objs.append(ctx_sale_obj.debit_from_balance(self))
@@ -1651,9 +1661,10 @@ class ConsumerAccount(TimeStampedModel):
                 balance_refund = True
                 for old_txn_obj in old_txn_objs:
                     if old_txn_obj.ref_txns:
-                        ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund, balance_refund))
+                        ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund, balance_refund, old_txn_obj.reference_id))
                     if old_txn_obj.balance and old_txn_obj.balance > 0:
-                        if old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE:
+                        if old_txn_obj.action == ConsumerTransaction.PAYMENT or (
+                                old_txn_obj.action == ConsumerTransaction.SALE and old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE):
                             ctx_objs.append(old_txn_obj.debit_from_balance(self))
                     old_txn_obj.save()
             else:
@@ -1757,7 +1768,7 @@ class ConsumerAccount(TimeStampedModel):
             return
 
         consumer_account = cls.objects.select_for_update().get(user=user)
-        consumer_account.cashback += cashback_amount
+        consumer_account.cashback += int(cashback_amount)
         action = ConsumerTransaction.CASHBACK_CREDIT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = consumer_account.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_amount, action, tx_type)
@@ -1769,7 +1780,7 @@ class ConsumerAccount(TimeStampedModel):
         consumer_account = cls.objects.get_or_create(user=user)
         consumer_account = cls.objects.select_for_update().get(user=user)
 
-        consumer_account.cashback += cashback_amount
+        consumer_account.cashback += int(cashback_amount)
         action = ConsumerTransaction.REFERRAL_CREDIT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = consumer_account.consumer_tx_appointment_data(user, None, product_id, cashback_amount,
@@ -1876,7 +1887,8 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
             except Exception as e:
                 logger.error(str(e))
 
-    def debit_from_ref_txn(self, consumer_account, refund_amount=0, parent_ref=False, initiate_refund=1, balance_refund=0):
+    def debit_from_ref_txn(self, consumer_account, refund_amount=0, parent_ref=False, initiate_refund=1,
+                           balance_refund=0, reference_id=None):
         ctx_objs = []
         ref_txns = self.ref_txns
         # todo - use python filter here to avoid db call
@@ -1893,14 +1905,18 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                 cashback_txn = True
             elif ref_txn_obj.action == ConsumerTransaction.SALE and ref_txn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
                 cashback_txn = True
-            if ref_txn_obj.ref_txns:
+            if ref_txn_obj.ref_txns or ref_txn_obj.action == ConsumerTransaction.PAYMENT:
                 ref_refund_amount = min(decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0)), refund_amount)
                 refund_amount -= ref_refund_amount
-                ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount)
+                if ref_txn_obj.action == ConsumerTransaction.PAYMENT:
+                    ref_txn_obj.balance += ref_refund_amount
+                    ctx_obj = ref_txn_obj.debit_from_balance(consumer_account, reference_id)
+                else:
+                    ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, False, 1, 0, reference_id)
             else:
                 ref_refund_amount = refund_amount
                 if not cashback_txn and ref_refund_amount:
-                    ctx_obj = ref_txn_obj.debit_txn_refund(consumer_account, ref_refund_amount)
+                    ctx_obj = ref_txn_obj.debit_txn_refund(consumer_account, ref_refund_amount, reference_id)
                 else:
                    ctx_obj = None
             if self.balance and not cashback_txn and parent_ref and ref_refund_amount:
@@ -1925,19 +1941,19 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                         ctx_objs.append(ctx_obj)
 
             if ref_txn_obj.balance and ref_txn_obj.balance > 0 and not cashback_txn and not is_preauth_txn:
-                ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account))
+                ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account, reference_id))
         self.save()
 
         return ctx_objs
 
-    def debit_txn_refund(self, consumer_account, refund_amount):
+    def debit_txn_refund(self, consumer_account, refund_amount, reference_id=None):
         tx_obj = PgTransaction.objects.filter(order_id=self.order_id).order_by('-created_at').first()
         ctx_obj = None
         data = dict()
         data["user"] = self.user
         if tx_obj:
             data["product_id"] = tx_obj.product_id
-            # data["reference_id"] = txn_entity_obj.id
+            data["reference_id"] = reference_id
             data["transaction_id"] = tx_obj.transaction_id
             data["order_id"] = tx_obj.order_id if tx_obj else None
         if refund_amount:
@@ -1950,13 +1966,13 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
 
         return ctx_obj
 
-    def debit_from_balance(self, consumer_account):
+    def debit_from_balance(self, consumer_account, reference_id=None):
         ctx_objs = []
         if self.balance:
             pg_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.PAYMENT,
                                                             order_id=self.order_id).last()
             if pg_ctx_obj:
-                ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
+                ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance, reference_id)
                 if ctx_obj:
                     self.balance = 0
                     self.save()
@@ -1968,7 +1984,7 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                     pg_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.PAYMENT,
                                                                     order_id=cancel_ctx_obj.order_id).last()
                     if pg_ctx_obj:
-                        ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
+                        ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance, reference_id)
                         if ctx_obj:
                             self.balance = 0
                             self.save()
@@ -2920,8 +2936,8 @@ class PayoutMapping(TimeStampedModel):
 
 
 class UserReferrals(TimeStampedModel):
-    SIGNUP_CASHBACK = 50
-    COMPLETION_CASHBACK = 50
+    SIGNUP_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
+    COMPLETION_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
 
     code = models.CharField(max_length=10, unique=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True, related_name='referral')

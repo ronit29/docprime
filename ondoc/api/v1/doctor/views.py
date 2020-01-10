@@ -101,6 +101,7 @@ from packaging.version import parse
 from django.http import HttpResponse, HttpResponseRedirect
 from geopy.geocoders import Nominatim
 from django.shortcuts import render
+import newrelic.agent
 
 geolocator = Nominatim()
 
@@ -473,7 +474,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     data['payment_type'] = OpdAppointment.GOLD
                 else:
                     data['payment_type'] = OpdAppointment.VIP
-
+                validated_data['payment_type'] = data['payment_type']
+            else:
+                validated_data['payment_type'] = validated_data.get('payment_type')
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'], data['is_vip_member'], data['cover_under_vip'], \
@@ -833,7 +836,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
             resp_data['is_provider_signup_lead'] = True
         else:
             resp_data['is_provider_signup_lead'] = False
-
+        resp_data['user_id'] = request.user.id
         return Response(resp_data)
 
     def licence_update(self, request):
@@ -1605,6 +1608,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     @use_slave
+    @newrelic.agent.function_trace()
     def common_conditions(self, request):
         city = None
         serializer = CommonConditionsSerializer(data=request.query_params)
@@ -1696,12 +1700,15 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         serializer = CommonConditionsSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        vip_user = None
-        from_vip_page = True
+#        vip_user = None
+ #       from_vip_page = True
 
-        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-            vip_user = logged_in_user.active_plus_user
-        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'), vip_user, from_vip_page)
+#        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+#            vip_user = logged_in_user.active_plus_user
+#        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'), vip_user, from_vip_page)
+
+
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
         return Response({"top_hospitals": top_hospitals_data})
 
@@ -2033,10 +2040,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
             if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
                 breadcrumb.append({'title': validated_data.get('specialization') + ' in ' + validated_data.get('locality_value'), 'url': None})
-            elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
+            elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY' and validated_data.get('sublocality_value'):
                 breadcrumb.append({'title': validated_data.get('specialization') + ' in ' +
                                  validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
-            elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY':
+            elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY' and validated_data.get('sublocality_value'):
                 breadcrumb.append({'title': 'Doctors in ' + validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
             elif validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
                 breadcrumb.append({'title': 'Procedures', 'url': 'ipd-procedures'})
@@ -4622,6 +4629,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
     @use_slave
     def near_you_hospitals(self, request):
+        from numpy.distutils.fcompiler import str2bool
         return Response({})
         request_data = request.query_params
         serializer = serializers.HospitalNearYouSerializer(data=request_data)
@@ -4633,21 +4641,30 @@ class HospitalViewSet(viewsets.GenericViewSet):
             point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
             day = datetime.datetime.today().weekday()
+            gold_request = str2bool(request_data.get('gold', 0))
+            vip_request = validated_data.get('from_vip') or str2bool(request_data.get('vip', 0))
 
             hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors', 'hospital_documents', 'matrix_city',
                                                                   Prefetch('hospital_doctors__availability',
-                                                                  queryset=DoctorClinicTiming.objects.filter(day=day))).\
+                                                                           queryset=DoctorClinicTiming.objects.filter(day=day))). \
                 filter(enabled_for_online_booking=True,
                        hospital_doctors__enabled_for_online_booking=True,
                        hospital_doctors__doctor__enabled_for_online_booking=True,
                        hospital_doctors__doctor__is_live=True, is_live=True).annotate(
-                       bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
-                                                      hospital_doctors__enabled_for_online_booking=True,
-                                                      hospital_doctors__doctor__enabled_for_online_booking=True,
-                                                      hospital_doctors__doctor__is_live=True, is_live=True)),
-                                                      distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
+                bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True)),
+                distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
 
-            if validated_data.get('from_vip'):
+            # if validated_data.get('from_vip'):
+            #     hospital_queryset = hospital_queryset.filter(enabled_for_prepaid=True)
+
+            if gold_request:
+                hospital_queryset = hospital_queryset.filter(enabled_for_gold=True)
+            elif vip_request:
+                hospital_queryset = hospital_queryset.filter(enabled_for_plus_plans=True)
+            else:
                 hospital_queryset = hospital_queryset.filter(enabled_for_prepaid=True)
 
             result_count = hospital_queryset.count()
@@ -4657,7 +4674,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                                                               EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
 
             hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True, context={'request': request,
-                                                                                         'hosp_entity_dict': hosp_entity_dict})
+                                                                                                             'hosp_entity_dict': hosp_entity_dict})
             hospital_percentage_dict = dict()
 
             plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True, is_selected=True).first()

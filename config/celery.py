@@ -8,7 +8,7 @@ from django.conf import settings
 from raven.contrib.celery import register_signal, register_logger_signal
 from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary, \
     get_thyrocare_reports, elastic_alias_switch, add_net_revenue_for_merchant, \
-    purchase_order_creation_counter_automation, purchase_order_closing_counter_automation
+    purchase_order_creation_counter_automation, purchase_order_closing_counter_automation, update_convenience_charge
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, \
     update_search_score, \
@@ -31,19 +31,20 @@ if os.environ.get('DJANGO_SETTINGS_MODULE') == 'config.settings.local' or os.env
     app = celery.Celery(__name__)
 
 else:
-    app = celery.Celery(__name__)
-    # class Celery(celery.Celery):
+    if env.bool('ENABLE_SENTRY', default=False):
+        class Celery(celery.Celery):
 
-        # def on_configure(self):
-            # client = raven.Client(settings.SENTRY_DSN)
-            #
-            # # register a custom filter to filter out duplicate logs
-            # register_logger_signal(client)
-            #
-            # # hook into the Celery error handler
-            # register_signal(client)
+            def on_configure(self):
+                client = raven.Client(settings.SENTRY_DSN)
 
-    # app = Celery(__name__)
+                # register a custom filter to filter out duplicate logs
+                register_logger_signal(client)
+
+                # hook into the Celery error handler
+                register_signal(client)
+        app = Celery(__name__)
+    else:
+        app = celery.Celery(__name__)
 
 
 class Config():
@@ -114,3 +115,4 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=19, minute=30), calculate_percentage.s(), name='Calculate Percentage in Common Hospital')
     sender.add_periodic_task(crontab(minute="*/2"), send_ipd_email_notification.s(),name="Send IPD Email Notifications")
     sender.add_periodic_task(crontab(hour=18, minute=30), invalidate_plus_users.s(), name='Invalidate the plus users.')
+    sender.add_periodic_task(crontab(hour=18, minute=45), update_convenience_charge.s(), name='Update convenience charge.')
