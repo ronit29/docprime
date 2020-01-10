@@ -154,9 +154,18 @@ class UserNumberUpdateAdmin(admin.ModelAdmin):
 
 
 class UserProfileAdmin(admin.ModelAdmin):
+
     list_display = ('name', 'email',)
     search_fields = ['email', 'name']
     autocomplete_fields = ['user']
+
+    def save_model(self, request, obj, form, change):
+        is_superuser = request.user.is_superuser
+        if obj.is_gold_profile and not is_superuser:
+            return
+        elif obj.is_insured_profile and not is_superuser:
+            return
+        super().save_model(request, obj, form, change)
 
 
 class PermissionAdmin(admin.ModelAdmin):
