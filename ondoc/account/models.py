@@ -723,7 +723,7 @@ class Order(TimeStampedModel):
             return UserPlanMapping.objects.filter(id=self.reference_id).first()
         elif self.product_id == self.INSURANCE_PRODUCT_ID:
             return UserInsurance.objects.filter(id=self.reference_id).first()
-        elif self.product_id == self.VIP_PRODUCT_ID or self.product_id == self.GOLD_PRODUCT_ID:
+        elif self.product_id == self.VIP_PRODUCT_ID or self.product_id == self.GOLD_PRODUCT_ID or self.product_id == self.CORP_VIP_PRODUCT_ID:
             return PlusUser.objects.filter(id=self.reference_id).first()
         return None
 

@@ -1843,7 +1843,7 @@ class PlusUserUpload(auth_model.TimeStampedModel):
         transaction_date = datetime.datetime.now()
         plus_plan = data['plan_id']
         plan = PlusPlans.objects.filter(pk=plus_plan).first()
-        if not plan.is_corporate or plan.is_retail:
+        if not plan and not plan.is_corporate or plan.is_retail:
             raise Exception("Selected Plan is not belongs to Corporate or belongs to Retail plan, "
                             "Please select correct plan")
         members_count = len(excel_data)
