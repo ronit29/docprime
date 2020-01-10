@@ -233,6 +233,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
             resp['primary_member'] = primary_member
         return resp
 
+    def validate(self, attrs):
+        if self.instance:
+            if self.instance.is_gold_profile:
+                raise serializers.ValidationError("Gold Member Profile can not be editable.")
+            if self.instance.is_insured_profile:
+                raise serializers.ValidationError("Insured Member profile can not be editable.")
+        return attrs
+
     def get_is_insured(self, obj):
         if isinstance(obj, dict):
             return False
