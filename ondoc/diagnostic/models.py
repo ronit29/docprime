@@ -785,7 +785,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         timing_response = {"time_slots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
         return timing_response
 
-    # Pathology available slots
+    # Pathology test available slots
     def get_available_slots(self, is_home_pickup, pincode, date):
         from ondoc.integrations.models import IntegratorTestMapping
         from ondoc.integrations import service
@@ -811,7 +811,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         return available_slots
 
-    # Radiology available slots
+    # Radiology test available slots
     def get_radiology_available_slots(self, test, is_home_pickup, pincode, date):
         from ondoc.integrations.models import IntegratorTestMapping
         from ondoc.integrations import service
@@ -976,6 +976,7 @@ class LabBookingClosingManager(models.Manager):
     #
     #         return res_data
 
+    # To get time slots for lab - Not in use
     def lab_booking_slots(self, *args, **kwargs):
         is_home_pickup = kwargs.get("for_home_pickup", False)
 
@@ -1108,15 +1109,16 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     enabled_for_plus_plans = models.NullBooleanField()
     center_visit = models.NullBooleanField()
 
+    # Get all vip plus enabled lab networks
     @classmethod
     def get_plus_enabled(cls):
         return cls.objects.filter(enabled_for_plus_plans=True)
 
+    # Get all labs in the network - Not in use
     def all_associated_labs(self):
         if self.id:
             return self.lab_set.all()
         return None
-
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
@@ -1420,9 +1422,8 @@ class LabTest(TimeStampedModel, SearchKey):
         
         self.create_url(url)
 
-
+    # This method is use to add id in duplicate url
     def generate_url(self, url):
-
         duplicate_urls = EntityUrls.objects.filter(~Q(entity_id=self.id), url__iexact=url, sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER)
         if duplicate_urls.exists():
             url = url.rstrip(self.URL_SUFFIX)
@@ -1431,15 +1432,14 @@ class LabTest(TimeStampedModel, SearchKey):
 
         return url
 
-
+    # To create new entity urls
     def create_url(self, url):
-
         existings_urls = EntityUrls.objects.filter(url__iexact=url, \
-            sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, entity_id=self.id).all()
+                                                sitemap_identifier=LabTest.LAB_TEST_SITEMAP_IDENTIFIER, entity_id=self.id).all()
 
         if not existings_urls.exists():
             url_entry = EntityUrls.objects.create(url=url, entity_id=self.id, sitemap_identifier=self.LAB_TEST_SITEMAP_IDENTIFIER,\
-                is_valid=True, url_type='PAGEURL', entity_type='LabTest')
+                                                  is_valid=True, url_type='PAGEURL', entity_type='LabTest')
             EntityUrls.objects.filter(entity_id=self.id).filter(~Q(id=url_entry.id)).update(is_valid=False)
         else:
             if not existings_urls.filter(is_valid=True).exists():
@@ -1460,6 +1460,7 @@ class LabTest(TimeStampedModel, SearchKey):
 #     class Meta:
 #         db_table = "related_tests"
 
+    # Returns test related categories details
     def get_all_categories_detail(self):
         all_categories = self.categories.all()
         res = []
@@ -1471,7 +1472,6 @@ class LabTest(TimeStampedModel, SearchKey):
                 resp['icon'] = item.icon.url if item.icon and item.icon.url else None
                 res.append(resp)
         return res
-
 
 
 class QuestionAnswer(TimeStampedModel):
@@ -1527,9 +1527,11 @@ class AvailableLabTest(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.lab, self.test)
 
+    # Get lab test deal price
     def get_deal_price(self):
         return self.custom_deal_price if self.custom_deal_price else self.computed_deal_price
 
+    # Calculate convenience charge for a VIP plan
     def calculate_convenience_charge(self, plan):
         if not plan:
             plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
@@ -1543,6 +1545,7 @@ class AvailableLabTest(TimeStampedModel):
 
         return self.convenience_pricing.get(str(plan.id), 0)
 
+    # Deal Price update - test specific
     def update_deal_price(self):
         # will update only this available lab test prices and will be called on save
         query = '''update available_lab_test set computed_deal_price = (case when custom_deal_price is null then mrp else custom_deal_price end )::integer where id = %s'''
@@ -1574,6 +1577,7 @@ class AvailableLabTest(TimeStampedModel):
         # if deal_price:
         #    self.computed_deal_price = deepcopy(deal_price[0].get('computed_deal_price'))
 
+    # Deal Price update - all tests
     @classmethod
     def update_all_deal_price(cls):
         # will update all lab prices
@@ -1596,9 +1600,11 @@ class AvailableLabTest(TimeStampedModel):
 
         update_all_available_lab_test_deal_price = RawSql(query, []).execute()
 
+    # Get lab test id
     def get_testid(self):
         return self.test.id
 
+    # Get lab test type (Radiology or Pathology)
     def get_type(self):
         return self.test.test_type
 
@@ -1614,6 +1620,7 @@ class AvailableLabTest(TimeStampedModel):
     def app_commit_tasks(self):
         self.update_deal_price()
 
+    # This methodd is use to send emails to internal members when test prices change.
     def send_pricing_alert_email(self, responsible_user):
         from ondoc.communications.models import EMAILNotification
         try:
@@ -1625,6 +1632,7 @@ class AvailableLabTest(TimeStampedModel):
         except Exception as e:
             logger.error(str(e))
 
+    # This method is use to get computed deal price
     def get_computed_deal_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
             deal_percent = self.lab_pricing_group.radiology_deal_price_percentage if self.lab_pricing_group.radiology_deal_price_percentage else None
@@ -1645,6 +1653,7 @@ class AvailableLabTest(TimeStampedModel):
         else:
             return None
 
+    # This method is use to get computed agreed price
     def get_computed_agreed_price(self):
         if self.test.test_type == LabTest.RADIOLOGY:
             agreed_percent = self.lab_pricing_group.radiology_agreed_price_percentage if self.lab_pricing_group.radiology_agreed_price_percentage else None
@@ -1672,6 +1681,7 @@ class AvailableLabTest(TimeStampedModel):
 
 
 class LabAppointmentInvoiceMixin(object):
+    # Generate appointment invoice
     def generate_invoice(self, context=None):
         invoices = self.get_invoice_objects()
         if not invoices:
@@ -1777,6 +1787,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                   on_delete=models.DO_NOTHING)
     plus_plan_data = GenericRelation(PlusAppointmentMapping)
 
+    # Check appointment provider is thyrocare or not
     @cached_property
     def is_thyrocare(self):
         lab = self.lab
@@ -1788,12 +1799,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return False
 
+    # Get all uploaded prescriptions
     def get_all_uploaded_prescriptions(self, date=None):
         from ondoc.prescription.models import AppointmentPrescription
         qs = LabAppointment.objects.filter(user=self.user).values_list('id', flat=True)
         prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs).order_by('-id')
         return prescriptions
 
+    # Get corporate deal id from coupon used in appointment
     def get_corporate_deal_id(self):
         coupon = self.coupon.first()
         if coupon and coupon.corporate_deal:
@@ -1801,18 +1814,21 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return None
 
+    # Get city of the lab
     def get_city(self):
         if self.lab and self.lab.matrix_city:
             return self.lab.matrix_city.id
         else:
             return None
 
+    # Get state of the lab
     def get_state(self):
         if self.lab and self.lab.matrix_state:
             return self.lab.matrix_state.id
         else:
             return None
 
+    # Appointment analytics data.
     def get_booking_analytics_data(self):
         data = dict()
 
@@ -1842,9 +1858,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return data
 
-
+    # Sync analytics data with optimus
     def sync_with_booking_analytics(self):
-
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                           content_type=ContentType.objects.get_for_model(LabAppointment),
@@ -1890,6 +1905,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #
         # return obj
 
+    # Get booked tests price data
     def get_tests_and_prices(self):
         test_price = []
         if self.payment_type == OpdAppointment.INSURANCE:
@@ -1915,9 +1931,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return test_price
 
+    # This method returns invoice object.
     def get_invoice_objects(self):
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.LAB_PRODUCT_ID)
 
+    # Get url of invoice
     def get_invoice_urls(self):
         invoices_urls = []
         if self.id:
@@ -1927,6 +1945,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
 
+    # This method returns all cancellation reasons list
     def get_cancellation_reason(self):
         return CancellationReason.objects.filter(Q(type=Order.LAB_PRODUCT_ID) | Q(type__isnull=True),
                                                  visible_on_front_end=True)
@@ -1936,6 +1955,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     #     appointment = diagnostic_serializers.LabAppointmentUpcoming(response_appointment, many=True)
     #     return appointment.data
 
+    # Get upcoming lab appointments of a user
     @classmethod
     def get_upcoming_appointment(cls, user_id):
         current_time = timezone.now()
@@ -1943,12 +1963,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             status__in=[LabAppointment.CANCELLED, LabAppointment.COMPLETED]).prefetch_related('tests', 'lab', 'profile')
         return appointments
 
+    # Get cancellation reason data
     def get_serialized_cancellation_reason(self):
         res = []
         for cr in self.get_cancellation_reason():
             res.append({'id': cr.id, 'name': cr.name, 'is_comment_needed': cr.is_comment_needed})
         return res
 
+    # Get lab appointment report urls
     def get_report_urls(self):
         reports = self.reports.all()
         report_file_links = set()
@@ -1958,6 +1980,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
         return list(report_file_links)
 
+    # Get file type and url of report
     def get_report_type(self):
         from ondoc.common.utils import get_file_mime_type
         resp = []
@@ -1970,9 +1993,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     resp.append({"url": file_url, "type": mime_type})
         return resp
 
+    # Get all uploaded reports of lab appointment
     def get_reports(self):
         return self.reports.all()
 
+    # This method provides allowed actions of an appointment
     def allowed_action(self, user_type, request):
         allowed = []
         if self.status == self.CREATED:
@@ -2007,6 +2032,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return allowed
 
+    # Check if notification needs to be send or not
     def is_to_send_notification(self, database_instance):
         if not database_instance:
             return True
@@ -2019,6 +2045,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             return True
         return False
 
+    # Get lab admin users
     def get_lab_admins(self):
         if self.lab.network and self.lab.network.manageable_lab_network_admins.filter(is_disabled=False).exists():
             return [admin.user for admin in self.lab.network.manageable_lab_network_admins.filter(is_disabled=False)
@@ -2027,6 +2054,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
                     if admin.user]
 
+    # Check if appointment booked by mobile app
     def created_by_native(self):
         from packaging.version import parse
         child_order = Order.objects.filter(reference_id=self.id).first()
@@ -2045,12 +2073,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return False
 
+    # Check if appointment booked through salespoint
     def booked_by_spo(self):
         if self.spo_data:
             return True
 
         return False
 
+    # Check if appointment is for integrated lab
     def is_part_of_integration(self):
         network_id = None
         if self.lab and self.lab.network and self.lab.network.id:
@@ -2063,6 +2093,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return False
 
+    # Check if appointment can be pushed to integrator
     def can_push_to_integrator(self):
         network_id = None
         if self.lab and self.lab.network and self.lab.network.id:
@@ -2075,6 +2106,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return False
 
+    # Check notification can be sent to provider or not
     def is_provider_notification_allowed(self, old_instance):
         if old_instance.status == OpdAppointment.CREATED and self.status == OpdAppointment.CANCELLED:
             return False
@@ -2203,6 +2235,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all lab appointment tasks completed')
 
+    # Check appointment is fraud or not when booked using insurance
     @property
     def is_fraud_appointment(self):
         if not self.insurance:
@@ -2214,6 +2247,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return False
 
+    # Get home pickup address of patient if lab test is home pickup
     def get_pickup_address(self):
         if not self.address:
             return ""
@@ -2319,6 +2353,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix, push_to_integrator))
 
+    # This method creates payout for provider when appointment is complete
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:
             raise Exception("Cannot create payout for COD appointments")
@@ -2351,6 +2386,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                                 financial_year=settings.CURRENT_FINANCIAL_YEAR,
                                                 merchant_payout=merchant_payout)
 
+    # This method is use to check if settlement amount is already paid(advance payment) to provider
+    # This method is a part of advance merchant payout and create dummy txn if appointment's payment type is insurance
     def check_merchant_payout_action(self):
         from ondoc.notification.tasks import set_order_dummy_transaction
         # check for advance payment
@@ -2386,6 +2423,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return delay
 
+    # This method is use to create appointment
     @classmethod
     def create_appointment(cls, appointment_data, responsible_user=None, source=None):
         from ondoc.prescription.models import AppointmentPrescription
@@ -2456,11 +2494,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         app_obj.coupon_data = coupon_data
         return app_obj
 
+    # Update lab appointment status when reschedule by lab
     def action_rescheduled_lab(self):
         self.status = self.RESCHEDULED_LAB
         self.save()
         return self
 
+    # Update lab appointment when reschedule by patient
     def action_rescheduled_patient(self, data):
         self.status = self.RESCHEDULED_PATIENT
         self.time_slot_start = data.get('time_slot_start')
@@ -2480,10 +2520,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 appointment_test.time_slot_start = test_time_slot.get('time_slot_start')
                 appointment_test.save()
 
+    # Update lab appointment status when appointment accepted
     def action_accepted(self):
         self.status = self.ACCEPTED
         self.save()
 
+    # Update appointment status as per ivr
     def update_ivr_status(self, status):
         if status == self.status:
             return True, ""
@@ -2503,6 +2545,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return True, ""
 
+    # This method is called when appointment is cancelled to initiate refund
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
         old_instance = LabAppointment.objects.get(pk=self.id)
@@ -2512,6 +2555,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             initiate_refund = old_instance.preauth_process(refund_flag)
             self.action_refund(refund_flag, initiate_refund)
 
+    # Get appointment amount break up.
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
         if self.money_pool:
@@ -2524,6 +2568,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return wallet_refund, cashback_refund
 
+    # This method is called when appointment is completed
     def action_completed(self):
         self.status = self.COMPLETED
         out_obj = None
@@ -2544,6 +2589,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if self.has_lensfit_coupon_used():
             notification_tasks.send_lensfit_coupons.apply_async((self.id, self.PRODUCT_ID, NotificationAction.SEND_LENSFIT_COUPON), countdown=5)
 
+    # To create outstanding - Old merchant payout
     def outstanding_create(self):
         admin_obj, out_level = self.get_billable_admin_level()
         app_outstanding_fees = self.lab_payout_amount()
@@ -2554,12 +2600,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         # if self.payment_type != self.INSURANCE:
         #     Outstanding.create_outstanding(self)
 
+    # To check amount to be paid at lab level or network level - Not in use
     def get_billable_admin_level(self):
         if self.lab.network and self.lab.network.is_billing_enabled:
             return self.lab.network, Outstanding.LAB_NETWORK_LEVEL
         else:
             return self.lab, Outstanding.LAB_LEVEL
 
+    # Amount to be paid to provider.
     def lab_payout_amount(self):
         amount = 0
         if self.payment_type == OpdAppointment.COD:
@@ -2568,6 +2616,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             amount = self.agreed_price + self.home_pickup_charges
         return amount
 
+    # Calculate booking revenue
     def get_booking_revenue(self):
         if self.payment_type == 3:
             booking_net_revenue = 0
@@ -2588,6 +2637,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return booking_net_revenue
 
+    # Billing Summary - Old
     @classmethod
     def get_billing_summary(cls, user, req_data):
         month = req_data.get("month")
@@ -2620,6 +2670,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                                        total_online_payout=Sum(tpf_condition))
         return queryset
 
+    # Appointment Billing Summary
     @classmethod
     def get_billing_appointment(cls, user, req_data):
         month = req_data.get("month")
@@ -2674,6 +2725,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #                                           lab__in=lab_list))
         # return queryset
 
+    # Get lab or lab network for payout
     @property
     def get_billed_to(self):
         network = self.lab.network
@@ -2682,6 +2734,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return self.lab
 
+    # Get merchant for payout
     @property
     def get_merchant(self):
         billed_to = self.get_billed_to
@@ -2691,6 +2744,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 return merchant.merchant
         return None
 
+    # Get price details of appointment
     @classmethod
     def get_price_details(cls, data, plus_user=None):
         import functools
@@ -2789,6 +2843,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "total_convenience_charge": total_convenience_charge
         }
 
+    # This method is use to create appointment data
     @classmethod
     def create_fulfillment_data(cls, user, data, price_data, request):
         from ondoc.api.v1.auth.serializers import AddressSerializer
@@ -3013,6 +3068,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             })
         return fulfillment_data
 
+    # Save tracking event
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
         from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
@@ -3032,6 +3088,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
+    # This method is use to show appointment status of integrator in CRM if appointment is part of integration
     def integrator_order_status(self):
         from ondoc.integrations.models import IntegratorHistory
 
@@ -3043,6 +3100,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return IntegratorHistory.STATUS_CHOICES[integrator_history.status - 1][1]
 
+    # Use to show integrator booking number in CRM
     def thyrocare_booking_no(self):
         from ondoc.integrations.models import IntegratorResponse
 
@@ -3054,6 +3112,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return [integrator_response.lead_id, integrator_response.integrator_order_id]
 
+    # Use to show if appointment is accepted by agents or by integrator API
     def accepted_through(self):
         from ondoc.integrations.models import IntegratorHistory
 
@@ -3065,6 +3124,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return integrator_history.accepted_through
 
+    # Use to prepare matrix data of appointment for agents
     def get_matrix_data(self, order, product_id, sub_product_id):
         # policy_details = self.get_matrix_policy_data()
         appointment_details = self.get_matrix_appointment_data(order)
@@ -3269,6 +3329,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return mobile_list
 
+    # Prepare ipd lead data
     def convert_ipd_lead_data(self):
         result = {}
         result['hospital'] = self.lab.related_hospital
@@ -3286,6 +3347,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         result['data'] = {'lab_appointment_id': self.id}
         return result
 
+    # Data for salespoint agents
     def get_spo_data(self, order, product_id, sub_product_id):
         tests = self.test_mappings.all()
         service_id = None
@@ -3324,17 +3386,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
+    # Get insured completed appointment count
     @classmethod
     def get_insured_completed_appointment(cls, insurance_obj):
         count = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj, status=cls.COMPLETED).count()
         return count
 
+    # Get insured active appointment count
     @classmethod
     def get_insured_active_appointment(cls, insurance_obj):
         appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
                                           insurance=insurance_obj)
         return appointments
 
+    # Get insurance usage of a user
     @classmethod
     def get_insurance_usage(cls, insurance_obj, date=None):
         appointments = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj).exclude(status=cls.CANCELLED)
@@ -3347,6 +3412,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         sum = sum if sum else 0
         return {'count': count, 'sum': sum}
 
+    # Get user's uploaded prescription
     def get_prescriptions(self, request):
         prescription_dict = {}
         files = []
@@ -3374,10 +3440,12 @@ class CommonTest(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
 
+    # Get common test for home page
     @classmethod
     def get_tests(cls, count):
         tests = cls.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
         return tests
+
 
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
@@ -3391,10 +3459,12 @@ class CommonPackage(TimeStampedModel):
     class Meta:
         db_table = 'common_package'
 
+    # Get common test for home page
     @classmethod
     def get_packages(cls, count):
         packages = cls.objects.prefetch_related('package', 'lab__lab_documents').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         return packages
+
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)
@@ -3504,6 +3574,7 @@ class LabDocument(TimeStampedModel, Document):
     def is_pdf(self):
         return self.name.name.endswith('.pdf')
 
+    # This method is use to resize images
     def resize_image(self, width, height):
         default_storage_class = get_storage_class()
         storage_instance = default_storage_class()
@@ -3562,6 +3633,7 @@ class LabDocument(TimeStampedModel, Document):
             else:
                 self.send_change_logo_email()
 
+    # Use to send email to internal members if logo of a lab changed
     def send_change_logo_email(self):
         from ondoc.communications.models import EMAILNotification
         try:
