@@ -188,7 +188,7 @@ class Order(TimeStampedModel):
                     insurance_order_transaction = transactions[0]
                     data['refOrderId'] = str(insurance_order_transaction.order_id)
                     data['refOrderNo'] = str(insurance_order_transaction.order_no)
-            if not self.is_parent() and self.booking_using_vip_plan():
+            if self.booking_using_vip_plan():
                 appt = self.getAppointment()
                 if appt and appt.plus_plan:
                     plus_user = appt.plus_plan
@@ -218,8 +218,6 @@ class Order(TimeStampedModel):
         return False
 
     def booking_using_vip_plan(self):
-        if self.parent():
-            raise Exception("Not implemented for parent")
         appt = self.getAppointment()
         if appt and appt.plus_plan and appt.plus_plan.plan and not appt.plus_plan.plan.is_gold:
             return True
