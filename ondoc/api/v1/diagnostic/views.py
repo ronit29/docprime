@@ -2641,8 +2641,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
             if data['cover_under_vip']:
                 if plus_user.plan.is_gold:
                     data['payment_type'] = OpdAppointment.GOLD
+                    data['is_gold_member'] = True
                 else:
                     data['payment_type'] = OpdAppointment.VIP
+                    data['is_gold_member'] = False
                 validated_data['payment_type'] = data['payment_type']
             else:
                 validated_data['payment_type'] = validated_data.get('payment_type')

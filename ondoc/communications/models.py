@@ -59,14 +59,17 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
                 admins_with_user = admins.filter(user__isnull=False)
                 if admins_with_user:
                     for admin in admins_with_user:
-                        if int(admin.user.phone_number) == int(spoc.number):
-                            user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
-                            if spoc.email:
-                                user_and_email.append({'user': admin.user, 'email': spoc.email})
-                        else:
-                            user_and_number.append({'user': None, 'phone_number': spoc.number})
-                            if spoc.email:
-                                user_and_email.append({'user': None, 'email': spoc.email})
+                        try:
+                            if int(admin.user.phone_number) == int(spoc.number):
+                                user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
+                                if spoc.email:
+                                    user_and_email.append({'user': admin.user, 'email': spoc.email})
+                            else:
+                                user_and_number.append({'user': None, 'phone_number': spoc.number})
+                                if spoc.email:
+                                    user_and_email.append({'user': None, 'email': spoc.email})
+                        except Exception as e:
+                            continue
                 else:
                     user_and_number.append({'user': None, 'phone_number': spoc.number})
                     if spoc.email:

@@ -93,6 +93,7 @@ from django.utils.functional import cached_property
 from ondoc.crm.constants import constants
 from django.utils.text import slugify
 from ondoc.plus import models as plus_model
+import newrelic.agent
 
 logger = logging.getLogger(__name__)
 
@@ -4419,6 +4420,7 @@ class CommonSpecialization(auth_model.TimeStampedModel):
     # icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
     icon = models.FileField(upload_to='doctor/common_specialization_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
+    svg_icon = models.FileField(upload_to='doctor/common_specialization_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['svg'])])
 
     def __str__(self):
         return "{}".format(self.specialization)
@@ -4427,6 +4429,7 @@ class CommonSpecialization(auth_model.TimeStampedModel):
         db_table = "common_specializations"
 
     @classmethod
+    @newrelic.agent.function_trace()
     def get_specializations(cls, count):
         specializations = cls.objects.select_related('specialization').all().order_by("-priority")[:count]
         return specializations

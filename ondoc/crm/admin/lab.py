@@ -1428,7 +1428,7 @@ class TestPackageFormSet(forms.BaseInlineFormSet):
             lab_test = data.get('lab_test')
             if not lab_test:
                 continue
-            if self.instance.test_type != LabTest.OTHER and self.instance.test_type != lab_test.test_type:
+            if self.instance.is_package is False and self.instance.test_type != LabTest.OTHER and self.instance.test_type != lab_test.test_type:
                 raise forms.ValidationError('Test-{} is not correct for the Package.'.format(lab_test.name))
             if lab_test.is_package is True:
                 raise forms.ValidationError('{} is a test package'.format(lab_test.name))
@@ -1495,9 +1495,12 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         all_parent_categories = []
         count_is_primary = 0
         for value in self.cleaned_data:
-            if value and not value.get("DELETE"):
-                all_parent_categories.append(value.get('parent_category'))
-                if value.get('is_primary', False):
+            if value:
+                if not value.get("DELETE"):
+                    all_parent_categories.append(value.get('parent_category'))
+                    if value.get('is_primary', False):
+                        count_is_primary += 1
+                else:
                     count_is_primary += 1
         # If lab test is a package its parent can only be package category.
         if self.instance.is_package:
@@ -1557,11 +1560,11 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('min_age cannot be more than max_age')
         else:
             if cleaned_data.get('min_age'):
-                raise forms.ValidationError('Please dont enter min_age')
+                raise forms.ValidationError('Please do not enter min_age')
             if cleaned_data.get('max_age'):
-                raise forms.ValidationError('Please dont enter max_age')
+                raise forms.ValidationError('Please do not enter max_age')
             if cleaned_data.get('gender_type'):
-                raise forms.ValidationError('Please dont enter gender_type')
+                raise forms.ValidationError('Please do not enter gender_type')
             # if cleaned_data.get('reference_code'):
             #     raise forms.ValidationError('Please dont enter reference code for a test')
 

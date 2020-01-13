@@ -228,6 +228,13 @@ class CartViewSet(viewsets.GenericViewSet):
                     vip_dict = plus_user.validate_plus_appointment(validated_data, utilization=deep_utilization)
                     if not vip_dict.get('cover_under_vip'):
                         raise Exception('Appointment no more cover under VIP')
+
+                    if vip_dict.get('cover_under_vip'):
+                        if plus_user and plus_user.plan.is_gold:
+                            validated_data['payment_type'] = 6
+                        elif plus_user and not plus_user.plan.is_gold:
+                            validated_data['payment_type'] = 5
+
                     item.data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
                     item.data['vip_amount'] = vip_dict['amount_to_be_paid']
                     item.data['vip_convenience_amount'] = vip_dict['vip_convenience_amount']
@@ -323,7 +330,7 @@ class CartViewSet(viewsets.GenericViewSet):
                                 #     item.data['payment_type'] = OpdAppointment.PREPAID
                                 # item.data['payment_type'] = OpdAppointment.PREPAID
 
-                price_data = item.get_price_details(validated_data)
+                price_data = item.get_price_details(validated_data, plus_user_obj)
                 items.append({
                     "id" : item.id,
                     "valid": True,
