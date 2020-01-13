@@ -1392,6 +1392,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     def validate_single_order_transaction(self, request, response):
         base_url = settings.BASE_URL
+        is_refund_process = False
         if request.query_params and request.query_params.get('sbig', False):
             base_url = settings.SBIG_BASE_URL
 
@@ -1474,12 +1475,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
         else:
             pg_response_amount = 0.0
 
-        try:
-            if float(order_obj.amount) != pg_response_amount:
-                send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                return REDIRECT_URL
-        except Exception as e:
-            logger.error("Error in sending pg acknowledge - after transaction amount mismatch " + str(e))
+        # try:
+        #     if float(order_obj.amount) != pg_response_amount:
+        #         send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+        #         return REDIRECT_URL
+        # except Exception as e:
+        #     logger.error("Error in sending pg acknowledge - after transaction amount mismatch " + str(e))
 
         try:
             # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
@@ -1514,15 +1515,28 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         try:
                             with transaction.atomic():
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                                if float(order_obj.amount) != pg_response_amount:
+                                    is_refund_process = True
                         except Exception as e:
                             logger.error("Error in saving PG Transaction Data - " + str(e))
 
-                        try:
-                            with transaction.atomic():
-                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
-                                success_in_process = True
-                        except Exception as e:
-                            logger.error("Error in processing order - " + str(e))
+                        if not is_refund_process:
+                            try:
+                                with transaction.atomic():
+                                    processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
+                                    success_in_process = True
+                            except Exception as e:
+                                logger.error("Error in processing order - " + str(e))
+                        else:
+                            consumer_account = ConsumerAccount.objects.get_or_create(user=order_obj.user)
+                            consumer_account = ConsumerAccount.objects.select_for_update().get(user=order_obj.user)
+                            ctx_objs = consumer_account.debit_refund()
+                            if ctx_objs:
+                                for ctx_obj in ctx_objs:
+                                    ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                                                            countdown=1)
+                            return REDIRECT_URL
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
         elif order_obj:
@@ -1582,6 +1596,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     def validate_multiple_order_transaction(self, request, response):
         base_url = settings.BASE_URL
+        is_refund_process = False
         if request.query_params and request.query_params.get('sbig', False):
             base_url = settings.SBIG_BASE_URL
 
@@ -1678,12 +1693,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 order_obj = Order.objects.select_for_update().filter(pk=order_id).first()
                 convert_cod_to_prepaid = False
 
-                try:
-                    if float(order_obj.amount) != pg_response_amount:
-                        send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
-                        return REDIRECT_URL
-                except Exception as e:
-                    logger.error("Error in sending pg acknowledge - after transaction amount mismatch" + str(e))
+                # try:
+                #     if float(order_obj.amount) != pg_response_amount:
+                #         send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
+                #         return REDIRECT_URL
+                # except Exception as e:
+                #     logger.error("Error in sending pg acknowledge - after transaction amount mismatch" + str(e))
 
                 try:
                     # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
@@ -1753,15 +1768,31 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                     try:
                                         with transaction.atomic():
                                             pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                                            if float(order_obj.amount) != pg_response_amount:
+                                                is_refund_process = True
                                     except Exception as e:
                                         logger.error("Error in saving PG Transaction Data - " + str(e))
 
-                                    try:
-                                        with transaction.atomic():
-                                            processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
-                                            success_in_process = True
-                                    except Exception as e:
-                                        logger.error("Error in processing order - " + str(e))
+                                    if not is_refund_process:
+                                        try:
+                                            with transaction.atomic():
+                                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
+                                                success_in_process = True
+                                        except Exception as e:
+                                            logger.error("Error in processing order - " + str(e))
+                                    else:
+                                        consumer_account = ConsumerAccount.objects.get_or_create(user=order_obj.user)
+                                        consumer_account = ConsumerAccount.objects.select_for_update().get(
+                                            user=order_obj.user)
+                                        ctx_objs = consumer_account.debit_refund()
+                                        if ctx_objs:
+                                            for ctx_obj in ctx_objs:
+                                                ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+                                        send_pg_acknowledge.apply_async(
+                                            (response.get("orderId"), response.get("orderNo"),),
+                                            countdown=1)
+                                        return REDIRECT_URL
+
                         else:
                             logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
                 elif order_obj:
