@@ -2733,7 +2733,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     price = price_engine.get_price(price_data)
                 # vip_convenience_amount = plus_membership.plan.get_convenience_charge(price, "LABTEST")
                 plus_membership_plan = plus_membership.plan if plus_membership else None
-                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_membership_plan)
+                vip_convenience_amount = total_convenience_charge
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)
@@ -2747,7 +2747,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             else:
                 effective_price = effective_price
 
-            effective_price += vip_convenience_amount
+            if vip_convenience_amount:
+                effective_price += vip_convenience_amount
             # coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, effective_price)
 
