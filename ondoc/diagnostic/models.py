@@ -1231,6 +1231,7 @@ class ParameterLabTest(TimeStampedModel):
         return "{}".format(self.parameter.name)
 
 
+
 class FrequentlyAddedTogetherTests(TimeStampedModel):
     original_test = models.ForeignKey('diagnostic.LabTest', related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
     booked_together_test = models.ForeignKey('diagnostic.LabTest', related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
