@@ -1249,6 +1249,8 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     priority = models.PositiveIntegerField(default=0)
     # icon = models.ImageField(upload_to='test/image', null=True, blank=True)
     icon = models.FileField(upload_to='test/image', blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
+    svg_icon = models.FileField(upload_to='test/image', blank=True, null=True,
+                                validators=[FileExtensionValidator(allowed_extensions=['svg'])])
 
     def __str__(self):
         return self.name
@@ -3351,6 +3353,8 @@ class CommonTest(TimeStampedModel):
     # icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
     icon = models.FileField(upload_to='diagnostic/common_test_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
+    svg_icon = models.FileField(upload_to='diagnostic/common_test_icons', blank=False, null=True,
+                                validators=[FileExtensionValidator(allowed_extensions=['svg'])])
 
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
@@ -3360,11 +3364,14 @@ class CommonTest(TimeStampedModel):
         tests = cls.objects.select_related('test').filter(test__enable_for_retail=True, test__searchable=True).order_by('-priority')[:count]
         return tests
 
+
 class CommonPackage(TimeStampedModel):
     package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
     icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
     priority = models.PositiveIntegerField(default=0)
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='packagelab', null=True)
+    svg_icon = models.FileField(upload_to='diagnostic/common_package_icons', null=True,
+                                validators=[FileExtensionValidator(allowed_extensions=['svg'])])
 
     def __str__(self):
         return "{}-{}".format(self.package.name, self.id)
@@ -3376,6 +3383,7 @@ class CommonPackage(TimeStampedModel):
     def get_packages(cls, count):
         packages = cls.objects.prefetch_related('package', 'lab__lab_documents').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         return packages
+
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)
