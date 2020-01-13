@@ -1428,7 +1428,7 @@ class TestPackageFormSet(forms.BaseInlineFormSet):
             lab_test = data.get('lab_test')
             if not lab_test:
                 continue
-            if self.instance.test_type != LabTest.OTHER and self.instance.test_type != lab_test.test_type:
+            if self.instance.is_package is False and self.instance.test_type != LabTest.OTHER and self.instance.test_type != lab_test.test_type:
                 raise forms.ValidationError('Test-{} is not correct for the Package.'.format(lab_test.name))
             if lab_test.is_package is True:
                 raise forms.ValidationError('{} is a test package'.format(lab_test.name))

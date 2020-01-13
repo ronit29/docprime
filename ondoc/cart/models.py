@@ -108,14 +108,14 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         validated_data = serializer.validated_data
         return validated_data
 
-    def get_price_details(self, validated_data):
+    def get_price_details(self, validated_data, plus_user=None):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
         if self.product_id == Order.DOCTOR_PRODUCT_ID:
-            price_data = OpdAppointment.get_price_details(validated_data)
+            price_data = OpdAppointment.get_price_details(validated_data, plus_user)
         elif self.product_id == Order.LAB_PRODUCT_ID:
-            price_data = LabAppointment.get_price_details(validated_data)
+            price_data = LabAppointment.get_price_details(validated_data, plus_user)
 
         return price_data
 
