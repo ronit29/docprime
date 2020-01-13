@@ -828,7 +828,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         if not engine:
             return resp
 
-        if engine and obj and obj._selected_test and lab_obj.is_enabled_for_plus_plans() and obj._selected_test.mrp:
+        if engine and obj and obj._selected_test and lab_obj and lab_obj.is_enabled_for_plus_plans() and obj._selected_test.mrp:
             # engine_response = engine.validate_booking_entity(cost=obj._selected_test.mrp, id=obj.package.id)
             # resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             resp['vip_convenience_amount'] = obj._selected_test.calculate_convenience_charge(plan)
