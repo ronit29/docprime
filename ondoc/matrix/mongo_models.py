@@ -18,6 +18,7 @@ class MatrixLog(DynamicDocument, TimeStampedModel):
     request_response = StringField()
     originating_source = StringField(null=True)
 
+    # Save matrix request and response data to mongo server
     @classmethod
     def create_matrix_logs(cls, obj, request_payload, request_response):
         from django.contrib.contenttypes.models import ContentType
