@@ -150,6 +150,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
 
+    #Checking insurance availibility for city
     def check_is_insurance_available(self, request):
         data = {
             'latitude': request.query_params.get('latitude'),
@@ -165,6 +166,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
 
         return Response({'available': True})
 
+    #Listing of insurance plans
     def list(self, request):
         if settings.IS_INSURANCE_ACTIVE:
 
@@ -202,11 +204,11 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
             return False
 
 
-
 class InsuredMemberViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    #provide Member list with disease wise
     def memberlist(self, request):
         if settings.IS_INSURANCE_ACTIVE:
 
@@ -237,6 +239,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(result)
 
+    #update each member detail with their respective disease
     def update(self, request):
         if settings.IS_INSURANCE_ACTIVE:
             resp ={}
@@ -265,6 +268,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     # permission_classes = (IsAuthenticated,)
 
+    # create lead on banner click
     def create_banner_lead(self, request):
         latitude = request.data.get('latitude', None)
         longitude = request.data.get('longitude', None)
@@ -310,6 +314,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             return Response({'success': True, 'is_insured': False})
 
 
+    #Order create for insurance purchase
     @transaction.atomic
     def create_order(self, request):
         user = request.user
@@ -460,6 +465,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    #Insurance user dashboard
     def profile(self, request):
         if settings.IS_INSURANCE_ACTIVE:
 
@@ -525,6 +531,7 @@ class InsuranceValidationViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    #Appointment validation for insured person
     def validation(self, request):
         resp = {}
         resp['is_user_insured'] = False
@@ -586,6 +593,7 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    # pushing insurance purchase journey data to db for insurance purchase - in case of agent
     def push_dummy_data(self, request):
         try:
             user = request.user
@@ -596,6 +604,7 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
             logger.error(str(e))
             return Response(data="could not save data", status=status.HTTP_400_BAD_REQUEST)
 
+    # showing insurance purchase journey data from db for insurance purchase - in case of agent
     def show_dummy_data(self, request):
         user = request.user
         res = {}
@@ -613,6 +622,7 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
         res['data'] = member_data
         return Response(data=res, status=status.HTTP_200_OK)
 
+    # pushing insurance endorsement journey data to db for insurance purchase - in case of agent
     def push_endorsement_data(self, request):
         try:
             user = request.user
@@ -623,6 +633,7 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
             logger.error(str(e))
             return Response(data="could not save data", status=status.HTTP_400_BAD_REQUEST)
 
+    # showing insurance endorsement journey data from db for insurance purchase - in case of agent
     def show_endorsement_data(self, request):
         user = request.user
         res = {}
@@ -645,6 +656,7 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    #initiate insurance cancellation
     @transaction.atomic()
     def insurance_cancel(self, request):
         res = {}
@@ -678,6 +690,7 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         user_insurance.save()
         return Response(data=response, status=status.HTTP_200_OK)
 
+    # Cancellation master data need to show while customer cancel the insurance
     def cancel_master(self,request):
         user = request.user
         res = {}
@@ -707,6 +720,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    #Get endorsement data push by customer
     def get_endorsement_data(self, request):
         user = request.user
         user_insurance = user.active_insurance
@@ -734,6 +748,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         res['members'] = members_data
         return Response(data=res, status=status.HTTP_200_OK)
 
+    #Create endorsement request for customer with document
     @transaction.atomic()
     def create(self, request):
         user = request.user
@@ -802,6 +817,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         res['success'] = 'Your endorsement request has been successfully submitted.'
         return Response(data=res, status=status.HTTP_200_OK)
 
+    #Upload document for endorsement
     def upload(self, request, *args, **kwargs):
         data = dict()
         document_data = {}

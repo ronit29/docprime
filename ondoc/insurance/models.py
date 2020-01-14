@@ -46,6 +46,7 @@ from ondoc.notification import tasks as notification_tasks
 from dateutil.relativedelta import relativedelta
 
 
+#generate insurance policy number - not in use now
 def generate_insurance_policy_number():
     query = '''select nextval('userinsurance_policy_num_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
@@ -59,6 +60,7 @@ def generate_insurance_policy_number():
         raise ValueError('Sequence Produced is not valid.')
 
 
+#generate insurance policy number insurer wise
 def generate_insurance_insurer_policy_number(insurance_plan):
     if not insurance_plan:
         raise Exception('Could not generate policy number according to the insurer.')
@@ -85,6 +87,7 @@ def generate_insurance_insurer_policy_number(insurance_plan):
         raise ValueError('Sequence Produced is not valid.')
 
 
+#generate insurance reciept number
 def generate_insurance_reciept_number():
     query = '''select nextval('userinsurance_policy_reciept_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
