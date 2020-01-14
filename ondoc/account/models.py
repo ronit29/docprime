@@ -127,10 +127,12 @@ class Order(TimeStampedModel):
         return False
 
     def get_vip_amount_to_be_paid(self):
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
         appt = self.getAppointment()
-        if self.product_id == self.LAB_PRODUCT_ID:
+        if isinstance(appt, LabAppointment):
             return appt.price
-        elif self.product_id == self.DOCTOR_PRODUCT_ID:
+        elif isinstance(appt, OpdAppointment):
             return appt.fees
         else:
             return (self.amount or 0) + (self.wallet_amount or 0)
