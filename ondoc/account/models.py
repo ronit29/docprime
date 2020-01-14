@@ -131,7 +131,7 @@ class Order(TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         appt = self.getAppointment()
         if isinstance(appt, LabAppointment):
-            return appt.price
+            return appt.agreed_price
         elif isinstance(appt, OpdAppointment):
             return appt.fees
         else:
