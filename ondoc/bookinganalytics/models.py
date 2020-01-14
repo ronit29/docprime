@@ -2,7 +2,7 @@ from django.db import models
 from django.utils import timezone
 # Create your models here.
 
-
+# Model of City at Optimus end, this model points to table in mssql server in optimus server.
 class DP_CityMaster(models.Model):
 
     CreatedOn = models.DateTimeField(auto_now_add=True)
@@ -17,7 +17,7 @@ class DP_CityMaster(models.Model):
         db_table = "DP_CityMaster"
         managed = False
 
-
+# Model of State at Optimus end, this model points to table in mssql server in optimus server.
 class DP_StateMaster(models.Model):
 
     StateId = models.IntegerField(primary_key=True)
@@ -37,6 +37,7 @@ class DP_StateMaster(models.Model):
         managed = False
 
 
+# Model of Speciality at Optimus end, this model points to table in mssql server in optimus server.
 class DP_SpecialityMaster(models.Model):
     SpecialityId = models.IntegerField(null=True, blank=False)
     Speciality = models.CharField(null=True, blank=True, max_length=500)
@@ -50,7 +51,7 @@ class DP_SpecialityMaster(models.Model):
         db_table = "DP_SpecialityMaster"
         managed = False
 
-
+# Model of OpdStatus at Optimus end, this model points to table in mssql server in optimus server.
 class DP_OPDStatusMaster(models.Model):
     OPDStatusId = models.IntegerField(null=True, blank=False)
     OPDStatus = models.CharField(null=True, blank=True, max_length=500)
@@ -64,6 +65,8 @@ class DP_OPDStatusMaster(models.Model):
         db_table = "DP_OPDStatusMaster"
         managed = False
 
+
+# Model of opd consult and tests at Optimus end, this model points to table in mssql server in optimus server.
 class DP_OpdConsultsAndTests(models.Model):
 
     Appointment_Id = models.BigIntegerField(primary_key=True)
@@ -95,6 +98,7 @@ class DP_OpdConsultsAndTests(models.Model):
         managed = False
 
 
+# Model of under writing details at Optimus end, this model points to table in mssql server in optimus server.
 class DP_UnderWritingDetails(models.Model):
 
     UnderWritingId = models.BigIntegerField(primary_key=True)
@@ -112,6 +116,7 @@ class DP_UnderWritingDetails(models.Model):
         managed = False
 
 
+# Model of Insurer at Optimus end, this model points to table in mssql server in optimus server.
 class DP_InsurerMaster(models.Model):
     InsurerMasterId = models.BigIntegerField(primary_key=True)
     InsurerId = models.IntegerField(null=True, blank=True)
@@ -127,6 +132,7 @@ class DP_InsurerMaster(models.Model):
         managed = False
 
 
+# Model of TeleD status at Optimus end, this model points to table in mssql server in optimus server.
 class DP_TeleDStatusMaster(models.Model):
     TeleStatusId = models.BigIntegerField(null=True, blank=False)
     TeleStatus = models.CharField(null=True, blank=True, max_length=500)
@@ -140,6 +146,7 @@ class DP_TeleDStatusMaster(models.Model):
         db_table = "DP_TeleDStatusMaster"
         managed = False
 
+# Model of Tele deal at Optimus end, this model points to table in mssql server in optimus server.
 class TeleDeal(models.Model):
     TeleDealId = models.BigIntegerField(primary_key=True)
     InsurerId = models.IntegerField(null=True, blank=True)
