@@ -5,6 +5,7 @@ from ondoc.account.models import Order
 from django.contrib.postgres.fields import JSONField
 from datetime import date, timedelta, datetime
 
+# Model for cart
 class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
     product_id = models.IntegerField(choices=Order.PRODUCT_IDS)
@@ -12,6 +13,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
     deleted_at = models.DateTimeField(blank=True, null=True)
     data = JSONField()
 
+    # Empty the cart.
     @classmethod
     def remove_all(cls, user):
         try:
@@ -20,6 +22,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         except Exception as e:
             pass
 
+    # get count of free opd items.
     @classmethod
     def get_free_opd_item_count(cls, request, cart_item=None):
         user = request.user
@@ -89,10 +92,12 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
                         return False, cls.get_cart_item_by_id(item.get("id"))
         return True, None
 
+    # Get item by id.
     @classmethod
     def get_cart_item_by_id(cls, item_id):
         return cls.objects.filter(id=item_id).first()
 
+    # Validate that the appointment can be added to cart or not.
     def validate(self, request):
         from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppointmentCreateSerializer
@@ -108,6 +113,8 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         validated_data = serializer.validated_data
         return validated_data
 
+
+    # Get price details of doctor or lab.
     def get_price_details(self, validated_data, plus_user=None):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -119,6 +126,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
         return price_data
 
+    # get fulfillment data needed to purchase cart items.
     def get_fulfillment_data(self, validated_data, request):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -135,6 +143,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
         return fulfillment_data
 
+    # check for plus appointment.
     @classmethod
     def check_for_plus_appointment(cls, data):
         resp = {
@@ -145,7 +154,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         plus_user = user.active_plus_user
         utilization = plus_user.get_utilization()
 
-
+    # get pg if pg coupon
     @classmethod
     def get_pg_if_pgcoupon(cls, user, cart_item=None):
         from ondoc.coupon.models import Coupon
@@ -162,6 +171,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
     def __str__(self):
         return str(self.id)
 
+    # Check if appointment data can be in insurance.
     @classmethod
     def check_for_insurance(cls, validated_data, **kwargs):
         from ondoc.insurance.models import UserInsurance
@@ -180,7 +190,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
                 validated_data, cart_items, booked_by=booked_by)
         return is_appointment_insured, insurance_id, insurance_message
 
-
+    # Add item to cart.
     @classmethod
     def add_items_to_cart(self, request, validated_data, data, product_id=Order.DOCTOR_PRODUCT_ID):
         from ondoc.doctor.models import OpdAppointment

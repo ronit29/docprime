@@ -9,6 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# Auto cancel appointment - Not in use
 @task(bind=True)
 def lab_app_auto_cancel(self, prev_app_dict):
     from ondoc.diagnostic.models import LabAppointment

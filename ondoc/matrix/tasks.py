@@ -344,6 +344,7 @@ from ondoc.matrix.mongo_models import MatrixLog
 #         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
 
 
+# This method is use to push appointment data to matrix
 @task(bind=True, max_retries=2)
 def push_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
@@ -483,7 +484,7 @@ def push_appointment_to_matrix(self, data):
 #     except Exception as e:
 #         logger.error("Error in Celery. Failed get mask number for appointment " + str(e))
 
-
+# This method is use to push signup data to matrix
 @task(bind=True, max_retries=2)
 def push_signup_lead_to_matrix(self, data):
     log_requests_on()
@@ -569,6 +570,7 @@ def push_signup_lead_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing online lead to the matrix- " + str(e))
 
 
+# This method is use to push order data to matrix
 @task(bind=True, max_retries=2)
 def push_order_to_matrix(self, data):
     log_requests_on()
@@ -659,6 +661,7 @@ def push_order_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
 
 
+# This method is use to save ipd and provider signup lead data to matrix
 @task(bind=True, max_retries=2)
 def create_or_update_lead_on_matrix(self, data):
     from ondoc.doctor.models import Doctor
@@ -827,6 +830,7 @@ def create_or_update_lead_on_matrix(self, data):
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
 
 
+# This method is use to update QC status on matrix for onboarding
 @task(bind=True, max_retries=3)
 def update_onboarding_qcstatus_to_matrix(self, data):
     from ondoc.procedure.models import IpdProcedureLead
@@ -912,6 +916,7 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         logger.error("Error in Celery. Failed to update status to the matrix - " + str(e))
 
 
+# This method is use to create QC status on matrix for onboarding
 @task(bind=True, max_retries=2)
 def push_onboarding_qcstatus_to_matrix(self, data):
     from ondoc.doctor.models import Doctor
@@ -999,6 +1004,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing qc status to the matrix- " + str(e))
 
 
+# This method is use to send non bookable doctors data to matrix
 @task(bind=True, max_retries=2)
 def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
     from ondoc.web.models import NonBookableDoctorLead
@@ -1053,6 +1059,7 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
         logger.error("Error while pushing the non bookable doctor lead to matrix. ", str(e))
 
 
+# To create ipd lead from opd appointment
 @task(bind=True, max_retries=2)
 def create_ipd_lead_from_opd_appointment(self, data):
     from ondoc.doctor.models import OpdAppointment
@@ -1315,6 +1322,7 @@ def decrypted_prescription_pdfs(hospital_ids, key):
             prescription.save()
 
 
+# To create ipd lead from lab appointment
 @task(bind=True, max_retries=2)
 def create_ipd_lead_from_lab_appointment(self, data):
     from ondoc.diagnostic.models import LabAppointment
@@ -1338,6 +1346,7 @@ def create_ipd_lead_from_lab_appointment(self, data):
     obj_created.save()
 
 
+# Check if ipd lead is valid or not
 @task(bind=True, max_retries=2)
 def check_for_ipd_lead_validity(self, data):
     from ondoc.procedure.models import IpdProcedureLead
@@ -1356,6 +1365,7 @@ def check_for_ipd_lead_validity(self, data):
         pass
 
 
+# To create retail appointment lead
 @task(bind=True, max_retries=2)
 def push_retail_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
@@ -1399,6 +1409,7 @@ def push_retail_appointment_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing Retail Appointment to the matrix- " + str(e))
 
 
+# Push order details to salespoint
 @task(bind=True, max_retries=2)
 def push_order_to_spo(self, data):
     try:
