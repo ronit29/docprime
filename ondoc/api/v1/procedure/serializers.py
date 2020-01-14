@@ -4,6 +4,7 @@ from ondoc.diagnostic.models import LabTestCategory
 from ondoc.doctor.models import OpdAppointmentProcedureMapping, CommonHospital
 from ondoc.procedure.models import Procedure, DoctorClinicProcedure, ProcedureToCategoryMapping, \
     CommonProcedureCategory, CommonProcedure, CommonIpdProcedure
+import newrelic.agent
 
 
 class ProcedureSerializer(serializers.ModelSerializer):
@@ -101,16 +102,17 @@ class CommonProcedureSerializer(serializers.ModelSerializer):
         model = CommonProcedure
         fields = ['id', 'name']
 
-
+@newrelic.agent.function_trace()
 class CommonIpdProcedureSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='ipd_procedure.id')
     name = serializers.ReadOnlyField(source='ipd_procedure.name')
     url = serializers.SerializerMethodField()
     icon = serializers.SerializerMethodField()
+    svg_icon = serializers.SerializerMethodField()
 
     class Meta:
         model = CommonIpdProcedure
-        fields = ['id', 'name', 'url', 'icon']
+        fields = ['id', 'name', 'url', 'icon', 'svg_icon']
 
     def get_url(self, obj):
         entity_dict = self.context.get('entity_dict', {})
@@ -123,6 +125,14 @@ class CommonIpdProcedureSerializer(serializers.ModelSerializer):
         if request:
             if obj and obj.ipd_procedure and obj.ipd_procedure.icon:
                 url = request.build_absolute_uri(obj.ipd_procedure.icon.url)
+        return url
+
+    def get_svg_icon(self, obj):
+        url = None
+        request = self.context.get('request')
+        if request:
+            if obj and obj.ipd_procedure and obj.ipd_procedure.svg_icon:
+                url = request.build_absolute_uri(obj.ipd_procedure.svg_icon.url)
         return url
 
 
@@ -138,11 +148,16 @@ class CommonHospitalSerializer(serializers.ModelSerializer):
 
 class CommonCategoriesSerializer(serializers.ModelSerializer):
     icon = serializers.SerializerMethodField()
+    svg_icon = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.icon.url) if obj.icon  and obj.icon.url else None
+        return request.build_absolute_uri(obj.icon.url) if obj.icon and obj.icon.url else None
+
+    def get_svg_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.svg_icon.url) if obj.svg_icon and obj.svg_icon.url else None
 
     class Meta:
         model = LabTestCategory
-        fields = [ 'id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen', 'priority', 'icon']
+        fields = [ 'id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen', 'priority', 'icon', 'svg_icon']

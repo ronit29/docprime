@@ -592,7 +592,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         if obj.doctor_clinic:
             doctor_clinic = obj.doctor_clinic
             if obj.doctor_clinic.hospital and obj.doctor_clinic.doctor:
-                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking and (doctor_clinic.hospital.enabled_for_cod or doctor_clinic.hospital.enabled_for_prepaid):
                    enable_for_online_booking = True
         return enable_for_online_booking
 
@@ -680,7 +680,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             hosp_is_gold = search_criteria.search_value
         plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
         plan = plus_user.plan if plus_user else None
-        calculated_convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
+        calculated_convenience_charge = obj.calculate_convenience_charge(plan)
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
                 "vip_convenience_amount": calculated_convenience_charge,
                 "vip_gold_price": 0, 'hosp_is_gold': False, "is_gold_member": False}
@@ -697,7 +697,11 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             resp['is_enable_for_vip'] = True
             resp['vip_gold_price'] = obj.fees
             if not plus_user:
-                if resp['vip_gold_price'] + calculated_convenience_charge >= obj.deal_price:
+                vip_gold_price = resp['vip_gold_price'] if (
+                            resp.get('vip_gold_price') and resp['vip_gold_price']) else 0
+                calculated_convenience_charge = calculated_convenience_charge if calculated_convenience_charge else 0
+                calc_deal_price = obj.deal_price if obj.deal_price else 0
+                if vip_gold_price + calculated_convenience_charge >= calc_deal_price:
                     resp['is_enable_for_vip'] = False
                 return resp
             utilization = plus_user.get_utilization
@@ -721,12 +725,13 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 # max_price = max_price_engine.get_price(price_data)
                 # convenience_charge = plus_user.plan.get_convenience_charge(max_price, min_price, "DOCTOR")
                 # resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
-                convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
+                convenience_charge = obj.calculate_convenience_charge(plus_user.plan)
                 resp['vip_convenience_amount'] = convenience_charge
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
-
-                if resp['vip_amount'] + convenience_charge >= obj.deal_price:
+                convenience_charge = convenience_charge if convenience_charge is not None else 0
+                vip_amount = resp['vip_amount'] if ('vip_amount' in resp and resp['vip_amount'] is not None) else 0
+                if vip_amount + convenience_charge >= obj.deal_price:
                     resp['is_enable_for_vip'] = False
             # amount = plus_user.get_vip_amount(utilization, mrp)
             # resp['cover_under_vip'] = True if (amount < mrp) else False
@@ -1683,6 +1688,23 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     cancellation_reason = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
     appointment_via_sbi = serializers.SerializerMethodField()
+    gold = serializers.SerializerMethodField()
+
+    def get_gold(self, obj):
+        from ondoc.api.v1.plus.serializers import PlusUserModelSerializer
+        request = self.context.get('request')
+        data = {'is_gold': False, 'members': [], 'is_single_flow': False}
+
+        plus_plan = obj.plus_plan
+        if plus_plan:
+            data['is_gold'] = plus_plan.plan.is_gold
+            data['members'] = PlusUserModelSerializer(plus_plan, context={'request': request}).data
+
+            appointment_order = Order.objects.filter(reference_id=obj.id).first()
+            if appointment_order and appointment_order.single_booking:
+                data['is_single_flow'] = True
+
+        return data
 
     class Meta:
         model = OpdAppointment
@@ -1690,7 +1712,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                   'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
-                  'report_files', 'vip', 'appointment_via_sbi')
+                  'report_files', 'vip', 'appointment_via_sbi', 'gold')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1834,10 +1856,18 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
     name = serializers.ReadOnlyField(source='specialization.name')
     icon = serializers.SerializerMethodField
     url = serializers.SerializerMethodField()
+    svg_icon = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
+
+    def get_svg_icon(self, obj):
+        request = self.context.get('request')
+        if request and obj and obj.svg_icon:
+            return request.build_absolute_uri(obj.svg_icon.url)
+
+        return None
 
     def get_url(self, obj):
         url = None
@@ -1847,7 +1877,7 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonSpecialization
-        fields = ('id', 'name', 'icon', 'url')
+        fields = ('id', 'name', 'icon', 'url', 'svg_icon')
 
 
 class ConfigGetSerializer(serializers.Serializer):
@@ -3000,7 +3030,10 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         return None
 
     def get_insurance_provider(self, obj):
-        return [x.name for x in obj.hospital.health_insurance_providers.all()]
+        if obj.hospital and obj.hospital.health_insurance_providers:
+            return [x.name for x in obj.hospital.health_insurance_providers.all()]
+
+        return []
 
     def get_multi_speciality(self, obj):
         result1 = len(obj.hospital.hospitalspeciality_set.all()) > 1 if obj.hospital else False

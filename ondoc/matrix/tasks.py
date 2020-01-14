@@ -344,6 +344,7 @@ from ondoc.matrix.mongo_models import MatrixLog
 #         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
 
 
+# This method is use to push appointment data to matrix
 @task(bind=True, max_retries=2)
 def push_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
@@ -483,7 +484,7 @@ def push_appointment_to_matrix(self, data):
 #     except Exception as e:
 #         logger.error("Error in Celery. Failed get mask number for appointment " + str(e))
 
-
+# This method is use to push signup data to matrix
 @task(bind=True, max_retries=2)
 def push_signup_lead_to_matrix(self, data):
     log_requests_on()
@@ -569,6 +570,7 @@ def push_signup_lead_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing online lead to the matrix- " + str(e))
 
 
+# This method is use to push order data to matrix
 @task(bind=True, max_retries=2)
 def push_order_to_matrix(self, data):
     log_requests_on()
@@ -659,6 +661,7 @@ def push_order_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
 
 
+# This method is use to save ipd and provider signup lead data to matrix
 @task(bind=True, max_retries=2)
 def create_or_update_lead_on_matrix(self, data):
     from ondoc.doctor.models import Doctor
@@ -827,6 +830,7 @@ def create_or_update_lead_on_matrix(self, data):
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
 
 
+# This method is use to update QC status on matrix for onboarding
 @task(bind=True, max_retries=3)
 def update_onboarding_qcstatus_to_matrix(self, data):
     from ondoc.procedure.models import IpdProcedureLead
@@ -912,6 +916,7 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         logger.error("Error in Celery. Failed to update status to the matrix - " + str(e))
 
 
+# This method is use to create QC status on matrix for onboarding
 @task(bind=True, max_retries=2)
 def push_onboarding_qcstatus_to_matrix(self, data):
     from ondoc.doctor.models import Doctor
@@ -999,6 +1004,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing qc status to the matrix- " + str(e))
 
 
+# This method is use to send non bookable doctors data to matrix
 @task(bind=True, max_retries=2)
 def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
     from ondoc.web.models import NonBookableDoctorLead
@@ -1053,6 +1059,7 @@ def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
         logger.error("Error while pushing the non bookable doctor lead to matrix. ", str(e))
 
 
+# To create ipd lead from opd appointment
 @task(bind=True, max_retries=2)
 def create_ipd_lead_from_opd_appointment(self, data):
     from ondoc.doctor.models import OpdAppointment
@@ -1315,6 +1322,7 @@ def decrypted_prescription_pdfs(hospital_ids, key):
             prescription.save()
 
 
+# To create ipd lead from lab appointment
 @task(bind=True, max_retries=2)
 def create_ipd_lead_from_lab_appointment(self, data):
     from ondoc.diagnostic.models import LabAppointment
@@ -1338,6 +1346,7 @@ def create_ipd_lead_from_lab_appointment(self, data):
     obj_created.save()
 
 
+# Check if ipd lead is valid or not
 @task(bind=True, max_retries=2)
 def check_for_ipd_lead_validity(self, data):
     from ondoc.procedure.models import IpdProcedureLead
@@ -1356,6 +1365,7 @@ def check_for_ipd_lead_validity(self, data):
         pass
 
 
+# To create retail appointment lead
 @task(bind=True, max_retries=2)
 def push_retail_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
@@ -1399,6 +1409,7 @@ def push_retail_appointment_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing Retail Appointment to the matrix- " + str(e))
 
 
+# Push order details to salespoint
 @task(bind=True, max_retries=2)
 def push_order_to_spo(self, data):
     try:
@@ -1462,3 +1473,56 @@ def push_order_to_spo(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))
+
+
+@task(bind=True, max_retries=2)
+def create_prescription_lead_to_matrix(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.notification.tasks import save_matrix_logs
+    try:
+        appointment_id = data.get('appointment_id', None)
+        if not appointment_id:
+            raise Exception("Appointment id not found, could not push prescription lead to Matrix")
+
+        appointment = LabAppointment.objects.filter(id=appointment_id).first()
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        booking_url = '%s/admin/diagnostic/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
+        if appointment.profile.phone_number:
+            phone_number = appointment.profile.phone_number
+        else:
+            phone_number = appointment.user.phone_number
+
+        request_data = {
+            "Name": appointment.profile.name if appointment.profile else "",
+            "ProductId": 14,
+            "PrimaryNo": phone_number,
+            "LeadSource": "Prescriptions",
+            "ExitPointUrl": booking_url
+        }
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        save_matrix_logs.apply_async((appointment.id, 'lab_appointment', request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info(json.dumps(request_data))
+            logger.info("[ERROR] Appointment Prescription could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logger.error("Appointment Prescription syc with the Matrix System failed with response - " + str(response))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+        resp_data = response.json()
+        print(resp_data)
+
+        if not resp_data.get('Id', None):
+            return
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Appointment Prescription lead to matrix- " + str(e))

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         DoctorNumber, Address, GenericAdmin, UserSecretKey,
+                                         DoctorNumber, Address, GenericAdmin, UserSecretKey, WhiteListedLoginTokens,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin, UserProfileEmailUpdate)
 from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital, Doctor
 from ondoc.common.models import AppointmentHistory
@@ -18,13 +18,14 @@ from ondoc.lead.models import UserLead
 from ondoc.web.models import OnlineLead, Career, ContactUs
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
-import jwt
+import jwt, logging
 from django.conf import settings
 from django.db.models import Q
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common import models as common_models
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class OTPSerializer(serializers.Serializer):
@@ -207,12 +208,40 @@ class UserProfileSerializer(serializers.ModelSerializer):
     is_default_user = serializers.BooleanField(required=False)
     is_vip_member = serializers.SerializerMethodField()
     is_vip_gold_member = serializers.SerializerMethodField()
+    vip_data = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
-                  "insurance_status", "is_vip_member", "is_vip_gold_member")
+                  "insurance_status", "is_vip_member", "is_vip_gold_member", "vip_data")
+
+    def get_vip_data(self, obj):
+        resp = {}
+        if isinstance(obj, dict):
+            return resp
+        plus_membership = obj.get_plus_membership
+        if not plus_membership:
+            return resp
+        resp['expiry_date'] = plus_membership.expire_date.date()
+        resp['purchase_date'] = plus_membership.purchase_date.date()
+        primary_member = plus_membership.get_primary_member_profile()
+        if primary_member:
+            resp['primary_member'] = primary_member.first_name + " " + primary_member.last_name
+        else:
+            members = plus_membership.get_members
+            primary_member_obj = members.first()
+            primary_member = primary_member_obj.first_name + " " + primary_member_obj.last_name
+            resp['primary_member'] = primary_member
+        return resp
+
+    def validate(self, attrs):
+        if self.instance:
+            if self.instance.is_gold_profile:
+                raise serializers.ValidationError("Gold Member Profile can not be editable.")
+            if self.instance.is_insured_profile:
+                raise serializers.ValidationError("Insured Member profile can not be editable.")
+        return attrs
 
     def get_is_insured(self, obj):
         if isinstance(obj, dict):
@@ -391,9 +420,58 @@ class UserTransactionModelSerializer(serializers.ModelSerializer):
 class RefreshJSONWebTokenSerializer(serializers.Serializer):
 
     token = serializers.CharField()
+    reset = serializers.CharField(required=False)
+    force_update = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
-        token = attrs['token']
+        import hashlib
+        token = attrs.get('token')
+        reset = attrs.get('reset')
+        force_update = True if (attrs.get('force_update') and attrs['force_update']) else False
+        request = self.context.get('request')
+        payload, status = self.check_payload_v2(token)
+        uid = payload if status == 0 else payload.get('user_id')
+        # if not WhiteListedLoginTokens.objects.filter(token=token, user_id=uid).exists():
+        #     attrs['active_session_error'] = True
+        #     return attrs
+        #     raise serializers.ValidationError("No Last Active sesssion found!")
+        if status == 1 and not force_update:
+            '''FAke Refresh, Return the original data [As required by Rohit Dhall]'''
+            return {
+                    'token': token,
+                    'user': payload.get('user_id'),
+                    'payload': payload
+            }
+        elif force_update or (status == 0 and reset):
+            try:
+                passphrase = hashlib.md5("hpDqwzdpoQY8ymm5".encode())
+                passphrase = passphrase.hexdigest()[:16]
+                decrypt = v1_utils.AES_encryption.decrypt(reset.encode(), passphrase)
+                if decrypt and isinstance(decrypt, tuple):
+                    decrypt = decrypt[0]
+                    data = v1_utils.AES_encryption.unpad(decrypt)
+            except Exception as e:
+                logger.error("Failed to decrypt data " + str(e))
+                raise serializers.ValidationError('Failed to decrypt!')
+            get_date = data.split('.')
+            if len(get_date) > 1:
+                uid = get_date[0]
+                date_generated = get_date[1]
+                time_format = '%Y-%m-%d %H:%M:%S'
+                date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
+
+                time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
+                if time_elapsed > 2:
+                    raise serializers.ValidationError('Reset Key Expired' + str(date_generated))
+                else:
+                    user = User.objects.filter(id=uid).first()
+                    blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
+                    token_object = JWTAuthentication.generate_token(user, request)
+                    return {
+                        'token': token_object['token'],
+                        'user': user,
+                        'payload': token_object['payload']
+                    }
 
         payload = self.check_payload_custom(token=token)
         user = self.check_user_custom(payload=payload)
@@ -417,15 +495,17 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         else:
             msg = _('orig_iat missing')
             raise serializers.ValidationError(msg)
-
-        token_object = JWTAuthentication.generate_token(user)
+        blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
+        # if blacllist_token and isinstance(blacllist_token, tuple) and (blacllist_token[0] > 0):
+        token_object = JWTAuthentication.generate_token(user, request)
         token_object['payload']['orig_iat'] = orig_iat
-
         return {
             'token': token_object['token'],
             'user': user,
             'payload': token_object['payload']
         }
+        # else:
+        # return serializers.ValidationError("Token Has expired")
 
     def check_user_custom(self, payload):
         uid = payload.get('user_id')
@@ -464,6 +544,20 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             raise serializers.ValidationError(msg)
 
         return payload
+
+    def check_payload_v2(self, token):
+        user_key = None
+        user_id = JWTAuthentication.get_unverified_user(token)
+        if user_id:
+            user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
+            if user_key_object:
+                user_key = user_key_object.key
+        try:
+            payload = jwt.decode(token, user_key)
+        except jwt.ExpiredSignature:
+            msg = ('Token has expired.')
+            return user_id, 0
+        return payload, 1
 
 
 class OnlineLeadSerializer(serializers.ModelSerializer):

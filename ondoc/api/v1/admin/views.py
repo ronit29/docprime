@@ -18,7 +18,7 @@ from ondoc.articles.serializers import ArticleImageSerializer
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image as Img
 from ondoc.articles.models import ArticleImage
-
+from ondoc.authentication.models import WhiteListedLoginTokens
 
 @api_view(['POST'])
 def upload(request):
@@ -64,7 +64,8 @@ def userlogin_via_agent(request):
         return JsonResponse(response, status=403)
 
     if user_type == User.CONSUMER and not request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists()  and \
-           not request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            not request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and \
+            not request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
         return JsonResponse(response, status=403)
 
     user = User.objects.filter(phone_number=data['phone_number'], user_type=user_type).first()
@@ -84,7 +85,6 @@ def userlogin_via_agent(request):
     user_key = UserSecretKey.objects.get_or_create(user=user)
     payload = JWTAuthentication.appointment_agent_payload_handler(request, user, can_book=can_book)
     token = jwt.encode(payload, user_key[0].key)
-
     response = {
         "login": 1,
         "agent_id": request.user.id,

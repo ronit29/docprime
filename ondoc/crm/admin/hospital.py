@@ -651,6 +651,8 @@ class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPem
             obj.data_status = QCModel.REOPENED
         if not obj.source_type:
             obj.source_type = Hospital.AGENT
+        if not obj.enabled_for_cod and not obj.enabled_for_prepaid:
+            obj.enabled_for_online_booking = False
 
         obj.status_changed_by = request.user
         obj.city = obj.matrix_city.name

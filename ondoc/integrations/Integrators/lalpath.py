@@ -15,6 +15,7 @@ from django.utils import timezone
 
 class Lalpath(BaseIntegrator):
 
+    # This method is use to get all test data from integrator.
     @classmethod
     def get_test_data(cls):
         url = "%s/BulkDataTestCityPrice" % settings.LAL_PATH_BASE_URL
@@ -43,6 +44,7 @@ class Lalpath(BaseIntegrator):
                                                          integrator_test_mapping=itm_obj)
                 print(test['TestName'])
 
+    # This method is use to get an auth_token to access integrator APIs.
     def get_auth_token(self):
         username = settings.LAL_PATH_USERNAME
         password = settings.LAL_PATH_PASSWORD
@@ -56,6 +58,7 @@ class Lalpath(BaseIntegrator):
 
         return None
 
+    # This method is use to push an appointment to integrator server.
     def _post_order_details(self, lab_appointment, **kwargs):
         from ondoc.integrations.models import IntegratorHistory
         tests = kwargs.get('tests', None)
@@ -87,6 +90,7 @@ class Lalpath(BaseIntegrator):
                 return resp_data
         return None
 
+    # This method is use to create request data for integrator order.
     def prepare_data(self, tests, lab_appointment):
         profile = lab_appointment.profile
         patient_address = ""
@@ -184,6 +188,7 @@ class Lalpath(BaseIntegrator):
         today = date.today()
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
+    # This method is use for getting pushed orders details from integrator.
     def _order_summary(self, integrator_response):
         from ondoc.integrations.models import IntegratorHistory
         from ondoc.diagnostic.models import LabAppointment

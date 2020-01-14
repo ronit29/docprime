@@ -35,7 +35,7 @@ from django.contrib.contenttypes.models import ContentType
 import string
 import random
 import decimal
-
+from django.conf import settings
 from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
@@ -111,6 +111,8 @@ class Order(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.id)
 
+    # This method is use when we need to create dummy txn for insurance booking
+    # This returns ref order id and ref order no of insurance premium txn
     def get_insurance_data_for_pg(self):
         from ondoc.insurance.models import UserInsurance
 
@@ -138,12 +140,14 @@ class Order(TimeStampedModel):
 
         return data
 
+    # Check if dummy txn needs to be created or not for order
     def dummy_transaction_allowed(self):
         if (not self.is_parent() and not self.booked_using_insurance()) or self.getTransactions():
             return False
 
         return True
 
+    # Check if order booked through insurance
     def booked_using_insurance(self):
         if self.is_parent():
             raise Exception('Not implemented for parent orders')
@@ -152,9 +156,11 @@ class Order(TimeStampedModel):
             return True
         return False
 
+    # check if order is a parent or child
     def is_parent(self):
         return self.parent_id is None
 
+    # To disable pending orders
     @classmethod
     def disable_pending_orders(cls, appointment_details, product_id, action):
         if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -180,6 +186,7 @@ class Order(TimeStampedModel):
                 action=action,
             ).update(is_viewable=False)
 
+    # Check if order is cod or not
     @cached_property
     def is_cod_order(self):
         if self.orders.exists():
@@ -188,6 +195,7 @@ class Order(TimeStampedModel):
             orders_to_process = [self]
         return len(orders_to_process) == 1 and all([child_order.get_cod_to_prepaid_appointment() for child_order in orders_to_process])
 
+    # To changes cod appointment into prepaid
     def get_cod_to_prepaid_appointment(self, update_order_and_appointment=False):
         from ondoc.doctor.models import OpdAppointment
         if self.product_id != self.DOCTOR_PRODUCT_ID:
@@ -239,8 +247,10 @@ class Order(TimeStampedModel):
         from ondoc.plus.models import PlusAppointmentMapping, TempPlusUser
 
         appointment_data = self.action_data
-        consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
+        # consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
+        # consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
+        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
 
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         cod_to_prepaid_app = None
@@ -268,6 +278,8 @@ class Order(TimeStampedModel):
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
             if appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -288,7 +300,9 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
-            elif appointment_data['payment_type'] == OpdAppointment.VIP:
+            elif appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -611,6 +625,7 @@ class Order(TimeStampedModel):
             return UserInsurance.objects.filter(id=self.reference_id).first()
         return None
 
+    # To get order total amount
     def get_total_price(self):
         if not self.is_parent() and self.booked_using_insurance():
             return 0
@@ -620,6 +635,7 @@ class Order(TimeStampedModel):
 
         return ( self.amount or 0 ) + ( self.wallet_amount or 0 )
 
+    # This method is use to get transaction of a order
     def getTransactions(self):
         # if trying to get txn on a child order, recurse for its parent instead
 
@@ -722,7 +738,7 @@ class Order(TimeStampedModel):
         process_immediately = False
         if total_balance >= payable_amount:
             cashback_amount = min(cashback_balance, payable_amount)
-            wallet_amount = max(0, payable_amount - cashback_amount)
+            wallet_amount = max(0, int(payable_amount) - int(cashback_amount))
             pg_order = cls.objects.create(
                 amount= 0,
                 wallet_amount= wallet_amount,
@@ -1155,7 +1171,6 @@ class Order(TimeStampedModel):
                 deal_price = Decimal(self.action_data.get('deal_price', '0.00'))
         return deal_price
 
-
     @cached_property
     def get_amount_without_pg_coupon(self):
         from ondoc.doctor.models import OpdAppointment
@@ -1178,7 +1193,6 @@ class Order(TimeStampedModel):
                             if coupon:
                                 amount += obj.get_discount(coupon, Decimal(order.action_data['deal_price']))
         return amount
-
 
     def used_coupons(self):
         coupons_ids = []
@@ -1528,6 +1542,7 @@ class ConsumerAccount(TimeStampedModel):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     cashback = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
+    # To get user's wallet balance
     def get_total_balance(self):
         return self.balance + self.cashback
 
@@ -1715,7 +1730,7 @@ class ConsumerAccount(TimeStampedModel):
             return
 
         consumer_account = cls.objects.select_for_update().get(user=user)
-        consumer_account.cashback += cashback_amount
+        consumer_account.cashback += int(cashback_amount)
         action = ConsumerTransaction.CASHBACK_CREDIT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = consumer_account.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_amount, action, tx_type)
@@ -1727,7 +1742,7 @@ class ConsumerAccount(TimeStampedModel):
         consumer_account = cls.objects.get_or_create(user=user)
         consumer_account = cls.objects.select_for_update().get(user=user)
 
-        consumer_account.cashback += cashback_amount
+        consumer_account.cashback += int(cashback_amount)
         action = ConsumerTransaction.REFERRAL_CREDIT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = consumer_account.consumer_tx_appointment_data(user, None, product_id, cashback_amount,
@@ -1852,10 +1867,14 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                 cashback_txn = True
             elif ref_txn_obj.action == ConsumerTransaction.SALE and ref_txn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
                 cashback_txn = True
-            if ref_txn_obj.ref_txns:
+            if ref_txn_obj.ref_txns or ref_txn_obj.action == ConsumerTransaction.PAYMENT:
                 ref_refund_amount = min(decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0)), refund_amount)
                 refund_amount -= ref_refund_amount
-                ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, False, 1, 0, reference_id)
+                if ref_txn_obj.action == ConsumerTransaction.PAYMENT:
+                    ref_txn_obj.balance += ref_refund_amount
+                    ctx_obj = ref_txn_obj.debit_from_balance(consumer_account, reference_id)
+                else:
+                    ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, False, 1, 0, reference_id)
             else:
                 ref_refund_amount = refund_amount
                 if not cashback_txn and ref_refund_amount:
@@ -2291,6 +2310,7 @@ class MerchantPayout(TimeStampedModel):
     #         if p.utr_no:
     #             p.create_insurance_transaction()
 
+    # # Get appointment object from merchant payout
     def get_corrosponding_appointment(self):
         appointment = None
         if self.booking_type == Order.DOCTOR_PRODUCT_ID:
@@ -2300,6 +2320,7 @@ class MerchantPayout(TimeStampedModel):
 
         return appointment
 
+    # Check if insurance txn needs to be create or not
     def should_create_insurance_transaction(self):
         from ondoc.insurance.models import InsuranceTransaction
 
@@ -2349,6 +2370,7 @@ class MerchantPayout(TimeStampedModel):
             if len(transfers)==0 and (transferred_amount+self.payable_amount)<=premium_amount:
                 return True
 
+    # Create transaction for insurance
     def create_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         if self.should_create_insurance_transaction():
@@ -2365,6 +2387,7 @@ class MerchantPayout(TimeStampedModel):
                                                 amount=self.payable_amount,
                                                 reason=InsuranceTransaction.PREMIUM_PAYOUT)
 
+    # Get insurance transaction
     def get_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         if not self.booking_type == self.InsurancePremium:
@@ -2373,6 +2396,7 @@ class MerchantPayout(TimeStampedModel):
         existing = user_insurance.transactions.filter(reason=InsuranceTransaction.PREMIUM_PAYOUT)
         return existing
 
+    # Get user insurance object
     def get_user_insurance(self):
         ui = self.user_insurance.all()
         if len(ui)>1:
@@ -2384,6 +2408,7 @@ class MerchantPayout(TimeStampedModel):
         user_insurance = pms.content_object
         return user_insurance
 
+    # Update payout status
     def update_status(self, status):
         if status == 'attempted':
             self.status = self.ATTEMPTED
@@ -2391,6 +2416,7 @@ class MerchantPayout(TimeStampedModel):
             self.status = self.INITIATED
         self.save()
 
+    # This method is use for showing payout info on appointment page CRM
     @staticmethod
     def get_merchant_payout_info(obj):
         """obj is either a labappointment or an opdappointment"""
@@ -2404,6 +2430,7 @@ class MerchantPayout(TimeStampedModel):
                 result += "Paid To : {}<br>".format(obj.merchant_payout.paid_to)
         return mark_safe(result)
 
+    # Get appointment from payout
     def get_appointment(self):
         if self.lab_appointment.all():
             return self.lab_appointment.all()[0]
@@ -2413,11 +2440,13 @@ class MerchantPayout(TimeStampedModel):
             return self.user_insurance.all()[0]
         return None
 
+    # Check if amount need to transfer to different nodal
     def is_nodal_transfer(self):
         merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
         if self.paid_to == merchant:
             return True
 
+    # Get insurance premium txn
     def get_insurance_premium_transactions(self):
         user_insurance = self.get_user_insurance()
         if self.is_nodal_transfer():
@@ -2457,6 +2486,7 @@ class MerchantPayout(TimeStampedModel):
 
         return []
 
+    # Check if payout related to insurance premium or not
     def is_insurance_premium_payout(self):
         if self.booking_type == Order.INSURANCE_PRODUCT_ID:
             return True
@@ -2546,6 +2576,7 @@ class MerchantPayout(TimeStampedModel):
             logger.error("Error in Setting Dummy Transaction of payout - " + str(self.id) + " with exception - " + str(e))
         return transaction
 
+    # This method is use for processing insurance premium payouts
     def process_insurance_premium_payout(self):
         from ondoc.api.v1.utils import create_payout_checksum
         from collections import OrderedDict
@@ -2644,6 +2675,7 @@ class MerchantPayout(TimeStampedModel):
         if payout_status and payout_status.get("status"):
             return True
 
+    # To get merchant billing information
     def get_billed_to(self):
         if self.content_object:
             return self.content_object
@@ -2652,6 +2684,7 @@ class MerchantPayout(TimeStampedModel):
             return appt.get_billed_to
         return ''
 
+    # Get default payment mode for payout
     def get_default_payment_mode(self):
         default_payment_mode = None
         merchant = self.get_merchant()
@@ -2664,6 +2697,7 @@ class MerchantPayout(TimeStampedModel):
 
         return default_payment_mode
 
+    # Get payout merchant
     def get_merchant(self):
         if self.paid_to:
             return self.paid_to
@@ -2773,6 +2807,7 @@ class MerchantPayout(TimeStampedModel):
         checksum_hash = checksum_hash.hexdigest()
         return checksum_hash
 
+    # This method is use to re create
     def recreate_failed_payouts(self):
         # # recreate payout only when status is failed
         if self.status == self.FAILED_FROM_DETAIL or self.status == self.FAILED_FROM_QUEUE or self.merchant_has_advance_payment():
@@ -2795,6 +2830,7 @@ class MerchantPayout(TimeStampedModel):
                 appointment.update_payout_id(new_obj.id)
                 print('New payout created for ' + str(self.id))
 
+    # Update merchant and billing amount when changed
     def update_billed_to_content_type(self):
         merchant = self.get_merchant()
         if merchant:
@@ -2818,6 +2854,7 @@ class MerchantPayout(TimeStampedModel):
         adv_amt_obj = AdvanceMerchantAmount.objects.select_for_update().filter(merchant_id=self.paid_to_id).first()
         return adv_amt_obj
 
+    # Check if merchant has advance payment.
     def merchant_has_advance_payment(self):
         adv_amt_obj = self.get_advance_amount_obj()
         if adv_amt_obj and adv_amt_obj.amount > 0:
@@ -2825,6 +2862,7 @@ class MerchantPayout(TimeStampedModel):
 
         return False
 
+    # Get advance payout amount
     def get_advance_balance(self):
         adv_amt_obj = self.get_advance_amount_obj()
         if adv_amt_obj:
@@ -2832,6 +2870,7 @@ class MerchantPayout(TimeStampedModel):
 
         return None
 
+    # Update payout if merchant has advance payment and marked it paid
     @transaction.atomic
     def update_payout_for_advance_available(self):
         adv_amt_obj = self.get_advance_amount_obj()
@@ -2850,6 +2889,7 @@ class MerchantPayout(TimeStampedModel):
             self.payout_ref_id = self.id
             self.save()
 
+    # Get nodal account for payout
     @property
     def get_nodal_id(self):
         from ondoc.doctor.models import OpdAppointment
@@ -2879,8 +2919,8 @@ class PayoutMapping(TimeStampedModel):
 
 
 class UserReferrals(TimeStampedModel):
-    SIGNUP_CASHBACK = 50
-    COMPLETION_CASHBACK = 50
+    SIGNUP_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
+    COMPLETION_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
 
     code = models.CharField(max_length=10, unique=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True, related_name='referral')
