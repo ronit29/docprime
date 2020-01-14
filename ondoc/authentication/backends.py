@@ -200,6 +200,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         return {
             'user_id': user.pk,
             'expiration_time': appointment.time_slot_start + datetime.timedelta(hours=24),
+            'exp': appointment.time_slot_start + datetime.timedelta(hours=24),
             'orig_iat': calendar.timegm(
                 datetime.datetime.utcnow().utctimetuple()
             ),
