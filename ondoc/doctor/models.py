@@ -4400,6 +4400,7 @@ class CommonSpecialization(auth_model.TimeStampedModel):
     # icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
     icon = models.FileField(upload_to='doctor/common_specialization_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
+    svg_icon = models.FileField(upload_to='doctor/common_specialization_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['svg'])])
 
     def __str__(self):
         return "{}".format(self.specialization)

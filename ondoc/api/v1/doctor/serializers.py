@@ -1856,10 +1856,18 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
     name = serializers.ReadOnlyField(source='specialization.name')
     icon = serializers.SerializerMethodField
     url = serializers.SerializerMethodField()
+    svg_icon = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
+
+    def get_svg_icon(self, obj):
+        request = self.context.get('request')
+        if request and obj and obj.svg_icon:
+            return request.build_absolute_uri(obj.svg_icon.url)
+
+        return None
 
     def get_url(self, obj):
         url = None
@@ -1869,7 +1877,7 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonSpecialization
-        fields = ('id', 'name', 'icon', 'url')
+        fields = ('id', 'name', 'icon', 'url', 'svg_icon')
 
 
 class ConfigGetSerializer(serializers.Serializer):
