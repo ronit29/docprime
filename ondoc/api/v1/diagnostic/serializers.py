@@ -3,7 +3,7 @@ from rest_framework import serializers
 from rest_framework.fields import CharField
 
 from ondoc.cart.models import Cart
-from ondoc.common.models import SearchCriteria
+from ondoc.common.models import SearchCriteria, UserConfig
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
                                      LabTestCategory, LabAppointmentTestMapping, LabTestGroup, LabTestGroupMapping)
@@ -1861,6 +1861,10 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     selected_timings_type = serializers.SerializerMethodField()
     appointment_via_sbi = serializers.SerializerMethodField()
     gold = serializers.SerializerMethodField()
+    user_referral_amt = serializers.SerializerMethodField()
+
+    def get_user_referral_amt(self, obj):
+        return UserConfig.get_referral_amount()
 
     def get_gold(self, obj):
         from ondoc.api.v1.plus.serializers import PlusUserModelSerializer
@@ -1941,7 +1945,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
                   'time_slot_start', 'time_slot_end', 'selected_timings_type', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
                   'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports',
                   'report_files', 'invoices', 'prescription', 'cancellation_reason', 'mask_data', 'payment_type',
-                  'price', 'appointment_via_sbi', 'gold')
+                  'price', 'appointment_via_sbi', 'gold', 'user_referral_amt')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
