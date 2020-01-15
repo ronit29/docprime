@@ -557,3 +557,4 @@ GOLD_MERCHANT_CODE=env('GOLD_MERCHANT_CODE')
 VIP_MERCHANT_CODE=env('VIP_MERCHANT_CODE')
 SBIG_BASE_URL=env('SBIG_BASE_URL')
 REFERRAL_CASHBACK_AMOUNT=env('REFERRAL_CASHBACK_AMOUNT')
+CORS_ALLOW_HEADERS = ['accept', 'accept-encoding', 'authorization', 'content-type', 'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with', 'app-name']
