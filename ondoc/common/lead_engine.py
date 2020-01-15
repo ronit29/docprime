@@ -149,6 +149,7 @@ class Medicine(AbstractLead):
             "SubProductId": 0,
             "PaymentStatus": 0,
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
+            "IPDIsInsured": 1 if user and user.active_insurance and user.active_insurance.is_valid() else 0,
             "LeadSource": request_data.get('lead_source'),
             "ProductId": 11,
             "UtmTerm": request_data.get('source', {}).get('utm_term', ''),
