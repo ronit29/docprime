@@ -33,7 +33,8 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
                                 DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate)
+                                         AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate,
+                                         WhiteListedLoginTokens)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs, PaymentProcessStatus
@@ -56,7 +57,7 @@ from ondoc.api.v1.insurance.serializers import (InsuranceTransactionSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
-from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication, SbiGAuthentication
+from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication, SbiGAuthentication, RefreshAuthentication
 from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
                                 ErrorCodeMapping, IsNotAgent, GenericAdminEntity, generate_short_url, form_time_slot)
 from django.conf import settings
@@ -87,6 +88,7 @@ def expire_otp(phone_number):
 
 class LoginOTP(GenericViewSet):
 
+    authentication_classes = []
     serializer_class = serializers.OTPSerializer
 
     @transaction.atomic
@@ -168,10 +170,9 @@ class UserViewset(GenericViewSet):
             # for new user, create a referral coupon entry
             self.set_referral(user)
 
-
         self.set_coupons(user)
 
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
 
         expire_otp(data['phone_number'])
 
@@ -180,7 +181,7 @@ class UserViewset(GenericViewSet):
             "user_exists": user_exists,
             "user_id": user.id,
             "token": token_object['token'],
-            "expiration_time": token_object['payload']['exp']
+            "exp": token_object['payload']['exp']
         }
         return Response(response)
 
@@ -192,13 +193,6 @@ class UserViewset(GenericViewSet):
             UserReferrals.objects.create(user=user)
         except Exception as e:
             logger.error(str(e))
-
-    @transaction.atomic
-    def logout(self, request):
-        required_token = request.data.get("token", None)
-        if required_token and request.user.is_authenticated:
-            NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
-        return Response({"message": "success"})
 
     @transaction.atomic
     def register(self, request, format=None):
@@ -225,6 +219,13 @@ class UserViewset(GenericViewSet):
         }
         return Response(response)
 
+    @transaction.atomic
+    def logout(self, request):
+        required_token = request.data.get("token", None)
+        if required_token and request.user.is_authenticated:
+            NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
+        WhiteListedLoginTokens.objects.filter(token=required_token).delete()
+        return Response({"message": "success"})
 
     @transaction.atomic
     def doctor_login(self, request, format=None):
@@ -249,7 +250,7 @@ class UserViewset(GenericViewSet):
         GenericLabAdmin.update_user_lab_admin(phone_number)
         self.update_live_status(phone_number)
 
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
         expire_otp(data['phone_number'])
 
         if data.get("source"):
@@ -257,6 +258,7 @@ class UserViewset(GenericViewSet):
 
         response = {
             "login": 1,
+            "user_id": user.id,
             "token": token_object['token'],
             "expiration_time": token_object['payload']['exp']
         }
@@ -545,13 +547,16 @@ class ReferralViewSet(GenericViewSet):
         help_flow = []
         share_text = ''
         share_url = ''
+        whatsapp_text = ''
         if user_config:
             all_data = user_config.data
             help_flow = all_data.get('help_flow', [])
             share_text = all_data.get('share_text', '').replace('$referral_code', referral.code)
             share_url = all_data.get('share_url', '').replace('$referral_code', referral.code)
+            whatsapp_text = all_data.get('whatsapp_text', '').replace('$referral_code', referral.code)
+
         return Response({"code": referral.code, "status": 1, 'help_flow': help_flow,
-                         "share_text": share_text, "share_url": share_url})
+                         "share_text": share_text, "share_url": share_url, 'whatsapp_text': whatsapp_text})
 
     def retrieve_by_code(self, request, code):
         referral = UserReferrals.objects.filter(code__iexact=code).first()
@@ -2288,14 +2293,21 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
 
 class RefreshJSONWebToken(GenericViewSet):
 
+    authentication_classes = (RefreshAuthentication,)
+
     def refresh(self, request):
         data = {}
-        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data)
-        # serializer.is_valid(raise_exception=True)
-        if not serializer.is_valid():
-            return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_401_UNAUTHORIZED)
-        data['token'] = serializer.validated_data['token']
-        data['payload'] = serializer.validated_data['payload']
+        if hasattr(request, 'agent') and request.agent is not None:
+            return Response({})
+        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        # if 'active_session_error' in valid_data and valid_data['active_session_error']:
+        #     return Response({'error': 'No Last Acctive Session Found'}, status=status.HTTP_401_UNAUTHORIZED)
+        # if not serializer.is_valid():
+        #     return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_400_BAD_REQUEST)
+        data['token'] = valid_data['token']
+        data['payload'] = valid_data['payload']
         return Response(data)
 
 
@@ -2353,7 +2365,7 @@ class SendBookingUrlViewSet(GenericViewSet):
         landing_url = request.data.get('landing_url')
 
         # agent_token = AgentToken.objects.create_token(user=request.user)
-        user_token = JWTAuthentication.generate_token(request.user)
+        user_token = JWTAuthentication.generate_token(request.user, request)
         token = user_token['token'].decode("utf-8") if 'token' in user_token else None
         user_profile = None
 
@@ -2410,7 +2422,7 @@ class SendCartUrlViewSet(GenericViewSet):
             utm_campaign = "utm_campaign=%s" % utm_campaign
             utm_parameters = utm_parameters + utm_campaign
 
-        user_token = JWTAuthentication.generate_token(request.user)
+        user_token = JWTAuthentication.generate_token(request.user, request)
         token = user_token['token'].decode("utf-8") if 'token' in user_token else None
         user_profile = None
 
@@ -2589,7 +2601,7 @@ class UserTokenViewSet(GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         agent_token = AgentToken.objects.filter(token=token, is_consumed=False, expiry_time__gte=timezone.now()).first()
         if agent_token:
-            token_object = JWTAuthentication.generate_token(agent_token.user)
+            token_object = JWTAuthentication.generate_token(agent_token.user, request)
             # agent_token.is_consumed = True
             agent_token.save()
             return Response({"status": 1, "token": token_object['token'], 'order_id': agent_token.order_id})
@@ -2853,7 +2865,7 @@ class MatrixUserViewset(GenericViewSet):
         if not hospital:
             return Response({'error': "Invalid Hospital ID"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            user_data = User.get_external_login_data(data)
+            user_data = User.get_external_login_data(data, request)
         except Exception as e:
             logger.error(str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2889,7 +2901,7 @@ class ExternalLoginViewSet(GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         redirect_type = data.get('redirect_type')
-        user_data = User.get_external_login_data(data)
+        user_data = User.get_external_login_data(data, request)
         token_object = user_data.get('token', None)
         if not token_object or not user_data:
             return Response({'error': 'Unauthorise'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2930,26 +2942,26 @@ class SbiGUserViewset(GenericViewSet):
         return response
 
 
-# class CloudLabUserViewSet(viewsets.GenericViewSet):
-#     authentication_classes = (JWTAuthentication,)
-#     permission_classes = (IsAuthenticated, IsDoctor)
-#
-#     @transaction.atomic()
-#     def user_login_via_cloud_lab(self, request):
-#         from django.http import JsonResponse
-#         response = {'login': 0}
-#         if request.method != 'POST':
-#             return JsonResponse(response, status=405)
-#         serializer = serializers.CloudLabUserLoginSerializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         data = serializer.validated_data
-#         try:
-#             user_data = User.get_external_login_data(data)
-#         except Exception as e:
-#             logger.error(str(e))
-#             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-#         token = user_data.get('token')
-#         if not token:
-#             return JsonResponse(response, status=400)
-#
-#         return Response(response, status=status.HTTP_200_OK)
+class PGRefundViewset(viewsets.GenericViewSet):
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated, IsDoctor)
+
+    @transaction.atomic()
+    def save_pg_refund(self, request):
+        from django.http import JsonResponse
+        response = {'login': 0}
+        if request.method != 'POST':
+            return JsonResponse(response, status=405)
+        serializer = serializers.CloudLabUserLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            user_data = User.get_external_login_data(data, request)
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        token = user_data.get('token')
+        if not token:
+            return JsonResponse(response, status=400)
+
+        return Response(response, status=status.HTTP_200_OK)
