@@ -1009,7 +1009,7 @@ class Order(TimeStampedModel):
         for order in orders_to_process:
             try:
                 is_process = True
-                app_data = order.action_data
+                app_data = order.action_data if order.action_data else {}
                 doctor = app_data.get('doctor', None)
 
                 if doctor:
