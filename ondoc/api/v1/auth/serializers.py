@@ -218,6 +218,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_vip_data(self, obj):
         resp = {}
+        if isinstance(obj, dict):
+            return resp
         plus_membership = obj.get_plus_membership
         if not plus_membership:
             return resp
