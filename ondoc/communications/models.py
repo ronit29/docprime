@@ -535,6 +535,7 @@ class SMSNotification:
         appointment = context.get("instance")
         user_key = UserSecretKey.objects.get_or_create(user=user)
         payload = JWTAuthentication.provider_sms_payload_handler(user, appointment)
+        payload.pop('expiration_time')
         token = jwt.encode(payload, user_key[0].key)
         token = str(token, 'utf-8')
         appointment_type = 'opd' if appointment.__class__ == OpdAppointment else 'lab'
