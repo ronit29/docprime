@@ -343,7 +343,7 @@ def plan_subscription_reverse_transform(subscription_data):
                                    "%Y-%m-%d")
     plus_members = subscription_data['plus_user']['plus_members']
     for member in plus_members:
-        member['dob'] = datetime.datetime.strptime(str(member['dob']), "%Y-%m-%d").date()
+        member['dob'] = datetime.datetime.strptime(str(member['dob']), "%Y-%m-%d %H:%M:%S").date()
     return subscription_data
 
 
