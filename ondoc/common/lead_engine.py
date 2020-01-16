@@ -127,6 +127,42 @@ class DropOff(AbstractLead):
         return data
 
 
+class Medicine(AbstractLead):
+
+    def __init__(self, obj):
+        super(Medicine, self).__init__(obj, "general_leads")
+
+    def update_matrix_lead_id(self, response, *args, **kwargs):
+        from ondoc.common.models import GeneralMatrixLeads
+        lead_id = response.get('Id')
+        if not lead_id:
+            raise Exception('Id not received from matrix')
+
+        GeneralMatrixLeads.objects.filter(id=self.obj.id).update(matrix_lead_id=lead_id)
+
+    def prepare_lead_data(self, *args, **kwargs) -> Dict:
+        obj = self.obj
+        request_data = obj.request_body
+        user = obj.user if obj.user else None
+
+        data = {
+            "SubProductId": 0,
+            "PaymentStatus": 0,
+            "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
+            "IPDIsInsured": 1 if user and user.active_insurance and user.active_insurance.is_valid() else 0,
+            "LeadSource": request_data.get('lead_source'),
+            "ProductId": 11,
+            "UtmTerm": request_data.get('source', {}).get('utm_term', ''),
+            "PrimaryNo": request_data.get('phone_number') if not user else str(user.phone_number),
+            "UtmCampaign": request_data.get('source', {}).get('utm_campaign', ''),
+            "UTMMedium": request_data.get('source', {}).get('utm_medium', ''),
+            "Name": user.full_name if user else 'none',
+            "UtmSource": request_data.get('source', {}).get('utm_source', ''),
+        }
+
+        return data
+
+
 class LabAds(AbstractLead):
 
     def __init__(self, obj):
@@ -203,6 +239,7 @@ class CancelDropOffLeadViaAppointment(AbstractLead):
 
 
 lead_class_mapping = {
+    'MEDICINE': Medicine,
     'DROPOFF': DropOff,
     'LABADS': LabAds,
     'CANCELDROPOFFLEADVIAAPPOINTMENT': CancelDropOffLeadViaAppointment

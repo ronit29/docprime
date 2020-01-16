@@ -536,27 +536,29 @@ class ReferralViewSet(GenericViewSet):
         user = request.user
         if not user.is_authenticated:
             return Response({"status": 0}, status=status.HTTP_401_UNAUTHORIZED)
-        if UserReferrals.objects.all():
-            referral = UserReferrals.objects.filter(user=user).first()
-            if not referral:
-                referral = UserReferrals()
-                referral.user = user
-                referral.save()
+        referral = UserReferrals.objects.filter(user=user).first()
+        if not referral:
+            referral = UserReferrals()
+            referral.user = user
+            referral.save()
 
         user_config = UserConfig.objects.filter(key="referral").first()
         help_flow = []
         share_text = ''
         share_url = ''
         whatsapp_text = ''
+        referral_amt = ''
         if user_config:
             all_data = user_config.data
             help_flow = all_data.get('help_flow', [])
             share_text = all_data.get('share_text', '').replace('$referral_code', referral.code)
             share_url = all_data.get('share_url', '').replace('$referral_code', referral.code)
             whatsapp_text = all_data.get('whatsapp_text', '').replace('$referral_code', referral.code)
+            referral_amt = all_data.get('referral_amt', '')
 
         return Response({"code": referral.code, "status": 1, 'help_flow': help_flow,
-                         "share_text": share_text, "share_url": share_url, 'whatsapp_text': whatsapp_text})
+                         "share_text": share_text, "share_url": share_url, 'whatsapp_text': whatsapp_text,
+                         "referral_amt": referral_amt})
 
     def retrieve_by_code(self, request, code):
         referral = UserReferrals.objects.filter(code__iexact=code).first()
@@ -566,6 +568,15 @@ class ReferralViewSet(GenericViewSet):
                 return Response({"name": default_user_profile.name, "status": 1})
 
         return Response({"status": 0}, status=status.HTTP_404_NOT_FOUND)
+
+    def get_referral_amt(self, request):
+        user_config = UserConfig.objects.filter(key="referral").first()
+        resp = {"referral_amt": ''}
+        if user_config:
+            all_data = user_config.data
+            resp['referral_amt'] = all_data.get('referral_amt', '')
+            return Response(resp)
+        return Response(resp)
 
 
 class UserAppointmentsViewSet(OndocViewSet):
@@ -1392,6 +1403,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     def validate_single_order_transaction(self, request, response):
         base_url = settings.BASE_URL
+        is_refund_process = False
         if request.query_params and request.query_params.get('sbig', False):
             base_url = settings.SBIG_BASE_URL
 
@@ -1468,6 +1480,19 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
         convert_cod_to_prepaid = False
+        pg_response_amount = response.get('txAmount', None)
+        if pg_response_amount:
+            pg_response_amount = float(pg_response_amount)
+        else:
+            pg_response_amount = 0.0
+
+        # try:
+        #     if float(order_obj.amount) != pg_response_amount:
+        #         send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+        #         return REDIRECT_URL
+        # except Exception as e:
+        #     logger.error("Error in sending pg acknowledge - after transaction amount mismatch " + str(e))
+
         try:
             # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
             if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(
@@ -1501,15 +1526,28 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         try:
                             with transaction.atomic():
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                                if float(order_obj.amount) != pg_response_amount:
+                                    is_refund_process = True
                         except Exception as e:
                             logger.error("Error in saving PG Transaction Data - " + str(e))
 
-                        try:
-                            with transaction.atomic():
-                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
-                                success_in_process = True
-                        except Exception as e:
-                            logger.error("Error in processing order - " + str(e))
+                        if not is_refund_process:
+                            try:
+                                with transaction.atomic():
+                                    processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
+                                    success_in_process = True
+                            except Exception as e:
+                                logger.error("Error in processing order - " + str(e))
+                        else:
+                            consumer_account = ConsumerAccount.objects.get_or_create(user=order_obj.user)
+                            consumer_account = ConsumerAccount.objects.select_for_update().get(user=order_obj.user)
+                            ctx_objs = consumer_account.debit_refund()
+                            if ctx_objs:
+                                for ctx_obj in ctx_objs:
+                                    ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                                                            countdown=1)
+                            return REDIRECT_URL
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
         elif order_obj:
@@ -1569,6 +1607,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     def validate_multiple_order_transaction(self, request, response):
         base_url = settings.BASE_URL
+        is_refund_process = False
         if request.query_params and request.query_params.get('sbig', False):
             base_url = settings.SBIG_BASE_URL
 
@@ -1604,6 +1643,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 order_id = item.get('orderId', None)
                 product_id = item.get('productId', None)
                 amount = item.get('txAmount', None)
+                pg_response_amount = amount
+                if pg_response_amount:
+                    pg_response_amount = float(pg_response_amount)
+                else:
+                    pg_response_amount = 0.0
                 # log pg data
                 try:
                     args = {'order_id': order_id, 'status_code': pg_resp_code, 'source': response.get("source")}
@@ -1659,6 +1703,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                 order_obj = Order.objects.select_for_update().filter(pk=order_id).first()
                 convert_cod_to_prepaid = False
+
+                # try:
+                #     if float(order_obj.amount) != pg_response_amount:
+                #         send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
+                #         return REDIRECT_URL
+                # except Exception as e:
+                #     logger.error("Error in sending pg acknowledge - after transaction amount mismatch" + str(e))
+
                 try:
                     # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
                     if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(amount):
@@ -1685,8 +1737,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             virtual_response = copy.deepcopy(response)
                             del virtual_response['items']
                             virtual_response['orderId'] = item['orderId']
+                            virtual_response['txAmount'] = item['txAmount']
 
                         resp_serializer = serializers.TransactionSerializer(data=virtual_response)
+
                         if resp_serializer.is_valid():
                             response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                             # For Testing
@@ -1717,6 +1771,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                                 virtual_response['items'] = stringify_item
                                 del virtual_response['orderId']
+                                virtual_response.pop('txAmount', None)
 
                                 if PgTransaction.is_valid_hash(virtual_response, product_id=order_obj.product_id):
                                     pg_tx_queryset = None
@@ -1724,15 +1779,31 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                     try:
                                         with transaction.atomic():
                                             pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                                            if float(order_obj.amount) != pg_response_amount:
+                                                is_refund_process = True
                                     except Exception as e:
                                         logger.error("Error in saving PG Transaction Data - " + str(e))
 
-                                    try:
-                                        with transaction.atomic():
-                                            processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
-                                            success_in_process = True
-                                    except Exception as e:
-                                        logger.error("Error in processing order - " + str(e))
+                                    if not is_refund_process:
+                                        try:
+                                            with transaction.atomic():
+                                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
+                                                success_in_process = True
+                                        except Exception as e:
+                                            logger.error("Error in processing order - " + str(e))
+                                    else:
+                                        consumer_account = ConsumerAccount.objects.get_or_create(user=order_obj.user)
+                                        consumer_account = ConsumerAccount.objects.select_for_update().get(
+                                            user=order_obj.user)
+                                        ctx_objs = consumer_account.debit_refund()
+                                        if ctx_objs:
+                                            for ctx_obj in ctx_objs:
+                                                ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+                                        send_pg_acknowledge.apply_async(
+                                            (response.get("orderId"), response.get("orderNo"),),
+                                            countdown=1)
+                                        return REDIRECT_URL
+
                         else:
                             logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
                 elif order_obj:
@@ -1796,8 +1867,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['order_id'] = order_obj.id
         data['reference_id'] = order_obj.reference_id
         data['type'] = PgTransaction.CREDIT
-        data['amount'] = order_obj.amount
-
+        # data['amount'] = order_obj.amount
+        data['amount'] = response.get('txAmount')
         data['payment_mode'] = format_return_value(response.get('paymentMode'))
         data['response_code'] = response.get('responseCode')
         data['bank_id'] = format_return_value(response.get('bankTxId'))

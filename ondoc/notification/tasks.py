@@ -1878,17 +1878,18 @@ def process_leads_to_matrix(self, data):
         if not general_lead_obj:
             raise Exception("GeneralMatrix object could not found against id - " + str(id))
 
-        plus_obj = PlusUser.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
-        insurance_obj = UserInsurance.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
-        earlier_date = timezone.now() - timedelta(minutes=10)
-        lab_appointment = LabAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
-        opd_appointment = OpdAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
+        if general_lead_obj.lead_type in ['DROPOFF', 'LABADS', 'CANCELDROPOFFLEADVIAAPPOINTMENT']:
+            plus_obj = PlusUser.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
+            insurance_obj = UserInsurance.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
+            earlier_date = timezone.now() - timedelta(minutes=10)
+            lab_appointment = LabAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
+            opd_appointment = OpdAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
 
-        if (plus_obj and plus_obj.is_valid()) or (insurance_obj and insurance_obj.is_valid()):
-            return
+            if (plus_obj and plus_obj.is_valid()) or (insurance_obj and insurance_obj.is_valid()):
+                return
 
-        if general_lead_obj.lead_type == 'DROPOFF' and (lab_appointment or opd_appointment):
-            return
+            if general_lead_obj.lead_type == 'DROPOFF' and (lab_appointment or opd_appointment):
+                return
 
         lead_engine_obj = lead_class_referance(general_lead_obj.lead_type, general_lead_obj)
         success = lead_engine_obj.process_lead()

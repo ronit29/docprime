@@ -326,6 +326,19 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             "random_coupon_list": random_coupon_list
         }
 
+    @classmethod
+    def get_gold_plan(cls):
+        plus_plans = cls.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(
+            is_gold=True)
+        plan = None
+        for plan in plus_plans:
+            if plan.is_selected:
+                plan = plan
+                break
+        if not plan:
+            plan = plus_plans.first()
+        return plan
+
     class Meta:
         db_table = 'plus_plans'
         # unique_together = (('is_selected', 'is_gold'), )
@@ -796,8 +809,11 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         appointment_type = OPD if "doctor" in appointment_data else LAB
         deep_utilization = deepcopy(self.get_utilization)
         for item in cart_items:
-            validated_item = item.validate(request)
-            self.validate_plus_appointment(validated_item, utilization=deep_utilization)
+            try:
+                validated_item = item.validate(request)
+                self.validate_plus_appointment(validated_item, utilization=deep_utilization)
+            except Exception as e:
+                pass
         current_item_price_data = OpdAppointment.get_price_details(
             appointment_data, self) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data, self)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
