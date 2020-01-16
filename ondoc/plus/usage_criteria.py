@@ -119,7 +119,7 @@ class DoctorAmountCount(AbstractCriteria):
                     return resp
                 cost = corporate_cost_engine.get_price(price_data)
                 upper_limit = int(plan.corporate_doctor_upper_limit)
-                if upper_limit <= cost:
+                if upper_limit < cost:
                     return resp
                 if available_amount >= cost:
                     vip_amount_deducted = cost
@@ -277,8 +277,8 @@ class LabtestAmountCount(AbstractCriteria):
                 if not corporate_cost_engine:
                     return resp
                 cost = corporate_cost_engine.get_price(price_data)
-                upper_limit = int(plan.corporate_doctor_upper_limit)
-                if upper_limit <= cost:
+                upper_limit = int(plan.corporate_lab_upper_limit)
+                if upper_limit < cost:
                     return resp
                 if total_amount_left >= cost:
                     vip_amount_deducted = cost
