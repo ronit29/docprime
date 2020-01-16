@@ -569,6 +569,15 @@ class ReferralViewSet(GenericViewSet):
 
         return Response({"status": 0}, status=status.HTTP_404_NOT_FOUND)
 
+    def get_referral_amt(self, request):
+        user_config = UserConfig.objects.filter(key="referral").first()
+        resp = {"referral_amt": ''}
+        if user_config:
+            all_data = user_config.data
+            resp['referral_amt'] = all_data.get('referral_amt', '')
+            return Response(resp)
+        return Response(resp)
+
 
 class UserAppointmentsViewSet(OndocViewSet):
 
