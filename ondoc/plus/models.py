@@ -1883,6 +1883,7 @@ class PlusUserUpload(auth_model.TimeStampedModel):
         members_dict['last_name'] = last_name
         # members_dict['dob'] = member['dob'].strftime("%Y-%m-%d") if member['dob'] else ''
         members_dict['dob'] = datetime.datetime.strptime(member['dob'], '%Y-%m-%d') if member['dob'] else ''
+        members_dict['dob'] = str(members_dict['dob'].date()) if members_dict['dob'] else ''
         members_dict['gender'] = gender
         members_dict['relation'] = member.get('relation', '')
         members_dict['phone_number'] = member.get('phone_number', None)
