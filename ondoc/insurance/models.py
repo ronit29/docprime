@@ -34,7 +34,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from num2words import num2words
 # from hardcopy import bytestring_to_pdf
-import math
+import math, uuid
 import reversion
 import numbers
 from ondoc.account.models import Order, Merchant, MerchantPayout, PgTransaction, PayoutMapping
@@ -46,6 +46,7 @@ from ondoc.notification import tasks as notification_tasks
 from dateutil.relativedelta import relativedelta
 
 
+#generate insurance policy number - not in use now
 def generate_insurance_policy_number():
     query = '''select nextval('userinsurance_policy_num_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
@@ -59,6 +60,7 @@ def generate_insurance_policy_number():
         raise ValueError('Sequence Produced is not valid.')
 
 
+#generate insurance policy number insurer wise
 def generate_insurance_insurer_policy_number(insurance_plan):
     if not insurance_plan:
         raise Exception('Could not generate policy number according to the insurer.')
@@ -85,6 +87,7 @@ def generate_insurance_insurer_policy_number(insurance_plan):
         raise ValueError('Sequence Produced is not valid.')
 
 
+#generate insurance reciept number
 def generate_insurance_reciept_number():
     query = '''select nextval('userinsurance_policy_reciept_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
@@ -961,7 +964,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin, Transactio
         html_body = render_to_string("pdfbody.html", context=context)
         policy_number = self.policy_number
         certificate_number = policy_number.split('/')[-1]
-        filename = "{}.pdf".format(str(certificate_number))
+        filename = "{}-{}.pdf".format(str(certificate_number), uuid.uuid4().hex)
         #
         # extra_args = {
         #     'virtual-time-budget': 6000

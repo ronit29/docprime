@@ -7,7 +7,7 @@ from django.contrib.gis.measure import D
 
 from config.settings.db_router import DatabaseInfo
 from ondoc.account.models import Order, ConsumerAccount, PgTransaction
-from ondoc.api.v1.auth.serializers import UserProfileSerializer
+# from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
     OfflinePatientSerializer, CommonConditionsSerializer, RecordSerializer
@@ -101,6 +101,7 @@ from packaging.version import parse
 from django.http import HttpResponse, HttpResponseRedirect
 from geopy.geocoders import Nominatim
 from django.shortcuts import render
+import newrelic.agent
 
 geolocator = Nominatim()
 
@@ -471,8 +472,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data['cover_under_vip']:
                 if plus_user.plan.is_gold:
                     data['payment_type'] = OpdAppointment.GOLD
+                    data['is_gold_member'] = True
                 else:
                     data['payment_type'] = OpdAppointment.VIP
+                    data['is_gold_member'] = False
                 validated_data['payment_type'] = data['payment_type']
             else:
                 validated_data['payment_type'] = validated_data.get('payment_type')
@@ -835,7 +838,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
             resp_data['is_provider_signup_lead'] = True
         else:
             resp_data['is_provider_signup_lead'] = False
-
+        resp_data['user_id'] = request.user.id
         return Response(resp_data)
 
     def licence_update(self, request):
@@ -1607,6 +1610,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     @use_slave
+    @newrelic.agent.function_trace()
     def common_conditions(self, request):
         city = None
         serializer = CommonConditionsSerializer(data=request.query_params)

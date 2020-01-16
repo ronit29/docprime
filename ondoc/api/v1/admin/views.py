@@ -18,7 +18,7 @@ from ondoc.articles.serializers import ArticleImageSerializer
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image as Img
 from ondoc.articles.models import ArticleImage
-
+from ondoc.authentication.models import WhiteListedLoginTokens
 
 @api_view(['POST'])
 def upload(request):
@@ -85,7 +85,6 @@ def userlogin_via_agent(request):
     user_key = UserSecretKey.objects.get_or_create(user=user)
     payload = JWTAuthentication.appointment_agent_payload_handler(request, user, can_book=can_book)
     token = jwt.encode(payload, user_key[0].key)
-
     response = {
         "login": 1,
         "agent_id": request.user.id,

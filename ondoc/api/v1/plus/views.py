@@ -30,14 +30,17 @@ logger = logging.getLogger(__name__)
 
 class PlusListViewSet(viewsets.GenericViewSet):
 
+    # Get default queryset.
     def get_queryset(self):
         return PlusProposer.objects.filter(is_live=True)
 
+    # Get plan queryset.
     def get_plan_queryset(self, utm_source):
         plans = PlusPlans.objects.filter(is_live=True, utm_source__contains={'utm_source': utm_source})
         # plans_with_utm = plans.filter()
         return plans
 
+    # get list of plans with proposer.
     @use_slave
     def list(self, request):
         resp = {}
@@ -64,10 +67,12 @@ class PlusListViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
+# Plus leads viewset.
 class PlusOrderLeadViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     # permission_classes = (IsAuthenticated,)
 
+    # create plus lead from request. Request contains all the lead data.
     def create_plus_lead(self, request):
         # latitude = request.data.get('latitude', None)
         # longitude = request.data.get('longitude', None)
@@ -122,6 +127,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    # Api for policy purchase, do validation, serialization, create order, and ask for payment if required.
     @transaction.atomic
     def create_order(self, request):
         user = request.user
@@ -269,8 +275,19 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 payment_status=account_models.Order.PAYMENT_PENDING,
                 # visitor_info=visitor_info
             )
-            resp["status"] = 1
-            resp['data'], resp["payment_required"] = payment_details(request, order)
+            if payable_amount > 0:
+                resp["status"] = 1
+                resp['data'], resp["payment_required"] = payment_details(request, order)
+            else:
+                plus_object, wallet_amount, cashback_amount = order.process_order()
+                resp["status"] = 1
+                resp["payment_required"] = False
+                resp["data"] = {'id': plus_object.id}
+                resp["data"] = {
+                    "orderId": order.id,
+                    "type": "plus_membership",
+                    "id": plus_object.id if plus_object else None
+                }
             # else:
             #     wallet_amount = amount
             #
@@ -299,6 +316,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
 
+    # After policy purchase add members to the policy.
     @transaction.atomic
     def add_members(self, request):
         user = request.user
@@ -350,6 +368,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, )
 
+    # After policy purchase below function gives the stats of the policy.
     def dashboard(self, request):
         resp = {}
         if request.query_params.get('is_dashboard'):
@@ -422,6 +441,7 @@ class PlusDataViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    # In journey of gold purchase, interim data is pushed by below api.
     def push_dummy_data(self, request):
         from ondoc.api.v1.doctor.views import DoctorAppointmentsViewSet
         from ondoc.api.v1.diagnostic.views import LabAppointmentView
@@ -444,6 +464,7 @@ class PlusDataViewSet(viewsets.GenericViewSet):
 
         return Response(data=resp, status=status.HTTP_200_OK)
 
+    # Get the interim data in the journey of policy purchase.
     def show_dummy_data(self, request):
         user = request.user
         data_type = request.query_params.get('dummy_data_type')
@@ -464,6 +485,7 @@ class PlusDataViewSet(viewsets.GenericViewSet):
 
 class PlusIntegrationViewSet(viewsets.GenericViewSet):
 
+    # Push vip integration lead.
     def push_vip_integration_leads(self, request):
         resp = {}
         request_data = request.data
@@ -471,34 +493,6 @@ class PlusIntegrationViewSet(viewsets.GenericViewSet):
         if utm_source:
             resp = PlusIntegration.get_response(request_data)
             return Response(data=resp, status=status.HTTP_200_OK)
-            # utm_param_dict = PlusIntegration.get_response(request_data)
-            # try:
-            #     if utm_param_dict:
-            #         url = utm_param_dict.get('url', "")
-            #         request_data = utm_param_dict.get('request_data', {})
-            #         auth_token = utm_param_dict.get('auth_token', "")
-            #
-            #         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
-            #                                                                               'Content-Type': 'application/json'})
-            #
-            #         if response.status_code != status.HTTP_200_OK:
-            #             logger.error(json.dumps(request_data))
-            #             logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
-            #             resp['error'] = "Error while saving data!!"
-            #             return Response(data=resp, status=status.HTTP_200_OK)
-            #         elif response.status_code == status.HTTP_200_OK and response.get('data', None) and \
-            #                 response.get('data, None').get('error', False):
-            #             resp['data'] = response.get('data', None).get('errorDetails', [])
-            #             return Response(data=resp, status=status.HTTP_200_OK)
-            #         else:
-            #             resp['data'] = "successfully save!!"
-            #             return Response(data=resp, status=status.HTTP_200_OK)
-            #     else:
-            #         resp['error'] = "Not able to find Utm params"
-            #         return Response(data=resp, status=status.HTTP_200_OK)
-            # except Exception as e:
-            #     logger.error(json.dumps(request_data))
-            #     logger.info("[ERROR] {}".format(e))
         else:
             resp['error'] = "UTM source required!!"
             return Response(data=resp, status=status.HTTP_200_OK)

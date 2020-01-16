@@ -45,10 +45,10 @@ SECRET_KEY = env('DJANGO_SECRET_KEY')
 JWT_AUTH = {
     'JWT_VERIFY': True,
     'JWT_VERIFY_EXPIRATION': True,
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=365),
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(minutes=5),
     'JWT_AUTH_HEADER_PREFIX': 'Token',
     'JWT_ALLOW_REFRESH': True,
-    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=365),
+    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(minutes=5),
 }
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -213,6 +213,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django.middleware.gzip.GZipMiddleware',
     'ondoc.articles.middleware.CsrfGetParamMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -556,3 +557,5 @@ GOLD_MERCHANT_CODE=env('GOLD_MERCHANT_CODE')
 VIP_MERCHANT_CODE=env('VIP_MERCHANT_CODE')
 SBIG_BASE_URL=env('SBIG_BASE_URL')
 REFERRAL_CASHBACK_AMOUNT=env('REFERRAL_CASHBACK_AMOUNT')
+
+CORS_ALLOW_HEADERS = ['accept', 'accept-encoding', 'authorization', 'content-type', 'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with', 'app-name']
