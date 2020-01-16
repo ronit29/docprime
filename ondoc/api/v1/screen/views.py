@@ -40,7 +40,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         show_search_header = True
         show_footer = True
-        grid_size = 6
+        grid_size = 9
         force_update_version = ""
         update_version = ""
         app_custom_data = None
