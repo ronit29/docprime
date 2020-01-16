@@ -15,15 +15,15 @@ class Migration(migrations.Migration):
             model_name='corporate',
             name='corporate_group',
         ),
-        migrations.AlterField(
-            model_name='plusplans',
-            name='corporate_group',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='corporate_plan', to='corporate_booking.CorporateGroup'),
-        ),
+        # migrations.AlterField(
+        #     model_name='plusplans',
+        #     name='corporate_group',
+        #     field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='corporate_plan', to='corporate_booking.CorporateGroup'),
+        # ),
         migrations.DeleteModel(
             name='Corporate',
         ),
-        migrations.DeleteModel(
-            name='CorporateGroup',
-        ),
+        # migrations.DeleteModel(
+        #     name='CorporateGroup',
+        # ),
     ]
