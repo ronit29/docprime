@@ -363,10 +363,10 @@ class DoctorSearchHelper:
                     rank_by = " rnk=1 "
             else:
                 if self.query_params.get("specialization_ids") and len(self.query_params.get("specialization_ids")) == 1:
-                    order_by_field = ' welcome_calling_done DESC, floor(distance/bucket_size) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
+                    order_by_field = ' floor(distance/bucket_size) ASC, is_license_verified DESC, is_gold DESC, search_score desc '.format(bucket_size=str(bucket_size))
 
                 else:
-                    order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
+                    order_by_field = ' floor(distance/{bucket_size}) ASC, is_license_verified DESC, is_gold DESC, search_score desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
             order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
@@ -501,12 +501,14 @@ class DoctorSearchHelper:
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
                            "is_license_verified, dc.priority,deal_price, h.welcome_calling_done, " \
+                           " case when h.enabled_for_gold=true and h.network_id is not null and  hn.enabled_for_plus_plans=true then true else false end as is_gold, " \
                            "dc.hospital_id as hospital_id, d.search_score " \
                            "{bucket_query} FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
                            "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true  " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
+                           " LEFT JOIN hospital_network hn on hn.id=h.network_id " \
                            "{ipd_query} " \
                            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
                            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
