@@ -10,19 +10,19 @@ from ondoc.common.models import MatrixMappedCity, MatrixMappedState, SyncBooking
 from ondoc.common.helper import Choices
 
 
-class CorporateGroup(auth_model.TimeStampedModel):
-    class CorporateType(Choices):
-        VIP = 'VIP'
-        GOLD = 'GOLD'
-
-    name = models.CharField(max_length=300, null=False, blank=False)
-    type = models.CharField(max_length=100, null=True, choices=CorporateType.as_choices())
-
-    def __str__(self):
-        return str(self.name)
-
-    class Meta:
-        db_table = 'corporate_groups'
+# class CorporateGroup(auth_model.TimeStampedModel):
+#     class CorporateType(Choices):
+#         VIP = 'VIP'
+#         GOLD = 'GOLD'
+#
+#     name = models.CharField(max_length=300, null=False, blank=False)
+#     type = models.CharField(max_length=100, null=True, choices=CorporateType.as_choices())
+#
+#     def __str__(self):
+#         return str(self.name)
+#
+#     class Meta:
+#         db_table = 'corporate_groups'
 
 
 class Corporates(auth_model.TimeStampedModel):
@@ -35,7 +35,7 @@ class Corporates(auth_model.TimeStampedModel):
     PIN = models.BigIntegerField(null=True, blank=True, verbose_name='PIN Code')
     pan_no = models.CharField(max_length=10000, default='', verbose_name='PAN no.')
     gst_no = models.CharField(max_length=10000, default='', verbose_name='GST no.')
-    corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_group', null=True, blank=True, on_delete=models.DO_NOTHING)
+    # corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_group', null=True, blank=True, on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return "{}".format(self.corporate_name)

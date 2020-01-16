@@ -20,7 +20,7 @@ from ondoc.authentication.models import UserProfile, User
 from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
-from ondoc.corporate_booking.models import CorporateGroup
+from ondoc.corporate_booking.models import Corporates
 from ondoc.coupon.models import Coupon
 
 from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, update_random_coupons_consumption
@@ -145,7 +145,9 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     is_gold = models.NullBooleanField()
     default_single_booking = models.NullBooleanField()
     is_corporate = models.NullBooleanField()
-    corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_plan', null=True, blank=True, on_delete=models.DO_NOTHING)
+    # corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_plan', null=True, blank=True, on_delete=models.DO_NOTHING)
+    corporate = models.ForeignKey(Corporates, related_name='corporate_plan', null=True, blank=True,
+                                        on_delete=models.DO_NOTHING)
     corporate_upper_limit_criteria = models.CharField(max_length=100, null=True, blank=True, choices=PriceCriteria.as_choices())
     corporate_doctor_upper_limit = models.PositiveIntegerField(null=True, blank=True)
     corporate_lab_upper_limit = models.PositiveIntegerField(null=True, blank=True)
