@@ -487,10 +487,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 if lab_test_group_mapping:
                     lab_test_group = LabTestGroup.objects.filter(id=lab_test_group_mapping.lab_test_group_id).first()
                     if lab_test_group:
-                        # timing_queryset = LabTestGroupTiming.objects.filter(lab=self,
-                        #                                                           lab_test_group=lab_test_group)
                         timing_queryset = self.test_group_timings.filter(lab_test_group=lab_test_group)
-                if not timing_queryset.exists():
+                        if not timing_queryset.exists():
+                            timing_queryset = self.lab_timings.all()
+                    else:
+                        timing_queryset = self.lab_timings.all()
+                else:
                     timing_queryset = self.lab_timings.all()
             else:
                 timing_queryset = self.lab_timings.all()
