@@ -20,6 +20,7 @@ from ondoc.authentication.models import UserProfile, User
 from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
+from ondoc.corporate_booking.models import CorporateGroup
 from ondoc.coupon.models import Coupon
 
 from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, update_random_coupons_consumption
@@ -106,16 +107,19 @@ class PlusProposer(auth_model.TimeStampedModel):
         db_table = 'plus_proposer'
 
 
-class CorporateGroup(auth_model.TimeStampedModel):
-    class CorporateType(Choices):
-        VIP = 'VIP'
-        GOLD = 'GOLD'
-
-    name = models.CharField(max_length=300, null=False, blank=False)
-    type = models.CharField(max_length=100, null=True, choices=CorporateType.as_choices())
-
-    class Meta:
-        db_table = 'plus_corporate_groups'
+# class CorporateGroup(auth_model.TimeStampedModel):
+#     class CorporateType(Choices):
+#         VIP = 'VIP'
+#         GOLD = 'GOLD'
+#
+#     name = models.CharField(max_length=300, null=False, blank=False)
+#     type = models.CharField(max_length=100, null=True, choices=CorporateType.as_choices())
+#
+#     def __str__(self):
+#         return str(self.name)
+#
+#     class Meta:
+#         db_table = 'plus_corporate_groups'
 
 
 # All the Gold plans of all the proposers.
@@ -1746,13 +1750,13 @@ class TempPlusUser(auth_model.TimeStampedModel):
         return resp
 
 
-class Corporate(auth_model.TimeStampedModel):
-    name = models.CharField(max_length=300, null=False, blank=False)
-    address = models.CharField(max_length=500, null=True, blank=True)
-    corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_group', null=False, blank=False, on_delete=models.DO_NOTHING)
-
-    class Meta:
-        db_table = 'plus_corporates'
+# class Corporate(auth_model.TimeStampedModel):
+#     name = models.CharField(max_length=300, null=False, blank=False)
+#     address = models.CharField(max_length=500, null=True, blank=True)
+#     # corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_group', null=False, blank=False, on_delete=models.DO_NOTHING)
+#
+#     class Meta:
+#         db_table = 'plus_corporates'
 
 
 class PlusUserUpload(auth_model.TimeStampedModel):

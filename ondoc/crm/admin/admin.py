@@ -117,9 +117,9 @@ from .integrations import IntegratorTestParameterMapping, IntegratorTestParamete
 from .salespoint import SalesPointAdmin, SalesPointAvailableTestMappingAdmin
 from ondoc.salespoint.models import SalesPoint, SalespointTestmapping
 from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin, \
-    PlusPlanUtmSourceAdmin, PlusMemberAdmin, PlusMembers, PlusUserUploadAdmin, CorporateAdmin, CorporateGroupAdmin
+    PlusPlanUtmSourceAdmin, PlusMemberAdmin, PlusMembers, PlusUserUploadAdmin, CorporateGroupAdmin
 from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources, \
-    PlusUserUpload, CorporateGroup, Corporate
+    PlusUserUpload, CorporateGroup
 from django.contrib.auth.models import Permission
 
 User = get_user_model()
@@ -139,7 +139,7 @@ admin.site.register(PlusProposer, PlusProposerAdmin)
 admin.site.register(PlusPlanParameters, PlusPlanParametersAdmin)
 admin.site.register(PlusPlanUtmSources, PlusPlanUtmSourceAdmin)
 admin.site.register(PlusUserUpload, PlusUserUploadAdmin)
-admin.site.register(Corporate, CorporateAdmin)
+# admin.site.register(Corporate, CorporateAdmin)
 admin.site.register(CorporateGroup, CorporateGroupAdmin)
 
 admin.site.register(OtpVerifications)
