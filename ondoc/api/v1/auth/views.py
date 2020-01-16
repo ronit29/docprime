@@ -536,27 +536,29 @@ class ReferralViewSet(GenericViewSet):
         user = request.user
         if not user.is_authenticated:
             return Response({"status": 0}, status=status.HTTP_401_UNAUTHORIZED)
-        if UserReferrals.objects.all():
-            referral = UserReferrals.objects.filter(user=user).first()
-            if not referral:
-                referral = UserReferrals()
-                referral.user = user
-                referral.save()
+        referral = UserReferrals.objects.filter(user=user).first()
+        if not referral:
+            referral = UserReferrals()
+            referral.user = user
+            referral.save()
 
         user_config = UserConfig.objects.filter(key="referral").first()
         help_flow = []
         share_text = ''
         share_url = ''
         whatsapp_text = ''
+        referral_amt = ''
         if user_config:
             all_data = user_config.data
             help_flow = all_data.get('help_flow', [])
             share_text = all_data.get('share_text', '').replace('$referral_code', referral.code)
             share_url = all_data.get('share_url', '').replace('$referral_code', referral.code)
             whatsapp_text = all_data.get('whatsapp_text', '').replace('$referral_code', referral.code)
+            referral_amt = all_data.get('referral_amt', '')
 
         return Response({"code": referral.code, "status": 1, 'help_flow': help_flow,
-                         "share_text": share_text, "share_url": share_url, 'whatsapp_text': whatsapp_text})
+                         "share_text": share_text, "share_url": share_url, 'whatsapp_text': whatsapp_text,
+                         "referral_amt": referral_amt})
 
     def retrieve_by_code(self, request, code):
         referral = UserReferrals.objects.filter(code__iexact=code).first()

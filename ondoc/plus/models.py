@@ -38,7 +38,7 @@ from .enums import UsageCriteria
 from copy import deepcopy
 from math import floor
 
-
+# Mixin or dependency which will be injected in the class with the below mentioned behaviour.
 class LiveMixin(models.Model):
     def save(self, *args, **kwargs):
         if self.enabled:
@@ -51,6 +51,8 @@ class LiveMixin(models.Model):
         abstract = True
 
 
+# Gold feature is associated with the entity who is liable for the feature. PlusProposer is Docprime and can be
+# any entity in future such as Apollo, SBI, HDFC etc
 @reversion.register()
 class PlusProposer(auth_model.TimeStampedModel):
     name = models.CharField(max_length=250)
@@ -75,7 +77,7 @@ class PlusProposer(auth_model.TimeStampedModel):
     def __str__(self):
         return "{}".format(self.name)
 
-
+    # Get the active plans associated with the object of plus proposer.
     @property
     def get_active_plans(self):
         return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')
@@ -88,6 +90,7 @@ class PlusProposer(auth_model.TimeStampedModel):
 
         # return plans
 
+    # Get all the plans associated with the object of plus proposer.
     @property
     def get_all_plans(self):
         return self.plus_plans.all().order_by('total_allowed_members')
@@ -96,6 +99,7 @@ class PlusProposer(auth_model.TimeStampedModel):
         db_table = 'plus_proposer'
 
 
+# All the Gold plans of all the proposers.
 @reversion.register()
 class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     plan_name = models.CharField(max_length=300)
@@ -118,6 +122,8 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     is_gold = models.NullBooleanField()
     default_single_booking = models.NullBooleanField()
 
+    # Some plans are only applicable when utm params are passed. Like some plans are to be targeted with media
+    # campaigns, emails or adwords etc.
     @classmethod
     def get_active_plans_via_utm(cls, utm):
         qs = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True)
@@ -128,6 +134,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
         return plans_via_utm
 
+    # Get all the plans
     @classmethod
     def all_active_plans(cls):
         return cls.objects.filter(is_live=True, enabled=True)
@@ -135,6 +142,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     def __str__(self):
         return "{}".format(self.plan_name)
 
+    # Get convenience charge of specific plan.
     def get_convenience_charge(self, max_price, min_price, type):
         if not max_price or min_price or max_price <= 0 or min_price <= 0:
             return 0
@@ -177,6 +185,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         charge = min(convenience_amount_list)
         return charge
 
+    # Get the default convenience charge.
     @classmethod
     def get_default_convenience_amount(cls, price_data, type, default_plan_query=None):
         charge = 0
@@ -224,6 +233,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         charge = min(convenience_amount_list)
         return charge
 
+    # Get associated convenience object according to the doctor and lab.
     def get_convenience_object(self, type):
         string = ''
         if type == "DOCTOR":
@@ -247,6 +257,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
         return None, None, None
 
+    # Get convenience amount.
     def get_convenience_amount(self, price, convenience_amount_obj, convenience_percentage_obj):
         if not price or price <= 0:
             return 0
@@ -269,6 +280,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         else:
             return convenience_amount
 
+    # Get price details
     def get_price_details(self, data, amount=0):
         coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, amount)
         if coupon_discount >= amount:
@@ -302,6 +314,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         # unique_together = (('is_selected', 'is_gold'), )
 
 
+# Utm Sources details.
 class PlusPlanUtmSources(auth_model.TimeStampedModel):
     source = models.CharField(max_length=100, null=False, blank=False, unique=True)
     source_details = models.CharField(max_length=500, null=True, blank=True)
@@ -314,6 +327,7 @@ class PlusPlanUtmSources(auth_model.TimeStampedModel):
         db_table = 'plus_plan_utmsources'
 
 
+# Utm source entity and plan mapping.
 @reversion.register()
 class PlusPlanUtmSourceMapping(auth_model.TimeStampedModel):
     plus_plan = models.ForeignKey(PlusPlans, related_name="plan_utmsources", null=False, blank=False, on_delete=models.CASCADE)
@@ -327,6 +341,7 @@ class PlusPlanUtmSourceMapping(auth_model.TimeStampedModel):
         db_table = 'plus_plan_utmsources_mapping'
 
 
+# Global Configurations objects for plus features.
 class PlusPlanParameters(auth_model.TimeStampedModel):
     key = models.CharField(max_length=100, null=False, blank=False, choices=PlanParametersEnum.as_choices())
     details = models.CharField(max_length=500, null=False, blank=False)
@@ -338,6 +353,7 @@ class PlusPlanParameters(auth_model.TimeStampedModel):
         db_table = 'plus_plan_parameters'
 
 
+# Configurations associated to specific plus plans.
 @reversion.register()
 class PlusPlanParametersMapping(auth_model.TimeStampedModel):
     plus_plan = models.ForeignKey(PlusPlans, related_name="plan_parameters", null=False, blank=False, on_delete=models.CASCADE)
@@ -351,6 +367,7 @@ class PlusPlanParametersMapping(auth_model.TimeStampedModel):
         db_table = 'plus_plan_parameters_mapping'
 
 
+# Static contents for plus plans.
 class PlusPlanContent(auth_model.TimeStampedModel):
 
     class PossibleTitles(Choices):
@@ -365,6 +382,7 @@ class PlusPlanContent(auth_model.TimeStampedModel):
         db_table = 'plus_plan_content'
 
 
+# Thresholds for Plus plans.
 class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
     plus_plan = models.ForeignKey(PlusPlans, related_name="plus_threshold", on_delete=models.DO_NOTHING)
     opd_amount_limit = models.PositiveIntegerField(default=0)
@@ -388,6 +406,7 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
         return str(self.plus_plan)
 
 
+# User who have purchased the plus or gold are maintained in this table.
 @reversion.register()
 class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, CouponsMixin):
     from ondoc.account.models import MoneyPool
@@ -423,22 +442,26 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
     payment_type = models.PositiveSmallIntegerField(choices=const.PAY_CHOICES, default=const.PREPAID)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="plus_coupon")
 
+    # Purchased gold plan have few states , some are valid and some are not valid, check if plan is still valid or not.
     def is_valid(self):
         if self.expire_date >= timezone.now() and (self.status == self.ACTIVE):
             return True
         else:
             return False
 
+    # Can appointment be booked via gold plan with respect to the appointment time.
     def is_appointment_valid(self, appointment_time):
         if self.expire_date >= appointment_time:
             return True
         else:
             return False
 
+    # Get the gold plan associated to the user if any.
     @classmethod
     def get_by_user(cls, user):
         return cls.objects.filter(user=user).order_by('id').last()
 
+    # Check if gold plans can be cancelled or not. If any appointment has booked, we cannot book.
     def can_be_cancelled(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -456,6 +479,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return {'reason': 'Can be cancelled.', 'can_be_cancelled': True}
 
+    # Get primary member profile of the gold plan.
     def get_primary_member_profile(self):
         insured_members = self.plus_members.filter().order_by('id')
         proposers = list(filter(lambda member: member.is_primary_user, insured_members))
@@ -464,11 +488,13 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return None
 
+    # get all the members associated with the gold policy.
     @cached_property
     def get_members(self):
         plus_members = self.plus_members.filter().order_by('id')
         return plus_members
 
+    # check if test can be covered in the vip in respect to the price.
     def can_test_be_covered_in_vip(self, *args, **kwargs):
         mrp = kwargs.get('mrp')
         id = kwargs.get('id')
@@ -477,6 +503,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             return
         utilization_dict = self.get_utilization
 
+    # can package be covered in the vip.
     def can_package_be_covered_in_vip(self, obj, *args, **kwargs):
         mrp = obj.mrp if obj else kwargs.get('mrp')
         # id = (obj.test.id if hasattr(obj, 'test') else obj.id) if obj else kwargs.get('id')
@@ -506,6 +533,16 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             else:
                 return UtilizationCriteria.AMOUNT, False
 
+    """
+    Every gold plan is associated with bulk of features such as 
+        1. Online chat
+        2. Limit of appointments in context of count and amount.
+        3. Min Max discount which can be availed.
+        4. Total packages which are whitelisted of plan.
+        
+    Below property gives all the stats available such as all the limits user have availed and all the limits which can 
+    be availed in future. Ex. 4 appointments have be booked and 2 remaing of total 6 appointments. 
+    """
     @cached_property
     def get_utilization(self):
         plan = self.plan
@@ -555,11 +592,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return resp
 
+    # Get count of doctor appointments which have been booked via gold policy.
     def get_doctor_plus_appointment_count(self):
         from ondoc.doctor.models import OpdAppointment
         opd_appointments_count = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED).count()
         return opd_appointments_count
 
+    """
+    An appointment data has to be validated that it can be covered in the gold policy or not. Some appointments are 
+    fully covered and some are partially. Partially covered appointments are charged with amount.
+    All the appointments under gold plans or vip plans are to be passed at each point before appointment creation.
+    """
     def validate_plus_appointment(self, appointment_data, *args, **kwargs):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -711,6 +754,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return response_dict
 
+    # validates the incoming cart item along with the existing cart items.
     def validate_cart_items(self, appointment_data, request):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -734,8 +778,11 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         appointment_type = OPD if "doctor" in appointment_data else LAB
         deep_utilization = deepcopy(self.get_utilization)
         for item in cart_items:
-            validated_item = item.validate(request)
-            self.validate_plus_appointment(validated_item, utilization=deep_utilization)
+            try:
+                validated_item = item.validate(request)
+                self.validate_plus_appointment(validated_item, utilization=deep_utilization)
+            except Exception as e:
+                pass
         current_item_price_data = OpdAppointment.get_price_details(
             appointment_data, self) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data, self)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
@@ -795,6 +842,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         vip_data_dict['is_gold_member'] = True if request.user.active_plus_user.plan.is_gold else False
         return vip_data_dict
 
+    # Get count of lab appointments which have been booked via gold policy.
     def get_labtest_plus_appointment_count(self):
         from ondoc.diagnostic.models import LabAppointment
         labtest_count = 0
@@ -806,6 +854,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             labtest_count = labtest_count + len(list(filter(lambda lab_test: not lab_test.test.is_package, lab_appointment.test_mappings.all())))
         return labtest_count
 
+    # Get total amount of lab appointments which have been booked via gold policy.
     def get_labtest_plus_appointment_amount(self):
         from ondoc.diagnostic.models import LabAppointment
 
@@ -825,6 +874,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return labtest_amount
 
+    # Get total count of package appointments which have been booked via gold policy.
     def get_package_plus_appointment_count(self):
         from ondoc.diagnostic.models import LabAppointment
         package_count = 0
@@ -836,6 +886,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             package_count = package_count + len(list(filter(lambda lab_test: lab_test.test.is_package, lab_appointment.test_mappings.all())))
         return package_count
 
+    # Get total amount of package appointments which have been booked via gold policy.
     def get_package_plus_appointment_amount(self):
         from ondoc.diagnostic.models import LabAppointment
 
@@ -852,6 +903,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return package_amount
 
+    # Get amount of doctor appointments which have been booked via gold policy.
     def get_doctor_plus_appointment_amount(self):
         import functools
         from ondoc.doctor.models import OpdAppointment
@@ -867,6 +919,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         total_mrp = functools.reduce(lambda a, b: a + b, opd_appointments_amount)
         return total_mrp
 
+    # create or update the profile of the plus member.
     @classmethod
     def profile_create_or_update(cls, member, user):
         profile = {}
@@ -915,6 +968,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return profile
 
+    # get all the enabled hospitals in the gold policy.
     @classmethod
     def get_enabled_hospitals(cls, *args, **kwargs):
         from ondoc.doctor.models import HospitalNetwork, HospitalNetworkDocument
@@ -932,6 +986,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return networks
 
+    # create the gold policy after successful payment along with the gold members.
     @classmethod
     def create_plus_user(cls, plus_data, user):
         from ondoc.doctor.models import OpdAppointment
@@ -963,6 +1018,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             update_random_coupons_consumption.apply_async((random_coupon_list), countdown=5)
         return plus_membership_obj
 
+    # Care product is also an addon which user get after purchase of gold policy.
     def activate_care_membership(self):
         from ondoc.subscription_plan.models import Plan, UserPlanMapping
 
@@ -1012,6 +1068,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         final_amount = mrp - discounted_amount
         return final_amount
 
+    # Get cancellation brekup.
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
         if self.money_pool:
@@ -1024,6 +1081,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return wallet_refund, cashback_refund
 
+    # operations which are needs to be performed after policy purchase.
     def after_commit_tasks(self, *args, **kwargs):
         from ondoc.api.v1.plus.plusintegration import PlusIntegration
         from ondoc.account.models import  UserReferred, Order
@@ -1033,6 +1091,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             PlusIntegration.assign_coupons_to_user_after_purchase(self)
             UserReferred.credit_after_completion(self.user, self, Order.GOLD_PRODUCT_ID)
 
+    # Process policy cancellation.
     def process_cancellation(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -1110,6 +1169,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.after_commit_tasks(is_fresh=is_fresh))
 
+    # prepare data after all the validation which is utilized after payment to create the policy.
     @classmethod
     def create_fulfillment_data(cls, data):
         from ondoc.doctor.models import OpdAppointment
@@ -1152,6 +1212,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         unique_together = (('user', 'plan'),)
 
 
+
 class PlusUserUtilization(auth_model.TimeStampedModel):
     plus_user = models.ForeignKey(PlusUser, related_name='plus_utilization', on_delete=models.DO_NOTHING)
     plan = models.ForeignKey(PlusPlans, related_name='plus_plans_for_utilization', on_delete=models.DO_NOTHING)
@@ -1161,6 +1222,7 @@ class PlusUserUtilization(auth_model.TimeStampedModel):
         db_table = 'plus_user_utilization'
         unique_together = (('plus_user', 'plan'),)
 
+    # Create utilization of individual user.
     @classmethod
     def create_utilization(cls, plus_user_obj):
         plus_plan = plus_user_obj.plan
@@ -1168,6 +1230,7 @@ class PlusUserUtilization(auth_model.TimeStampedModel):
         plus_utilize = cls.objects.create(plus_user=plus_user_obj, plan=plus_plan, utilization=utilization)
 
 
+# Transaction of gold purchase.
 class PlusTransaction(auth_model.TimeStampedModel):
     CREDIT = 1
     DEBIT = 2
@@ -1185,6 +1248,7 @@ class PlusTransaction(auth_model.TimeStampedModel):
     amount = models.PositiveSmallIntegerField(default=0)
     reason = models.PositiveSmallIntegerField(null=True, choices=REASON_CHOICES)
 
+    # After successful transaction we perform few operations.
     def after_commit_tasks(self):
         from ondoc.plus.tasks import push_plus_buy_to_matrix
         from ondoc.notification.tasks import send_plus_membership_notifications
@@ -1220,6 +1284,7 @@ class PlusTransaction(auth_model.TimeStampedModel):
         db_table = "plus_transaction"
 
 
+# Associated gold members.
 class PlusMembers(auth_model.TimeStampedModel):
     class Relations(Choices):
         SELF = 'SELF'
@@ -1293,9 +1358,11 @@ class PlusMembers(auth_model.TimeStampedModel):
     district_code = models.CharField(max_length=10, blank=True, null=True, default=None)
     is_primary_user = models.NullBooleanField()
 
+    # get full name of plus members.
     def get_full_name(self):
         return "{first_name} {last_name}".format(first_name=self.first_name, last_name=self.last_name)
 
+    # create gold members.
     @classmethod
     def create_plus_members(cls, plus_user_obj, *args, **kwargs):
 
@@ -1326,6 +1393,7 @@ class PlusMembers(auth_model.TimeStampedModel):
         db_table = "plus_members"
 
 
+# Lead which are gained for gold policy.
 class PlusLead(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     extras = JSONField(default={})
@@ -1336,37 +1404,11 @@ class PlusLead(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.after_commit())
 
+    # After lead creation, few tasks are to be performed.
     def after_commit(self):
         push_plus_lead_to_matrix.apply_async(({'id': self.id}, ))
 
-    # get seconds elapsed since creation time
-
-    # def get_creation_time_diff(self):
-    #     now = datetime.utcnow().replace(tzinfo=utc)
-    #     timediff = now - self.created_at
-    #     return timediff.total_seconds()
-    #
-    # def get_lead_creation_wait_time(self):
-    #     source = self.get_source()
-    #     if source!='docprimechat':
-    #         return 0
-    #     tdiff = self.get_creation_time_diff()
-    #     wait = 86400 - tdiff
-    #     if wait<0:
-    #         wait=0
-    #     return wait
-    #
-    # def get_source(self):
-    #     extras = self.extras
-    #     lead_source = "InsuranceOPD"
-    #     lead_data = extras.get('lead_data')
-    #     if lead_data:
-    #         provided_lead_source = lead_data.get('source')
-    #         if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
-    #             lead_source = 'docprimechat'
-    #
-    #     return lead_source
-
+    # Get latest lead id of user.
     @classmethod
     def get_latest_lead_id(cls, user):
         insurance_lead = cls.objects.filter(user=user).order_by('id').last()
@@ -1375,6 +1417,7 @@ class PlusLead(auth_model.TimeStampedModel):
 
         return None
 
+    # create lead by phone number.
     @classmethod
     def create_lead_by_phone_number(cls, request):
         phone_number = request.data.get('phone_number', None)
@@ -1393,6 +1436,7 @@ class PlusLead(auth_model.TimeStampedModel):
         db_table = 'plus_leads'
 
 
+# Mappings of appointment and policy.
 class PlusAppointmentMapping(auth_model.TimeStampedModel):
     plus_user = models.ForeignKey(PlusUser, related_name='appointment_mapping', on_delete=models.DO_NOTHING)
     plus_plan = models.ForeignKey(PlusPlans, related_name='plan_appointment', on_delete=models.DO_NOTHING)
@@ -1402,6 +1446,7 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
     amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     extra_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True)
 
+    # get amount which has been utilized by policy holder in terms of appointment.
     @classmethod
     def get_vip_amount(cls, plus_user, content_type):
         from ondoc.doctor.models import OpdAppointment
@@ -1413,6 +1458,7 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
             vip_amount = functools.reduce(lambda a, b: a + b, valid_amounts)
         return vip_amount
 
+    # get count which has been utilized by policy holder in terms of appointment.
     @classmethod
     def get_count(cls, plus_user, content_type):
         from ondoc.doctor.models import OpdAppointment
@@ -1424,6 +1470,7 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
         db_table = 'plus_appointment_mapping'
 
 
+# Data which user has filled in process of purchase of gold policy. User data is saved in this table.
 class PlusDummyData(auth_model.TimeStampedModel):
     class DataType(Choices):
         PLAN_PURCHASE = 'PLAN_PURCHASE'
@@ -1437,6 +1484,7 @@ class PlusDummyData(auth_model.TimeStampedModel):
         db_table = 'plus_dummy_data'
 
 
+# For the single flow, dummy gold policy is been created which is converted to actual policy after purchase.
 class TempPlusUser(auth_model.TimeStampedModel):
     user = models.ForeignKey(User, related_name='temp_plus_user', on_delete=models.DO_NOTHING)
     plan = models.ForeignKey(PlusPlans, related_name='temp_plus_plan', on_delete=models.DO_NOTHING)
@@ -1448,6 +1496,7 @@ class TempPlusUser(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'temp_plus_user'
 
+    # Conversion of temp appointment data to valid gold appointment in the case of single flow.
     @classmethod
     def temp_appointment_to_plus_appointment(cls, appointment_data):
         from ondoc.account.models import  Order
@@ -1468,6 +1517,11 @@ class TempPlusUser(auth_model.TimeStampedModel):
 
         return appointment_data
 
+    """
+        An appointment data has to be validated that it can be covered in the gold policy or not. Some appointments are 
+        fully covered and some are partially. Partially covered appointments are charged with amount.
+        All the appointments under gold plans or vip plans are to be passed at each point before appointment creation.
+    """
     def validate_plus_appointment(self, appointment_data, *args, **kwargs):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -1610,6 +1664,16 @@ class TempPlusUser(auth_model.TimeStampedModel):
 
         return response_dict
 
+    """
+        Every gold plan is associated with bulk of features such as 
+            1. Online chat
+            2. Limit of appointments in context of count and amount.
+            3. Min Max discount which can be availed.
+            4. Total packages which are whitelisted of plan.
+
+        Below property gives all the stats available such as all the limits user have availed and all the limits which can 
+        be availed in future. Ex. 4 appointments have be booked and 2 remaing of total 6 appointments. 
+        """
     @cached_property
     def get_utilization(self):
         plan = self.plan

@@ -214,6 +214,16 @@ class UserConfig(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.id)
 
+    '''Get User Referral from UserConfig CRM, Code Block. Used in Appointment Retrieve Serializers'''
+    @staticmethod
+    def get_referral_amount():
+        user_config = UserConfig.objects.filter(key="referral").first()
+        if user_config:
+            all_data = user_config.data
+            referral_amt = all_data.get('referral_amt', '')
+            return referral_amt
+        return None
+
     class Meta:
         db_table = 'user_config'
 

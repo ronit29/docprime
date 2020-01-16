@@ -114,6 +114,7 @@ def availablelabtestajaxsave(request):
         return JsonResponse({'error': "Invalid Request"})
 
 
+# This method use to upload csv and excel to available lab test
 def testcsvupload(request):
     import csv
     import openpyxl
