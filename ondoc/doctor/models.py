@@ -307,7 +307,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     # get top hospital data
     @staticmethod
-    def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, plan=None):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
         from numpy.distutils.fcompiler import str2bool
@@ -349,12 +349,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # for data in common_hosp_queryset:
         #     common_hosp_percentage_dict[data.id] = data.percentage
 
-        plus_plans = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True)
-        selected_plus_plans = list(filter(lambda x: x.is_selected is True, plus_plans))
-        if selected_plus_plans:
-            plan = selected_plus_plans[0]
-        else:
-            plan = plus_plans.first()
+        if not plan:
+            plan = PlusPlans.get_gold_plan()
         # if not plan:
         #     plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 

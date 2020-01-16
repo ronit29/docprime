@@ -3486,7 +3486,9 @@ class CommonPackage(TimeStampedModel):
     # Get common test for home page
     @classmethod
     def get_packages(cls, count):
-        packages = cls.objects.prefetch_related('package', 'lab__lab_documents').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        packages = cls.objects.select_related('lab', 'package') \
+                              .prefetch_related('lab__lab_documents', 'lab__lab_pricing_group', 'lab__network') \
+                              .filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         return packages
 
 

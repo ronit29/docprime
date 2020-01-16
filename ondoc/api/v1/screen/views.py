@@ -17,12 +17,12 @@ from ondoc.doctor.models import CommonSpecialization, Hospital
 from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
 from ondoc.banner.models import Banner
-from ondoc.common.models import PaymentOptions, UserConfig
+from ondoc.common.models import PaymentOptions, UserConfig, SearchCriteria
 from ondoc.insurance.models import InsuranceEligibleCities
 from ondoc.location.models import EntityUrls
 from ondoc.procedure.models import CommonIpdProcedure, CommonProcedureCategory
 from ondoc.tracking.models import TrackingEvent
-from ondoc.common.models import UserConfig
+from ondoc.plus.models import PlusPlans
 from ondoc.ratings_review.models import AppRatings
 from ondoc.api.v1.doctor.serializers import CommonSpecializationsSerializer
 from ondoc.api.v1.diagnostic.serializers import CommonTestSerializer
@@ -74,14 +74,12 @@ class ScreenViewSet(viewsets.GenericViewSet):
             # if city_name:
             #     insurance_availability = True
 
-        if UserConfig.objects.filter(key="app_update").exists():
-            app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
-            if app_update:
-                force_update_version = app_update.get("force_update_version", "")
-                update_version = app_update.get("update_version", "")
+        app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
+        if app_update:
+            force_update_version = app_update.get("force_update_version", "")
+            update_version = app_update.get("update_version", "")
 
-        if UserConfig.objects.filter(key="app_custom_data").exists():
-            app_custom_data = UserConfig.objects.filter(key="app_custom_data").values_list('data', flat=True).first()
+        app_custom_data = UserConfig.objects.filter(key="app_custom_data").values_list('data', flat=True).first()
 
         common_specializations = CommonSpecialization.get_specializations(grid_size-1)
         specializations_serializer = CommonSpecializationsSerializer(common_specializations, many=True,
@@ -92,7 +90,13 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         package_queryset = CommonPackage.get_packages(grid_size-1)
         coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
-        package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender': coupon_recommender})
+        is_gold_search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        plan = PlusPlans.get_gold_plan()
+        package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request,
+                                                                                           'coupon_recommender': coupon_recommender,
+                                                                                           'is_gold_search_criteria': is_gold_search_criteria,
+                                                                                           'plan': plan
+                                                                                           })
 
         # upcoming_appointment_viewset = AppointmentViewSet()
         # upcoming_appointment_result = upcoming_appointment_viewset.upcoming_appointments(request).data
@@ -101,7 +105,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             upcoming_appointment_result = get_all_upcoming_appointments(request.user.id)
 
         common_package_data = package_serializer.data
-        top_hospitals_data = Hospital.get_top_hospitals_data(request, lat, long)
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, lat, long, plan=plan)
 
         common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
             ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
@@ -127,7 +131,12 @@ class ScreenViewSet(viewsets.GenericViewSet):
             point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
 
-            hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors').filter(enabled_for_online_booking=True,
+            hospital_queryset = Hospital.objects.select_related('matrix_city',
+                                                                'network')\
+                                                .prefetch_related('hospital_doctors',
+                                                                  'hospital_documents',
+                                                                  'network__hospital_network_documents')\
+                                                .filter(enabled_for_online_booking=True,
                                                hospital_doctors__enabled_for_online_booking=True,
                                                hospital_doctors__doctor__enabled_for_online_booking=True,
                                                hospital_doctors__doctor__is_live=True, is_live=True).annotate(
