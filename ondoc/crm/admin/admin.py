@@ -116,11 +116,10 @@ from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
 from .integrations import IntegratorTestParameterMapping, IntegratorTestParameterMappingAdmin
 from .salespoint import SalesPointAdmin, SalesPointAvailableTestMappingAdmin
 from ondoc.salespoint.models import SalesPoint, SalespointTestmapping
-from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin
-from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusMembers
 from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin, \
-    PlusPlanUtmSourceAdmin, PlusMemberAdmin
-from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources
+    PlusPlanUtmSourceAdmin, PlusMemberAdmin, PlusMembers, PlusUserUploadAdmin
+from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources, \
+    PlusUserUpload
 from django.contrib.auth.models import Permission
 
 User = get_user_model()
@@ -139,6 +138,9 @@ admin.site.register(PlusMembers, PlusMemberAdmin)
 admin.site.register(PlusProposer, PlusProposerAdmin)
 admin.site.register(PlusPlanParameters, PlusPlanParametersAdmin)
 admin.site.register(PlusPlanUtmSources, PlusPlanUtmSourceAdmin)
+admin.site.register(PlusUserUpload, PlusUserUploadAdmin)
+# admin.site.register(Corporate, CorporateAdmin)
+# admin.site.register(CorporateGroup, CorporateGroupAdmin)
 
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
