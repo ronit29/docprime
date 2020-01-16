@@ -1762,8 +1762,9 @@ class TempPlusUser(auth_model.TimeStampedModel):
 class PlusUserUpload(auth_model.TimeStampedModel):
     CASH = 1
     CHEQUE = 2
+    NEFT = 4
     OTHER = 3
-    PAYMENT_THROUGH_CHOICES = ((CASH, 'CASH'), (CHEQUE, "CHEQUE"), (OTHER, "OTHER"),)
+    PAYMENT_THROUGH_CHOICES = ((CASH, 'CASH'), (CHEQUE, "CHEQUE"), (OTHER, "OTHER"), (NEFT, "NEFT"))
 
     file = models.FileField(default=None, null=False, upload_to='insurance/upload', validators=[FileExtensionValidator(allowed_extensions=['xls', 'xlsx'])])
     amount = models.PositiveIntegerField(default=None, null=True, blank=True)
