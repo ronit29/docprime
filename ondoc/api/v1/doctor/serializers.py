@@ -9,7 +9,7 @@ from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
-from ondoc.common.models import Feature, MatrixMappedCity, SearchCriteria
+from ondoc.common.models import Feature, MatrixMappedCity, SearchCriteria, UserConfig
 from ondoc.diagnostic.models import LabTest
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
@@ -1786,6 +1786,10 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
 class NewAppointmentRetrieveSerializer(AppointmentRetrieveSerializer):
     doctor = QrcodeRetrieveDoctorSerializer()
+    user_referral_amt = serializers.SerializerMethodField()
+
+    def get_user_referral_amt(self, obj):
+        return UserConfig.get_referral_amount()
 
     class Meta(AppointmentRetrieveSerializer.Meta):
         model = OpdAppointment
@@ -1793,7 +1797,7 @@ class NewAppointmentRetrieveSerializer(AppointmentRetrieveSerializer):
         #           'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
         #           'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
         #           'invoices', 'cancellation_reason', 'payment_type')
-        fields = AppointmentRetrieveSerializer.Meta.fields
+        fields = AppointmentRetrieveSerializer.Meta.fields + ('user_referral_amt', )
 
 
 
