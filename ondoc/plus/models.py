@@ -1,8 +1,9 @@
+import openpyxl
 from dateutil.relativedelta import relativedelta
 from django.db import models
 import functools
 
-from ondoc.api.v1.utils import CouponsMixin
+from ondoc.api.v1.utils import CouponsMixin, plus_subscription_transform
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -19,9 +20,12 @@ from ondoc.authentication.models import UserProfile, User
 from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
+from ondoc.corporate_booking.models import Corporates
 from ondoc.coupon.models import Coupon
 
-from ondoc.notification.tasks import push_plus_lead_to_matrix, update_random_coupons_consumption
+from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, update_random_coupons_consumption
+    # set_order_dummy_transaction_for_corporate,
+
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
     get_max_convenience_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
@@ -37,6 +41,10 @@ from django.utils.functional import cached_property
 from .enums import UsageCriteria
 from copy import deepcopy
 from math import floor
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 # Mixin or dependency which will be injected in the class with the below mentioned behaviour.
 class LiveMixin(models.Model):
@@ -99,6 +107,21 @@ class PlusProposer(auth_model.TimeStampedModel):
         db_table = 'plus_proposer'
 
 
+# class CorporateGroup(auth_model.TimeStampedModel):
+#     class CorporateType(Choices):
+#         VIP = 'VIP'
+#         GOLD = 'GOLD'
+#
+#     name = models.CharField(max_length=300, null=False, blank=False)
+#     type = models.CharField(max_length=100, null=True, choices=CorporateType.as_choices())
+#
+#     def __str__(self):
+#         return str(self.name)
+#
+#     class Meta:
+#         db_table = 'plus_corporate_groups'
+
+
 # All the Gold plans of all the proposers.
 @reversion.register()
 class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
@@ -121,6 +144,13 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     convenience_max_price_reference = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
     is_gold = models.NullBooleanField()
     default_single_booking = models.NullBooleanField()
+    is_corporate = models.NullBooleanField()
+    # corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_plan', null=True, blank=True, on_delete=models.DO_NOTHING)
+    corporate = models.ForeignKey(Corporates, related_name='corporate_plan', null=True, blank=True,
+                                        on_delete=models.DO_NOTHING)
+    corporate_upper_limit_criteria = models.CharField(max_length=100, null=True, blank=True, choices=PriceCriteria.as_choices())
+    corporate_doctor_upper_limit = models.PositiveIntegerField(null=True, blank=True)
+    corporate_lab_upper_limit = models.PositiveIntegerField(null=True, blank=True)
 
     # Some plans are only applicable when utm params are passed. Like some plans are to be targeted with media
     # campaigns, emails or adwords etc.
@@ -295,6 +325,19 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             "coupon_list": coupon_list,
             "random_coupon_list": random_coupon_list
         }
+
+    @classmethod
+    def get_gold_plan(cls):
+        plus_plans = cls.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(
+            is_gold=True)
+        plan = None
+        for plan in plus_plans:
+            if plan.is_selected:
+                plan = plan
+                break
+        if not plan:
+            plan = plus_plans.first()
+        return plan
 
     class Meta:
         db_table = 'plus_plans'
@@ -555,6 +598,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         resp['allowed_package_ids'] = list(map(lambda x: int(x), data.get('package_ids', '').split(','))) if data.get('package_ids') else []
         resp['doctor_consult_amount'] = int(data['doctor_consult_amount']) if data.get('doctor_consult_amount') and data.get('doctor_consult_amount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
+        resp['lab_amount_utilized'] = self.get_labtest_plus_appointment_amount()
         resp['doctor_discount'] = int(data['doctor_consult_discount']) if data.get('doctor_consult_discount') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
         resp['lab_discount'] = int(data['lab_discount']) if data.get('lab_discount') and data.get('lab_discount').__class__.__name__ == 'str' else 0
         resp['package_discount'] = int(data['package_discount']) if data.get('package_discount') and data.get('package_discount').__class__.__name__ == 'str' else 0
@@ -765,8 +809,11 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         appointment_type = OPD if "doctor" in appointment_data else LAB
         deep_utilization = deepcopy(self.get_utilization)
         for item in cart_items:
-            validated_item = item.validate(request)
-            self.validate_plus_appointment(validated_item, utilization=deep_utilization)
+            try:
+                validated_item = item.validate(request)
+                self.validate_plus_appointment(validated_item, utilization=deep_utilization)
+            except Exception as e:
+                pass
         current_item_price_data = OpdAppointment.get_price_details(
             appointment_data, self) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data, self)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
@@ -936,9 +983,10 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 profile = profile.id
         # Create Profile if not exist with name or not exist in profile id from request
         else:
+            phone_number = member.get('phone_number') if member.get('phone_number') else user.phone_number
             data = {'name': name, 'email': member.get('email'), 'user_id': user.id,
                     'dob': member.get('dob'), 'is_default_user': False, 'is_otp_verified': False,
-                    'phone_number': user.phone_number, 'gender': member.get('gender')}
+                    'phone_number': phone_number, 'gender': member.get('gender')}
             # if member['is_primary_user']:
             #     data['is_default_user'] = True
             profile_obj = UserProfile.objects.filter(user_id=user.id).first()
@@ -1718,3 +1766,221 @@ class TempPlusUser(auth_model.TimeStampedModel):
         # resp['availabe_labtest_discount_count'] = resp['total_labtest_count_limit']
 
         return resp
+
+
+# class Corporate(auth_model.TimeStampedModel):
+#     name = models.CharField(max_length=300, null=False, blank=False)
+#     address = models.CharField(max_length=500, null=True, blank=True)
+#     # corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_group', null=False, blank=False, on_delete=models.DO_NOTHING)
+#
+#     class Meta:
+#         db_table = 'plus_corporates'
+
+
+class PlusUserUpload(auth_model.TimeStampedModel):
+    CASH = 1
+    CHEQUE = 2
+    NEFT = 4
+    OTHER = 3
+    PAYMENT_THROUGH_CHOICES = ((CASH, 'CASH'), (CHEQUE, "CHEQUE"), (OTHER, "OTHER"), (NEFT, "NEFT"))
+
+    file = models.FileField(default=None, null=False, upload_to='insurance/upload', validators=[FileExtensionValidator(allowed_extensions=['xls', 'xlsx'])])
+    amount = models.PositiveIntegerField(default=None, null=True, blank=True)
+    paid_through = models.PositiveSmallIntegerField(null=True, blank=True, choices=PAYMENT_THROUGH_CHOICES)
+    payment_proof = models.FileField(default=None, null=True, blank=True, upload_to='insurance/upload/payment_proof')
+    cheque_number = models.CharField(max_length=100, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        # should never be saved again
+        if self.pk:
+            return
+
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit_tasks())
+
+    def after_commit_tasks(self):
+        file = self.file
+        wb = openpyxl.load_workbook(file)
+
+        # getting a particular sheet by name out of many sheets
+        worksheet = wb.active
+        excel_data = list()
+        headers = list()
+
+        # iterating over the rows and
+        # getting value from each cell in row in dict
+        i = 0
+        for row in worksheet.iter_rows():
+            j = 0
+            data = {}
+            for cell in row:
+                if i == 0:
+                    headers.append(str(cell.value))
+                else:
+                    data[headers[j]] = cell.value
+                    j = j + 1
+            i = i + 1
+            excel_data.append(data)
+        for data in excel_data:
+            if data:
+                try:
+                    with transaction.atomic():
+                        if data['is_primary_member'] == 1:
+                            user = self.create_user(data)
+                            excel_data = list(filter(None, excel_data))
+                            if not user.active_plus_user:
+                                member_list = []
+                                for user_member_data in excel_data:
+                                    if str(user_member_data.get('primary_phone_number', 0)) == str(user.phone_number):
+                                        member_list.append(user_member_data)
+                                fetched_data = self.get_plus_user_data(member_list, data, user)
+                                plus_user_data = fetched_data.get('plus_data')
+                                amount = fetched_data.get('amount')
+                                order = self.create_order(plus_user_data, amount, user)
+                                plus_user_obj = order.process_plus_user_upload_order()
+                                if not plus_user_obj:
+                                    raise Exception("Something Went Wrong")
+                                order = plus_user_obj.order
+                                # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
+                                if not order.getTransactions():
+                                    try:
+                                        transaction.on_commit(
+                                            lambda: set_order_dummy_transaction.apply_async(
+                                                (order.id, plus_user_obj.user_id,), countdown=5))
+                                    except Exception as e:
+                                        logger.error(str(e))
+                except Exception as e:
+                    raise Exception(e)
+
+    def create_user(self, data):
+        phone_number = data['phone_number']
+        if not phone_number:
+            raise Exception('Phone number does not exist')
+        user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
+
+        if not user:
+            user = User.objects.create(phone_number=phone_number, user_type=User.CONSUMER)
+
+        return user
+
+    def get_plus_user_members_data(self, export_data, data):
+        plus_user_members = list()
+        phone_number = data.get('phone_number', None)
+        if phone_number:
+            primary_member_data = self.get_member_info(data, primary_member_data={}, primary=True)
+            plus_user_members.append(primary_member_data)
+            for member in export_data:
+                if not member['relationship'] == 'Self':
+                    secondary_member_data = self.get_member_info(member, primary_member_data, primary=False)
+                    plus_user_members.append(secondary_member_data)
+
+        return plus_user_members
+
+    def get_member_info(self, member, primary_member_data, primary):
+        members_dict = dict()
+        name = member.get('plus_member_name', '')
+        if not name:
+            raise Exception('Name is mandatory for Plus User')
+
+        name = name.split(' ')
+        first_name = ''
+        middle_name = ''
+        last_name = ''
+        if len(name) > 1 and len(name) == 2:
+            first_name = name[0]
+            last_name = name[1]
+        elif len(name) > 1 and len(name) > 2:
+            first_name = name[0]
+            middle_name = name[1]
+            last_name = name[2]
+        else:
+            first_name = name[0]
+            middle_name = ''
+            last_name = ''
+        if member.get('gender', None) == "Male" or member.get('gender', None) == "MALE" or member.get('gender') == "male":
+            gender = 'm'
+        else:
+            gender = 'f'
+        members_dict['first_name'] = first_name
+        members_dict['middle_name'] = middle_name
+        members_dict['last_name'] = last_name
+        # members_dict['dob'] = member['dob'].strftime("%Y-%m-%d") if member['dob'] else ''
+        members_dict['dob'] = datetime.datetime.strptime(member['dob'], '%Y-%m-%d') if member['dob'] else ''
+        members_dict['dob'] = str(members_dict['dob'].date()) if members_dict['dob'] else ''
+        members_dict['gender'] = gender
+        members_dict['relation'] = member.get('relation', '')
+        members_dict['phone_number'] = member.get('phone_number', None)
+        if not primary and not member.get('email', ''):
+            members_dict['email'] = primary_member_data['email']
+        else:
+            members_dict['email'] = member.get('email')
+        members_dict['profile'] = None
+        if primary:
+            members_dict['is_primary_user'] = True
+        else:
+            members_dict['is_primary_user'] = False
+
+        return members_dict
+
+    def get_plus_user_data(self, excel_data, data, user):
+        from dateutil.relativedelta import relativedelta
+        members = self.get_plus_user_members_data(excel_data, data)
+        transaction_date = datetime.datetime.now()
+        plus_plan = data['plan_id']
+        plan = PlusPlans.objects.filter(pk=plus_plan).first()
+        if not plan and not plan.is_corporate or plan.is_retail:
+            raise Exception("Selected Plan is not belongs to Corporate or belongs to Retail plan, "
+                            "Please select correct plan")
+        members_count = len(excel_data)
+        if int(plan.total_allowed_members) < members_count:
+            raise Exception("Total members is greater than allowed members")
+        if plan:
+            amount = plan.deal_price
+            expiry_date = transaction_date + relativedelta(months=int(plan.tenure))
+            expiry_date = expiry_date - timedelta(days=1)
+            expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
+            expiry_date = expiry_date
+
+            # if plan.total_allowed_members < len(members):
+            #     raise Exception('Only ' + str(plan.total_allowed_members) + ' members are allowed in selected plan for ' + data['first_name'])
+
+        if data['relationship'] == 'Self' or data['relationship'] == 'SELF' or data['relationship'] == 'self':
+            user_profile = UserProfile.objects.filter(user_id=user.pk).first()
+            if user_profile:
+                user_profile = {"name": user_profile.name, "email": user_profile.email, "gender": user_profile.gender,
+                                "dob": user_profile.dob, "profile": user_profile.id}
+            else:
+                user_profile = {"name": data['plus_member_name'], "email": data['email'], "gender": data['gender'],
+                                "dob": data['dob'] if data['dob'] else '', "profile": None}
+
+        plus_user_data = {'proposer': plan.proposer.id, 'plus_plan': plan.id,
+                          'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': int(amount),
+                          'user': user.id, "plus_members": members,
+                          'effective_price': int(amount)}
+
+        plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plan.id,
+                                  "user": user.pk, "plus_user": plus_user_data}
+
+        plus_data = plus_subscription_transform(plus_subscription_data)
+
+        return {'plus_data': plus_data, "amount": amount}
+
+    def create_order(self, plus_user_data, amount, user):
+        from ondoc.account import models as account_models
+        visitor_info = None
+
+        order = account_models.Order.objects.create(
+            product_id=account_models.Order.CORP_VIP_PRODUCT_ID,
+            action=account_models.Order.CORP_VIP_CREATE,
+            action_data=plus_user_data,
+            amount=amount,
+            cashback_amount=0,
+            wallet_amount=0,
+            user=user,
+            payment_status=account_models.Order.PAYMENT_PENDING,
+            visitor_info=visitor_info
+        )
+        return order
+
+    class Meta:
+        db_table = 'plus_user_upload'

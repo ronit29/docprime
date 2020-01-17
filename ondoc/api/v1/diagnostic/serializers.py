@@ -3,7 +3,7 @@ from rest_framework import serializers
 from rest_framework.fields import CharField
 
 from ondoc.cart.models import Cart
-from ondoc.common.models import SearchCriteria
+from ondoc.common.models import SearchCriteria, UserConfig
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
                                      LabTestCategory, LabAppointmentTestMapping, LabTestGroup, LabTestGroupMapping)
@@ -737,7 +737,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
                 filters |= q
 
         if filters:
-            queryset = queryset.filter(filters)
+            queryset = queryset.select_related('test').prefetch_related('test__categories').filter(filters)
         else:
             queryset = queryset.none()
         for ins in instance:
@@ -787,7 +787,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
     def get_vip(self, obj):
         request = self.context.get("request")
-        resp = Lab.get_vip_details(request.user)
+        resp = Lab.get_vip_details(request.user, search_criteria_query=self.context.get('is_gold_search_criteria'))
         user = request.user
 
         deal_price = None
@@ -798,7 +798,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             deal_price = obj._selected_test.custom_deal_price if obj._selected_test.custom_deal_price else obj._selected_test.computed_deal_price
             agreed_price = obj._selected_test.custom_agreed_price if obj._selected_test.custom_agreed_price else obj._selected_test.computed_agreed_price
 
-        lab_obj = Lab.objects.filter(id=obj.lab_id).first()
+        lab_obj = obj.lab
         price_data = {"mrp": mrp, "deal_price": deal_price,
                       "cod_deal_price": deal_price,
                       "fees": agreed_price}
@@ -808,7 +808,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
         plan = plus_obj.plan if plus_obj else None
         resp['vip_gold_price'] = agreed_price
-        resp['vip_convenience_amount'] = obj._selected_test.calculate_convenience_charge(plan)
+        resp['vip_convenience_amount'] = obj._selected_test.calculate_convenience_charge(plan=plan if plan else self.context.get('plan'))
 
         # resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(agreed_price, "LABTEST")
         resp['is_enable_for_vip'] = True if lab_obj and lab_obj.is_enabled_for_plus_plans() else False
@@ -828,7 +828,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         if not engine:
             return resp
 
-        if engine and obj and obj._selected_test and lab_obj.is_enabled_for_plus_plans() and obj._selected_test.mrp:
+        if engine and obj and obj._selected_test and lab_obj and lab_obj.is_enabled_for_plus_plans() and obj._selected_test.mrp:
             # engine_response = engine.validate_booking_entity(cost=obj._selected_test.mrp, id=obj.package.id)
             # resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             resp['vip_convenience_amount'] = obj._selected_test.calculate_convenience_charge(plan)
@@ -1861,6 +1861,10 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     selected_timings_type = serializers.SerializerMethodField()
     appointment_via_sbi = serializers.SerializerMethodField()
     gold = serializers.SerializerMethodField()
+    user_referral_amt = serializers.SerializerMethodField()
+
+    def get_user_referral_amt(self, obj):
+        return UserConfig.get_referral_amount()
 
     def get_gold(self, obj):
         from ondoc.api.v1.plus.serializers import PlusUserModelSerializer
@@ -1941,7 +1945,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
                   'time_slot_start', 'time_slot_end', 'selected_timings_type', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
                   'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports',
                   'report_files', 'invoices', 'prescription', 'cancellation_reason', 'mask_data', 'payment_type',
-                  'price', 'appointment_via_sbi', 'gold')
+                  'price', 'appointment_via_sbi', 'gold', 'user_referral_amt')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
