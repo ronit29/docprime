@@ -2370,7 +2370,10 @@ class RefreshJSONWebToken(GenericViewSet):
         data = {}
         if hasattr(request, 'agent') and request.agent is not None:
             return Response({})
-        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request})
+        app_name = True if (request.META.get("HTTP_APP_NAME") and
+                            (request.META.get("HTTP_APP_NAME") == 'docprime_consumer_app' or request.META.get("HTTP_APP_NAME") == 'd_web'))\
+                        else None
+        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request, 'app_name': app_name})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         # if 'active_session_error' in valid_data and valid_data['active_session_error']:
