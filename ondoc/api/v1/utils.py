@@ -341,9 +341,9 @@ def plan_subscription_reverse_transform(subscription_data):
     subscription_data['profile_detail']['dob'] = \
         datetime.datetime.strptime(subscription_data['profile_detail']['dob'],
                                    "%Y-%m-%d")
-    insured_members = subscription_data['plus_user']['plus_members']
-    for member in insured_members:
-        member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
+    plus_members = subscription_data['plus_user']['plus_members']
+    for member in plus_members:
+        member['dob'] = datetime.datetime.strptime(str(member['dob']), "%Y-%m-%d").date()
     return subscription_data
 
 
@@ -762,7 +762,7 @@ def get_pg_secret_client_key(order):
     from ondoc.account.models import Order
     secret_key = client_key = ""
 
-    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID,  Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID]:
+    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID,  Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID, Order.CORP_VIP_PRODUCT_ID]:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:

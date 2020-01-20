@@ -532,7 +532,8 @@ class CouponRecommender():
         else:
             all_coupons = Coupon.objects.filter(type__in=types, is_visible=True)
 
-        all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
+        all_coupons = all_coupons.select_related('payment_option') \
+                                 .prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
                                                    'hospitals_exclude', 'doctors', 'doctors_exclude', 'specializations',
                                                    'procedures', 'lab', 'test', 'procedure_categories',
                                                    'users_vip_gold_plans', 'vip_gold_plans', user_opd_booked,
