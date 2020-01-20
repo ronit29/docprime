@@ -4885,6 +4885,8 @@ class SearchScore(auth_model.TimeStampedModel):
     doctors_in_clinic_score = models.PositiveIntegerField(default=None, null=True)
     avg_ratings_score = models.PositiveIntegerField(default=None, null=True)
     ratings_count_score = models.PositiveIntegerField(default=None, null=True)
+    partner_app_activity = models.FloatField(default=None, null=True)
+    discount = models.FloatField(default=None, null=True)
     final_score = models.FloatField(default=None, null=True)
 
     class Meta:

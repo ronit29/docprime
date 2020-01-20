@@ -4,6 +4,9 @@ from django.db.models import Count, Case, When, F, Prefetch
 from ondoc.api.v1.utils import RawSql
 import datetime
 import logging
+
+from ondoc.doctor.models import DoctorClinic
+
 logger = logging.getLogger(__name__)
 from celery import task
 from django.db import transaction
@@ -36,7 +39,12 @@ class DoctorSearchScore:
 
                                  "ratings_count": [{"min": 0, "max": 5, "score": 0},
                                                         {"min": 5, "max": 10, "score": 3},
-                                                        {"min": 10, "max": 15, "score": 7}]
+                                                        {"min": 10, "max": 15, "score": 7}],
+
+                                 "discount_percentage": [{"min": 1, "max": 10, "score": 0.20},
+                                                        {"min": 10, "max": 20, "score": 0.40},
+                                                        {"min": 20, "max": 30, "score": 0.60},
+                                                        {"min": 30, "max": 40, "score": 0.80}]
 
                              }
 
@@ -53,7 +61,9 @@ class DoctorSearchScore:
                 score_obj_list = list()
                 doctor_in_hosp_count = dict()
                 doctors = doctor_models.Doctor.objects.all().prefetch_related("hospitals", "doctor_clinics",
-                                                                              "doctor_clinics__hospital",
+                                                                              Prefetch('doctor_clinics__hospital',
+                                                                                       queryset=DoctorClinic.objects.all().order_by('id')),
+                                                                              'doctor_clinics__availability',
                                                                               "doctor_clinics__hospital__hospital_place_details").order_by('id')[count: count+100]
 
                 hospitals_without_network = doctor_models.Hospital.objects.prefetch_related('assoc_doctors', 'hospital_doctors').filter(
@@ -71,20 +81,21 @@ class DoctorSearchScore:
 
                 for doctor in doctors:
                     print("doctor : " + str(doctor.id))
-                    result = list()
-                    result.append(self.get_popularity_score(doctor))
-                    result.append(self.get_practice_score(doctor))
-                    result.append(self.get_doctors_score(doctor_in_hosp_count, doctor))
-                    result.append(self.get_doctor_ratings(doctor))
-                    result.append(self.get_doctor_ratings_count(doctor))
-                    result.append(self.get_final_score(result, doctor))
+                    # popularity_score = self.get_popularity_score(doctor)
+                    years_of_experience_score = self.get_practice_score(doctor).get('experience_score')
+                    doctors_in_clinic_score = self.get_doctors_score(doctor_in_hosp_count, doctor).get('doctors_in_clinic_score')
+                    avg_ratings_score = self.get_doctor_ratings(doctor).get('avg_ratings_score')
+                    ratings_count_score = self.get_doctor_ratings_count(doctor).get('ratings_count')
+                    discount_score = self.get_discount(doctor).get('discount_percentage')
+
+                    final_score = self.get_final_score(doctor, years_of_experience_score=years_of_experience_score, doctors_in_clinic_score=doctors_in_clinic_score, avg_ratings_score=avg_ratings_score, ratings_count_score=ratings_count_score)
                     score_obj_list.append(
-                        doctor_models.SearchScore(doctor=doctor, popularity_score=result[0]['popularity_score'],
-                                                  years_of_experience_score=result[1]['experience_score'],
-                                                  doctors_in_clinic_score=result[2]['doctors_in_clinic_score'],
-                                                  avg_ratings_score=result[3]['avg_ratings_score'],
-                                                  ratings_count_score=result[4]['ratings_count'],
-                                                  final_score=result[5]['final_score']))
+                        doctor_models.SearchScore(doctor=doctor,
+                                                  years_of_experience_score=years_of_experience_score,
+                                                  doctors_in_clinic_score=doctors_in_clinic_score,
+                                                  avg_ratings_score=avg_ratings_score,
+                                                  ratings_count_score=ratings_count_score,
+                                                  final_score=final_score))
 
                 bulk_created = doctor_models.SearchScore.objects.bulk_create(score_obj_list)
                 if bulk_created:
@@ -96,6 +107,24 @@ class DoctorSearchScore:
                  logger.error("Error in calculating search score - " + str(e))
 
         return 'successfully inserted.'
+
+    def get_discount(self, doctor):
+        discount_percentage = self.scoring_data.get('discount_percentage')
+        if doctor.doctor_clinics.all():
+            doctor_clinic = doctor.doctor_clinics.all()[0]
+            clinic_time = doctor_clinic.availability.all()[0]
+            if clinic_time.fees and clinic_time.deal_price:
+                discount = (1-clinic_time.fees/clinic_time.deal_price)*100
+                for score in discount_percentage:
+                    if (discount == 0):
+                        return {'discount_percentage': 0}
+                    if discount >= 40:
+                        return {'discount_percentage': 10}
+
+                    elif discount >= score.get('min') and discount < score.get('max'):
+                        return {'discount_percentage': score.get('score') * 10}
+
+        return {'discount_percentage': 0}
 
     def get_doctor_ratings(self, doctor):
         average_ratings = self.scoring_data.get('average_ratings')
@@ -139,19 +168,19 @@ class DoctorSearchScore:
 
         return {'ratings_count': 0}
 
-    def get_popularity_score(self, doctor):
-        pop_score = self.popularity_data.get(doctor.id)
-
-        if not pop_score:
-            pop_score = 0
-
-        # popularity_list = self.scoring_data.get('popularity_score')
-        # for score in popularity_list:
-        #     if pop_score == 10:
-        #         return {'popularity_score': 10}
-        #
-        #     elif pop_score >= score.get('min') and pop_score < score.get('max'):
-        return {'popularity_score': pop_score}
+    # def get_popularity_score(self, doctor):
+    #     pop_score = self.popularity_data.get(doctor.id)
+    #
+    #     if not pop_score:
+    #         pop_score = 0
+    #
+    #     # popularity_list = self.scoring_data.get('popularity_score')
+    #     # for score in popularity_list:
+    #     #     if pop_score == 10:
+    #     #         return {'popularity_score': 10}
+    #     #
+    #     #     elif pop_score >= score.get('min') and pop_score < score.get('max'):
+    #     return {'popularity_score': pop_score}
 
     def get_practice_score(self, doctor):
         score = 0
@@ -185,15 +214,15 @@ class DoctorSearchScore:
             elif doctors_count >= score.get('min') and doctors_count < score.get('max'):
                 return {'doctors_in_clinic_score': score.get('score')}
 
-    def get_final_score(self, result, doctor):
-        if result:
+    def get_final_score(self, doctor, *args, **kwargs):
+        if self:
             final_score = 0
             priority_score = 0
             final_score_list = self.scoring_data.get('weightage')[0]
-            final_score = float(result[0]['popularity_score']) * final_score_list['popularity_score'] + result[1][
-                'experience_score'] * final_score_list['years_of_experience'] + result[2]['doctors_in_clinic_score'] * \
-                          final_score_list['doctors_in_clinic'] + result[3]['avg_ratings_score'] * final_score_list[
-                              'average_ratings'] + result[4]['ratings_count'] * final_score_list['ratings_count']
+            final_score = kwargs['years_of_experience_score'] * final_score_list['years_of_experience'] + \
+                          kwargs['doctors_in_clinic_score'] * final_score_list['doctors_in_clinic'] +\
+                          kwargs['avg_ratings_score'] * final_score_list['average_ratings'] + \
+                          kwargs['ratings_count_score'] * final_score_list['ratings_count']
 
             if doctor.priority_score:
                 priority_score += doctor.priority_score
