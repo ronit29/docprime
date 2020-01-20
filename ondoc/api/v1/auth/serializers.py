@@ -460,10 +460,13 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                 date_generated = get_date[1]
                 time_format = '%Y-%m-%d %H:%M:%S'
                 date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
-
-                time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
-
+                # time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
                 current_time_string = datetime.datetime.strftime(datetime.datetime.now(), time_format)
+                last_time_object = datetime.datetime.strptime(date_generated, time_format)
+                current_object = datetime.datetime.strptime(current_time_string, time_format)
+                delta = current_object - last_time_object
+                time_elapsed = delta.seconds / 60
+
                 if time_elapsed > 10:
                     raise serializers.ValidationError('Reset Key Expired' + ' '+str(date_generated) + '   elapsed '+str(time_elapsed)+ ' current '+ str(current_time_string))
                 else:
@@ -476,37 +479,37 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                         'payload': token_object['payload']
                     }
 
-        payload = self.check_payload_custom(token=token)
-        user = self.check_user_custom(payload=payload)
-        # Get and check 'orig_iat'
-        orig_iat = payload.get('orig_iat')
-
-        if orig_iat:
-            # Verify expiration
-            refresh_limit = settings.JWT_AUTH['JWT_REFRESH_EXPIRATION_DELTA']
-
-            if isinstance(refresh_limit, datetime.timedelta):
-                refresh_limit = (refresh_limit.days * 24 * 3600 +
-                                 refresh_limit.seconds)
-
-            expiration_timestamp = orig_iat + int(refresh_limit)
-            now_timestamp = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
-
-            if now_timestamp > expiration_timestamp:
-                msg = _('Token has expired.')
-                raise serializers.ValidationError(msg)
-        else:
-            msg = _('orig_iat missing')
-            raise serializers.ValidationError(msg)
-        blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
-        # if blacllist_token and isinstance(blacllist_token, tuple) and (blacllist_token[0] > 0):
-        token_object = JWTAuthentication.generate_token(user, request)
-        token_object['payload']['orig_iat'] = orig_iat
-        return {
-            'token': token_object['token'],
-            'user': user,
-            'payload': token_object['payload']
-        }
+        # payload = self.check_payload_custom(token=token)
+        # user = self.check_user_custom(payload=payload)
+        # # Get and check 'orig_iat'
+        # orig_iat = payload.get('orig_iat')
+        #
+        # if orig_iat:
+        #     # Verify expiration
+        #     refresh_limit = settings.JWT_AUTH['JWT_REFRESH_EXPIRATION_DELTA']
+        #
+        #     if isinstance(refresh_limit, datetime.timedelta):
+        #         refresh_limit = (refresh_limit.days * 24 * 3600 +
+        #                          refresh_limit.seconds)
+        #
+        #     expiration_timestamp = orig_iat + int(refresh_limit)
+        #     now_timestamp = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
+        #
+        #     if now_timestamp > expiration_timestamp:
+        #         msg = _('Token has expired.')
+        #         raise serializers.ValidationError(msg)
+        # else:
+        #     msg = _('orig_iat missing')
+        #     raise serializers.ValidationError(msg)
+        # blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
+        # # if blacllist_token and isinstance(blacllist_token, tuple) and (blacllist_token[0] > 0):
+        # token_object = JWTAuthentication.generate_token(user, request)
+        # token_object['payload']['orig_iat'] = orig_iat
+        # return {
+        #     'token': token_object['token'],
+        #     'user': user,
+        #     'payload': token_object['payload']
+        # }
         # else:
         # return serializers.ValidationError("Token Has expired")
 
