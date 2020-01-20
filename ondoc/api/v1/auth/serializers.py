@@ -424,7 +424,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
     force_update = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
-        import hashlib
+        import hashlib, time
         token = attrs.get('token')
         reset = attrs.get('reset')
         app_name = self.context.get('app_name')
@@ -457,18 +457,20 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             get_date = data.split('.')
             if len(get_date) > 1:
                 uid = get_date[0]
-                date_generated = get_date[1]
-                time_format = '%Y-%m-%d %H:%M:%S'
-                date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
-                # time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
-                current_time_string = datetime.datetime.strftime(datetime.datetime.now(), time_format)
-                last_time_object = datetime.datetime.strptime(date_generated, time_format)
-                current_object = datetime.datetime.strptime(current_time_string, time_format)
+                last_time_object = int(get_date[1])
+                current_object = time.time()
+                # time_format = '%Y-%m-%d %H:%M:%S'
+                # date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
+                # # time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
+                # current_time_string = datetime.datetime.strftime(datetime.datetime.now(), time_format)
+                # last_time_object = datetime.datetime.strptime(date_generated, time_format)
+                # current_object = datetime.datetime.strptime(current_time_string, time_format)
                 delta = current_object - last_time_object
-                time_elapsed = delta.seconds / 60
+                time_elapsed = delta / 60
 
                 if time_elapsed > 10:
-                    raise serializers.ValidationError('Reset Key Expired' + ' '+str(date_generated) + '   elapsed '+str(time_elapsed)+ ' current '+ str(current_time_string))
+                    # raise serializers.ValidationError('Reset Key Expired' + ' '+str(date_generated) + '   elapsed '+str(time_elapsed)+ ' current '+ str(current_time_string))
+                    raise serializers.ValidationError('Reset Key Expired' +  ' last ' + str(last_time_object) + ' current  '+ str(current_object) + ' delta ' + str(delta) )
                 else:
                     user = User.objects.filter(id=uid).first()
                     blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
