@@ -98,6 +98,7 @@ import newrelic.agent
 logger = logging.getLogger(__name__)
 
 
+# get doctor mobile otp validity.
 def doctor_mobile_otp_validity():
     return timezone.now() + timezone.timedelta(hours=2)
 
@@ -294,6 +295,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         return self.city
     #     return None
 
+    # Get all cities.
     def get_all_cities(self):
         result = []
         q = MatrixMappedCity.objects.prefetch_related('state').all().order_by('name')
@@ -304,8 +306,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         result.extend([{'id': x.id, 'name': x.name, 'state': x.state.name if x.state else None} for x in q])
         return result
 
+    # get top hospital data
     @staticmethod
-    def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, plan=None):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
         from numpy.distutils.fcompiler import str2bool
@@ -347,12 +350,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # for data in common_hosp_queryset:
         #     common_hosp_percentage_dict[data.id] = data.percentage
 
-        plus_plans = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True)
-        selected_plus_plans = list(filter(lambda x: x.is_selected is True, plus_plans))
-        if selected_plus_plans:
-            plan = selected_plus_plans[0]
-        else:
-            plan = plus_plans.first()
+        if not plan:
+            plan = PlusPlans.get_gold_plan()
         # if not plan:
         #     plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
@@ -451,7 +450,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         #                                                                                  'new_dynamic_dict': new_dynamic_dict}).data
 
 
-
+    # update hospital google avg rating.
     @classmethod
     def update_hosp_google_avg_rating(cls):
         update_hosp_google_ratings = RawSql('''update hospital h set google_avg_rating = (select (reviews->>'user_avg_rating')::float from hospital_place_details 
@@ -460,6 +459,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         update_hosp_google_ratings_count = RawSql(''' update hospital h set google_ratings_count = (select (reviews->>'user_ratings_total')::int from hospital_place_details 
                                                  where hospital_id=h.id limit 1)''', []).execute()
 
+    # get active opd appointments of a user.
     def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
 
         appointments = OpdAppointment.objects.filter(hospital_id=self.id)\
@@ -483,6 +483,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #     return False
 
 
+    # get hospital and locality data
     @classmethod
     def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
         if not temp_hospital_ids:
@@ -512,6 +513,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             hosp_entity_qs if x.sublocality_value and x.locality_value}
         return hosp_entity_dict, hosp_locality_entity_dict
 
+    # update hospital seo urls.
     @classmethod
     def update_hospital_seo_urls(cls):
 
@@ -532,6 +534,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # update search and profile urls
         hospital_urls.hospital_urls()
 
+    # check if entity is enabled for cod or not.
     def is_enabled_for_cod(self, *args, **kwargs):
         user = kwargs.get('user')
         if user and not user.is_anonymous and user.is_authenticated and user.active_plus_user:
@@ -542,6 +545,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         else:
             return False
 
+    # update city search
     @classmethod
     def update_city_search(cls):
         query = '''  update hospital set city_search_key = alternative_value
@@ -566,28 +570,33 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         update_city = RawSql(query1, []).execute()
 
 
+    # check if hospital is open for communication or not.
     def open_for_communications(self):
         if (self.network and self.network.open_for_communication) or (not self.network and self.open_for_communication):
             return True
 
         return False
 
+    # check if hospital enabled for gold plans or not.
     def is_enabled_for_plus_plans(self):
         if (self.network and self.network.enabled_for_plus_plans) or (not self.network and self.enabled_for_plus_plans):
             return True
 
         return False
 
+    #  check if auto ivr is enabled for hospital or not.
     def is_auto_ivr_enabled(self):
         if (self.network and self.network.auto_ivr_enabled) or (not self.network and self.auto_ivr_enabled):
             return True
 
         return False
 
+    # get thumbnail
     def get_thumbnail(self):
         return None
         # return static("hospital_images/hospital_default.png")
 
+    # get hospital address.
     def get_hos_address(self):
         address = []
 
@@ -613,6 +622,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         return ", ".join(result)
 
+    # update avg rating.
     @classmethod
     def update_avg_rating(cls):
         from django.db import connection
@@ -623,6 +633,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where rr.appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
             cursor.execute(query)
 
+    # update is hospital is big or not.
     @classmethod
     def update_is_big_hospital(cls):
         big_hospitals = Hospital.objects.filter(is_live=True, hospital_doctors__enabled=True,
@@ -633,11 +644,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     def ad_str(self, string):
         return str(string).strip().replace(',', '')
 
+    # return short address.
     def get_short_address(self):
         address_items = [value for value in
                          [self.locality, self.city] if value]
         return ", ".join(address_items)
 
+    # update live status
     def update_live_status(self):
         if not self.is_live and ( self.data_status == self.QC_APPROVED and self.enabled == True):
             self.is_live = True
@@ -646,6 +659,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         if self.is_live and (self.data_status != self.QC_APPROVED or self.enabled == False):
             self.is_live = False
 
+    # update time stamps.
     def update_time_stamps(self):
         from ondoc.api.v1.utils import update_physical_agreement_timestamp
         update_physical_agreement_timestamp(self)
@@ -655,6 +669,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         elif self.enabled and self.disabled_at:
             self.disabled_at = None
 
+    # create dedicated url for the hospital.
     def create_entity_url(self):
         if not self.is_live:
             return

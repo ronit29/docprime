@@ -218,6 +218,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_vip_data(self, obj):
         resp = {}
+        if isinstance(obj, dict):
+            return resp
         plus_membership = obj.get_plus_membership
         if not plus_membership:
             return resp
@@ -392,7 +394,7 @@ class TransactionSerializer(serializers.Serializer):
     orderId = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all())
     orderNo = serializers.CharField(max_length=200, required=False)
     paymentMode = serializers.CharField(max_length=200, required=False)
-
+    txAmount = serializers.DecimalField(max_digits=12, decimal_places=2)
     responseCode = serializers.CharField(max_length=200)
     bankTxId = serializers.CharField(max_length=200, allow_blank=True, required=False)
     txDate = serializers.CharField(max_length=100)

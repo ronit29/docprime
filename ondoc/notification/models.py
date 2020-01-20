@@ -1757,6 +1757,6 @@ class IPDIntimateEmailNotification(TimeStampedModel):
 
                 kwargs['email_obj'] = data
                 kwargs['ipd_email_obj'] = data
-                email_notification.send(receivers, *args, **kwargs)
+                # email_notification.send(receivers, *args, **kwargs)
                 IPDIntimateEmailNotification.objects.filter(user=data.user).update(is_sent=True)
                 print("ipd_obj: " + str(data.id))
