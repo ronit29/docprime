@@ -1,4 +1,5 @@
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
+from ondoc.common.models import LastUsageTimestamp
 from ondoc.doctor import models as doctor_models
 from django.db.models import Count, Case, When, F, Prefetch
 from ondoc.api.v1.utils import RawSql
@@ -64,7 +65,7 @@ class DoctorSearchScore:
                                                                               Prefetch('doctor_clinics__hospital',
                                                                                        queryset=DoctorClinic.objects.all().order_by('id')),
                                                                               'doctor_clinics__availability',
-                                                                              "doctor_clinics__hospital__hospital_place_details").order_by('id')[count: count+100]
+                                                                              "doctor_clinics__hospital__hospital__hospital_place_details").order_by('id')[count: count+100]
 
                 hospitals_without_network = doctor_models.Hospital.objects.prefetch_related('assoc_doctors', 'hospital_doctors').filter(
                     network__isnull=True, hospital_doctors__doctor__in=doctors).annotate(doctors_count=Count('assoc_doctors__id'))
@@ -87,6 +88,7 @@ class DoctorSearchScore:
                     avg_ratings_score = self.get_doctor_ratings(doctor).get('avg_ratings_score')
                     ratings_count_score = self.get_doctor_ratings_count(doctor).get('ratings_count')
                     discount_score = self.get_discount(doctor).get('discount_percentage')
+                    partner_app_activity_score = self.get_partner_app_activity(doctor)
 
                     final_score = self.get_final_score(doctor, years_of_experience_score=years_of_experience_score, doctors_in_clinic_score=doctors_in_clinic_score, avg_ratings_score=avg_ratings_score, ratings_count_score=ratings_count_score)
                     score_obj_list.append(
@@ -94,7 +96,7 @@ class DoctorSearchScore:
                                                   years_of_experience_score=years_of_experience_score,
                                                   doctors_in_clinic_score=doctors_in_clinic_score,
                                                   avg_ratings_score=avg_ratings_score,
-                                                  ratings_count_score=ratings_count_score,
+                                                  ratings_count_score=ratings_count_score, partner_app_activity=partner_app_activity_score,
                                                   final_score=final_score))
 
                 bulk_created = doctor_models.SearchScore.objects.bulk_create(score_obj_list)
@@ -107,6 +109,18 @@ class DoctorSearchScore:
                  logger.error("Error in calculating search score - " + str(e))
 
         return 'successfully inserted.'
+
+    def get_partner_app_activity(self, doctor):
+        if doctor.doctor_clinics.all():
+            doctor_clinic = doctor.doctor_clinics.all()[0]
+            hospital = doctor_clinic.hospital.hospital if doctor_clinic.hospital else None
+            if hospital.spoc_details.all():
+                spoc = hospital.spoc_details.all()[0]
+                last_usage_timestamp = LastUsageTimestamp.objects.filter(phone_number=spoc.number)
+                if(last_usage_timestamp):
+                    if((datetime.datetime.today() - last_usage_timestamp).days >48):
+                        return 10
+        return 0
 
     def get_discount(self, doctor):
         discount_percentage = self.scoring_data.get('discount_percentage')

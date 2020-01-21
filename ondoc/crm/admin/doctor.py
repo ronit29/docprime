@@ -2648,3 +2648,7 @@ class GoogleMapRecordForm(forms.ModelForm):
 
 class RecordAdmin(VersionAdmin, ActionAdmin):
     form = GoogleMapRecordForm
+
+
+class SearchScoreParamsAdmin(admin.ModelAdmin):
+    fields = ('param', 'max_score', 'is_enabled', 'is_live')

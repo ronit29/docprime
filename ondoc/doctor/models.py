@@ -4893,6 +4893,16 @@ class SearchScore(auth_model.TimeStampedModel):
         db_table = 'search_score'
 
 
+class SearchScoreParams(auth_model.TimeStampedModel):
+    param = models.CharField(max_length=200, null=True, blank=True)
+    max_score = models.PositiveIntegerField(null=True, blank=True)
+    is_enabled = models.NullBooleanField(default=False)
+    is_live = models.NullBooleanField(default=False)
+
+    class Meta:
+        db_table = 'search_score_params'
+
+
 class UploadDoctorData(auth_model.TimeStampedModel):
     CREATED = 1
     IN_PROGRESS = 2
