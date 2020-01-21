@@ -224,7 +224,7 @@ class UserViewset(GenericViewSet):
         required_token = request.data.get("token", None)
         if required_token and request.user.is_authenticated:
             NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
-        WhiteListedLoginTokens.objects.filter(token=required_token).delete()
+        # WhiteListedLoginTokens.objects.filter(token=required_token).delete()
         return Response({"message": "success"})
 
     @transaction.atomic
