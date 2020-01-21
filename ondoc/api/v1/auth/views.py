@@ -1451,7 +1451,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         # pg_txn.payment_captured = True
                         pg_txn.save()
 
-                        ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                        ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
                                                                      action=ConsumerTransaction.PAYMENT).last()
                         ctx_txn.transaction_id = response.get('pgTxId')
                         ctx_txn.save()
@@ -1676,7 +1676,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                 #pg_txn.payment_captured = True
                                 pg_txn.save()
 
-                                ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                                ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
                                                                              action=ConsumerTransaction.PAYMENT).last()
                                 ctx_txn.transaction_id = response.get('pgTxId')
                                 ctx_txn.save()
