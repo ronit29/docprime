@@ -154,7 +154,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         return {
             'agent_id': request.user.id,
             'user_id': created_user.pk,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=10),
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7),
             'orig_iat': calendar.timegm(
                 datetime.datetime.utcnow().utctimetuple()
             ),
