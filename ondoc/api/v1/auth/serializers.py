@@ -471,6 +471,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                 time_elapsed = delta / 60
 
                 if time_elapsed > 10:
+                    logger.error('Reset Key Expired  --last ' + str(last_time_object) + '| current -- '+ str(current_object) + '| delta --' + str(delta))
                     # raise serializers.ValidationError('Reset Key Expired' + ' '+str(date_generated) + '   elapsed '+str(time_elapsed)+ ' current '+ str(current_time_string))
                     raise serializers.ValidationError('Reset Key Expired' +  ' last ' + str(last_time_object) + ' current  '+ str(current_object) + ' delta ' + str(delta) )
                 else:
