@@ -483,7 +483,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                     #     'payload': token_object['payload']
                     # }
                     attrs['token'] = token_object['token']
-                    attrs['user'] = user
+                    attrs['user'] = user.id
                     attrs['payload'] = token_object['payload']
         return attrs
         # payload = self.check_payload_custom(token=token)
