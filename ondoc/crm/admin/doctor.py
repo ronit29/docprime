@@ -2652,3 +2652,4 @@ class RecordAdmin(VersionAdmin, ActionAdmin):
 
 class SearchScoreParamsAdmin(admin.ModelAdmin):
     fields = ('param', 'max_score', 'is_enabled', 'is_live')
+    list_display = ('param', 'max_score', 'is_enabled', 'is_live')
