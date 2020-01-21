@@ -438,11 +438,14 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         #     raise serializers.ValidationError("No Last Active sesssion found!")
         if app_name and status == 1 and not force_update:
             '''FAke Refresh, Return the original data [As required by Rohit Dhall]'''
-            return {
-                    'token': token,
-                    'user': payload.get('user_id'),
-                    'payload': payload
-            }
+            # return {
+            #         'token': token,
+            #         'user': payload.get('user_id'),
+            #         'payload': payload
+            # }
+            attrs['token']= token
+            attrs['user'] = payload.get('user_id')
+            attrs['payload'] = payload
         elif (force_update or reset):
             try:
                 passphrase = hashlib.md5("hpDqwzdpoQY8ymm5".encode())
@@ -461,7 +464,6 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                 current_object = time.time()
                 # time_format = '%Y-%m-%d %H:%M:%S'
                 # date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
-                # # time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
                 # current_time_string = datetime.datetime.strftime(datetime.datetime.now(), time_format)
                 # last_time_object = datetime.datetime.strptime(date_generated, time_format)
                 # current_object = datetime.datetime.strptime(current_time_string, time_format)
@@ -475,12 +477,15 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                     user = User.objects.filter(id=uid).first()
                     blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
                     token_object = JWTAuthentication.generate_token(user, request)
-                    return {
-                        'token': token_object['token'],
-                        'user': user,
-                        'payload': token_object['payload']
-                    }
-
+                    # return {
+                    #     'token': token_object['token'],
+                    #     'user': user,
+                    #     'payload': token_object['payload']
+                    # }
+                    attrs['token'] = token_object['token']
+                    attrs['user'] = user
+                    attrs['payload'] = token_object['payload']
+        return attrs
         # payload = self.check_payload_custom(token=token)
         # user = self.check_user_custom(payload=payload)
         # # Get and check 'orig_iat'

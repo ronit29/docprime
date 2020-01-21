@@ -2380,8 +2380,9 @@ class RefreshJSONWebToken(GenericViewSet):
         #     return Response({'error': 'No Last Acctive Session Found'}, status=status.HTTP_401_UNAUTHORIZED)
         # if not serializer.is_valid():
         #     return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_400_BAD_REQUEST)
-        data['token'] = valid_data['token']
-        data['payload'] = valid_data['payload']
+        data['token'] = valid_data.get('token', '')
+        data['user'] = valid_data.get('user', '')
+        data['payload'] = valid_data.get('payload','')
         return Response(data)
 
 
