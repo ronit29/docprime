@@ -1901,3 +1901,77 @@ def process_leads_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing General lead to the matrix- " + str(e))
+
+
+@task()
+def opd_send_completion_notification(appointment_id, payment_type):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or not instance.user:
+            return
+        if payment_type in (OpdAppointment.PREPAID, OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD, OpdAppointment.PLAN):
+            opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT)
+            opd_notification.send()
+        if payment_type == OpdAppointment.COD:
+            opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC)
+            opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+@task()
+def opd_send_confirmation_notification(data):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=data.get('appointment_id')).first()
+        if not instance or not instance.user:
+            return
+
+        if data.get('payment_type') in (OpdAppointment.PREPAID, OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD, OpdAppointment.PLAN):
+            opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
+            opd_notification.send()
+        if data.get('payment_type') == OpdAppointment.COD:
+            opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC)
+            opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+@task()
+def lab_send_notification_before_appointment(appointment_id, time):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.communications.models import LabNotification
+    try:
+        instance = LabAppointment.objects.filter(id=appointment_id).first()
+        if not instance or not instance.user:
+            return
+        lab_notification = LabNotification(instance, NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
+        lab_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def push_reminder_message_medanta_and_artemis(data, *args, **kwargs):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=data.get('appointment_id')).first()
+        if not instance or not instance.user:
+            return
+        opd_notification = OpdNotification(instance, NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS)
+        receivers = opd_notification.get_receivers(is_valid_for_provider=True)
+
+        from ondoc.communications.models import SMSNotification
+        context = {'doctor_name': instance.doctor.name.title(),
+                   'time_slot_start_date': instance.time_slot_start.date(),
+                   'time_slot_start_time': instance.time_slot_start.strftime("%I:%M%p"),
+                   'hospital_name': instance.hospital.name,
+                   'patient_name': instance.profile_detail.get('name').title() if instance.profile_detail.get(
+                       'name') else ''}
+        sms_notification = SMSNotification(NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS, context)
+        sms_notification.send(receivers.get('sms_receivers', []), *args, **kwargs)
+
+    except Exception as e:
+        logger.error(str(e))
