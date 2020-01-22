@@ -120,13 +120,13 @@ class DoctorSearchScore:
     def get_partner_app_activity(self, doctor):
         max_score = self.max_score_dict.get('partner_app_activity')
         if max_score and doctor.doctor_clinics.all():
-            doctor_clinic = doctor.doctor_clinics.all()[0]
-            hospital = doctor_clinic.hospital.hospital if doctor_clinic.hospital else None
-            if hospital.spoc_details.all():
+            doctor_clinic = doctor.doctor_clinics.all()
+            hospital = doctor_clinic[0].hospital.hospital if doctor_clinic and doctor_clinic[0].hospital else None
+            if hospital and hospital.spoc_details.all():
                 spoc = hospital.spoc_details.all()[0]
                 last_usage_timestamp = LastUsageTimestamp.objects.filter(phone_number=spoc.number)
                 if(last_usage_timestamp):
-                    if((datetime.datetime.today() - last_usage_timestamp).days >48):
+                    if((datetime.datetime.today().replace(tzinfo=datetime.timezone.utc) - last_usage_timestamp[0].last_app_open_timestamp).days >48):
                         return max_score
         return 0
 
