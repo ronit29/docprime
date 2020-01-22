@@ -18,7 +18,7 @@ from django.forms import model_to_dict
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from ondoc.api.v1.utils import aware_time_zone, log_requests_on, pg_seamless_hash
+from ondoc.api.v1.utils import aware_time_zone, log_requests_on, pg_seamless_hash, get_pg_secret_client_key
 from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate, Address
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.matrix.mongo_models import MatrixLog
@@ -319,6 +319,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import User
     from ondoc.account.mongo_models import PgLogs
     from ondoc.account.models import MerchantPayoutLog
+    from ondoc.account.models import PgTransaction
+    from ondoc.plus.models import PlusUser
+
     req_data = dict()
     try:
         order_row = Order.objects.filter(id=order_id).first()
@@ -333,7 +336,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
         appointment = order_row.getAppointment()
         if not appointment:
-            raise Exception("No Appointment/UserPlanMapping found.")
+            raise Exception("No Appointment/UserPlanMapping/PlusUser found.")
 
         total_price = order_row.get_total_price()
 
@@ -343,10 +346,11 @@ def set_order_dummy_transaction(self, order_id, user_id):
             "Content-Type": "application/json"
         }
         url = settings.PG_DUMMY_TRANSACTION_URL
-        insurance_data = order_row.get_insurance_data_for_pg()
+        # insurance_data = order_row.get_insurance_data_for_pg()
+        additional_data = order_row.get_additional_data_for_pg()
 
         if appointment.__class__.__name__ in ['LabAppointment', 'OpdAppointment']:
-            if appointment.insurance and not order_row.is_parent() and not insurance_data:
+            if appointment.insurance and not order_row.is_parent() and not additional_data:
                 MerchantPayoutLog.create_log(None, "refOrderId, insurerCode and refOrderNo not found for order id {}".format(order_row.id))
                 raise Exception("refOrderId, insurerCode, refOrderNo details not found for order id {}".format(order_row.id))
 
@@ -354,7 +358,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
         if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
             name = appointment.profile.name
 
-        if isinstance(appointment, UserInsurance):
+        if isinstance(appointment, UserInsurance) or isinstance(appointment, PlusUser):
             name = appointment.user.full_name
 
         req_data = {
@@ -373,14 +377,21 @@ def set_order_dummy_transaction(self, order_id, user_id):
             "buCallbackFailureUrl": ""
         }
 
-        req_data.update(insurance_data)
-
+        # req_data.update(insurance_data)
+        req_data.update(additional_data)
         for key in req_data:
             req_data[key] = str(req_data[key])
 
+        secret_key, client_key = get_pg_secret_client_key(order_row)
+        filtered_pgdata = {k: v for k, v in req_data.items() if v is not None and v != ''}
+        req_data.clear()
+        req_data.update(filtered_pgdata)
+        req_data['hash'] = PgTransaction.create_pg_hash(req_data, secret_key, client_key)
+
         response = requests.post(url, data=json.dumps(req_data), headers=headers)
-        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
         if response.status_code == status.HTTP_200_OK:
+            save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,),
+                                         eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             resp_data = response.json()
             #logger.error(resp_data)
             if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
@@ -402,6 +413,112 @@ def set_order_dummy_transaction(self, order_id, user_id):
     except Exception as e:
         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([order_id, user_id], countdown=300)
+
+# @task(bind=True, max_retries=5)
+# def set_order_dummy_transaction_for_corporate(self, order_id, user_id):
+#     from ondoc.account.models import PgTransaction
+#     from ondoc.account.models import Order, DummyTransactions
+#     from ondoc.plus.models import PlusUser
+#     from ondoc.account.models import User
+#     from ondoc.account.mongo_models import PgLogs
+#     from ondoc.account.models import MerchantPayoutLog
+#     req_data = dict()
+#     try:
+#         order_row = Order.objects.filter(id=order_id).first()
+#         user = User.objects.filter(id=user_id).first()
+#
+#         if not order_row or not user:
+#             raise Exception('order and user are required')
+#         if order_row.getTransactions():
+#             return
+#         if not order_row.dummy_transaction_allowed():
+#             raise Exception("Cannot create dummy payout for a child order.")
+#
+#         # appointment = order_row.getAppointment()
+#         # if not appointment:
+#         #     raise Exception("No Appointment/UserPlanMapping found.")
+#
+#         # total_price = order_row.get_total_price()
+#         total_price = 0
+#         token = settings.PG_DUMMY_TRANSACTION_TOKEN
+#         headers = {
+#             "auth": token,
+#             "Content-Type": "application/json"
+#         }
+#         url = settings.PG_DUMMY_TRANSACTION_URL
+#         action_data = order_row.action_data
+#         if not action_data:
+#             raise Exception("Can not create dummy transaction for empty action data")
+#         profile = action_data.get('profile_detail')
+#         if not profile:
+#             raise Exception("Can not create dummy transaction for empty profile")
+#         name = profile.get('name', '')
+#         plus_user = PlusUser.objects.filter(user_id=user_id).order_by('-id').first()
+#         # insurance_data = order_row.get_insurance_data_for_pg()
+#
+#         # if appointment.__class__.__name__ in ['LabAppointment', 'OpdAppointment']:
+#         #     if appointment.insurance and not order_row.is_parent() and not insurance_data:
+#         #         MerchantPayoutLog.create_log(None, "refOrderId, insurerCode and refOrderNo not found for order id {}".format(order_row.id))
+#         #         raise Exception("refOrderId, insurerCode, refOrderNo details not found for order id {}".format(order_row.id))
+#         #
+#         # name = ''
+#         # if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
+#         #     name = appointment.profile.name
+#         #
+#         # if isinstance(appointment, UserInsurance):
+#         #     name = appointment.user.full_name
+#
+#         req_data = {
+#             "customerId": user_id,
+#             "mobile": user.phone_number,
+#             "email": user.email or "dummyemail@docprime.com",
+#             "productId": order_row.product_id,
+#             "orderId": order_id,
+#             "name": name,
+#             "txAmount": 0,
+#             "couponCode": "",
+#             "couponAmt": str(total_price),
+#             "paymentMode": "DC",
+#             "AppointmentId": plus_user.id,
+#             "buCallbackSuccessUrl": "",
+#             "buCallbackFailureUrl": ""
+#         }
+#
+#         # req_data.update(insurance_data)
+#
+#         for key in req_data:
+#             req_data[key] = str(req_data[key])
+#
+#         secret_key, client_key = get_pg_secret_client_key(order_row)
+#         filtered_pgdata = {k: v for k, v in req_data.items() if v is not None and v != ''}
+#         req_data.clear()
+#         req_data.update(filtered_pgdata)
+#         req_data['hash'] = PgTransaction.create_pg_hash(req_data, secret_key, client_key)
+#
+#         response = requests.post(url, data=json.dumps(req_data), headers=headers)
+#         save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+#         if response.status_code == status.HTTP_200_OK:
+#             resp_data = response.json()
+#             #logger.error(resp_data)
+#             if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+#                 tx_data = {}
+#                 tx_data['user'] = user
+#                 tx_data['product_id'] = order_row.product_id
+#                 tx_data['order_no'] = resp_data.get('orderNo')
+#                 tx_data['order_id'] = order_row.id
+#                 tx_data['reference_id'] = plus_user.id
+#                 tx_data['type'] = DummyTransactions.CREDIT
+#                 tx_data['amount'] = total_price
+#                 tx_data['payment_mode'] = "DC"
+#
+#                 DummyTransactions.objects.create(**tx_data)
+#                 #print("SAVED DUMMY TRANSACTION")
+#         else:
+#             raise Exception("Retry on invalid Http response status - " + str(response.content))
+#
+#     except Exception as e:
+#         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
+#         self.retry([order_id, user_id], countdown=300)
 
 @task
 def send_offline_appointment_message(**kwargs):
@@ -1761,17 +1878,18 @@ def process_leads_to_matrix(self, data):
         if not general_lead_obj:
             raise Exception("GeneralMatrix object could not found against id - " + str(id))
 
-        plus_obj = PlusUser.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
-        insurance_obj = UserInsurance.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
-        earlier_date = timezone.now() - timedelta(minutes=10)
-        lab_appointment = LabAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
-        opd_appointment = OpdAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
+        if general_lead_obj.lead_type in ['DROPOFF', 'LABADS', 'CANCELDROPOFFLEADVIAAPPOINTMENT']:
+            plus_obj = PlusUser.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
+            insurance_obj = UserInsurance.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
+            earlier_date = timezone.now() - timedelta(minutes=10)
+            lab_appointment = LabAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
+            opd_appointment = OpdAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
 
-        if (plus_obj and plus_obj.is_valid()) or (insurance_obj and insurance_obj.is_valid()):
-            return
+            if (plus_obj and plus_obj.is_valid()) or (insurance_obj and insurance_obj.is_valid()):
+                return
 
-        if general_lead_obj.lead_type == 'DROPOFF' and (lab_appointment or opd_appointment):
-            return
+            if general_lead_obj.lead_type == 'DROPOFF' and (lab_appointment or opd_appointment):
+                return
 
         lead_engine_obj = lead_class_referance(general_lead_obj.lead_type, general_lead_obj)
         success = lead_engine_obj.process_lead()
@@ -1783,3 +1901,77 @@ def process_leads_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing General lead to the matrix- " + str(e))
+
+
+@task()
+def opd_send_completion_notification(appointment_id, payment_type):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or not instance.user:
+            return
+        if payment_type in (OpdAppointment.PREPAID, OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD, OpdAppointment.PLAN):
+            opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT)
+            opd_notification.send()
+        if payment_type == OpdAppointment.COD:
+            opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC)
+            opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+@task()
+def opd_send_confirmation_notification(data):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=data.get('appointment_id')).first()
+        if not instance or not instance.user:
+            return
+
+        if data.get('payment_type') in (OpdAppointment.PREPAID, OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD, OpdAppointment.PLAN):
+            opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
+            opd_notification.send()
+        if data.get('payment_type') == OpdAppointment.COD:
+            opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC)
+            opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+@task()
+def lab_send_notification_before_appointment(appointment_id, time):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.communications.models import LabNotification
+    try:
+        instance = LabAppointment.objects.filter(id=appointment_id).first()
+        if not instance or not instance.user:
+            return
+        lab_notification = LabNotification(instance, NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
+        lab_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def push_reminder_message_medanta_and_artemis(data, *args, **kwargs):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=data.get('appointment_id')).first()
+        if not instance or not instance.user:
+            return
+        opd_notification = OpdNotification(instance, NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS)
+        receivers = opd_notification.get_receivers(is_valid_for_provider=True)
+
+        from ondoc.communications.models import SMSNotification
+        context = {'doctor_name': instance.doctor.name.title(),
+                   'time_slot_start_date': instance.time_slot_start.date(),
+                   'time_slot_start_time': instance.time_slot_start.strftime("%I:%M%p"),
+                   'hospital_name': instance.hospital.name,
+                   'patient_name': instance.profile_detail.get('name').title() if instance.profile_detail.get(
+                       'name') else ''}
+        sms_notification = SMSNotification(NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS, context)
+        sms_notification.send(receivers.get('sms_receivers', []), *args, **kwargs)
+
+    except Exception as e:
+        logger.error(str(e))

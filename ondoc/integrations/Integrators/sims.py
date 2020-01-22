@@ -12,6 +12,7 @@ from ondoc.integrations.models import IntegratorDoctorMappings
 
 class Sims(BaseIntegrator):
 
+    # This method is use to get all the doctor data from hospital.
     @classmethod
     def get_doctor_data(cls):
         url = '%s/GetDoctor' % settings.SIMS_BASE_URL

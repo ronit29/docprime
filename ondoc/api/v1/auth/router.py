@@ -9,7 +9,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
                     DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet, UserRatingViewSet, AppointmentViewSet,
                     WhatsappOptinViewSet, DoctorScanViewSet, TokenFromUrlKey, ProfileEmailUpdateViewset,
-                    BajajAllianzUserViewset, MatrixUserViewset, SendCartUrlViewSet, SbiGUserViewset)
+                    BajajAllianzUserViewset, MatrixUserViewset, SendCartUrlViewSet, SbiGUserViewset, PGRefundViewset)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -76,4 +76,6 @@ urlpatterns = [
     path('profile-email/update/init', ProfileEmailUpdateViewset.as_view({'post': 'create'}), name='update-profile-email-init'),
     path('profile-email/update', ProfileEmailUpdateViewset.as_view({'post': 'update_email'}), name='update-profile-email'),
     path('matrix_user', MatrixUserViewset.as_view({'post': 'user_login_via_matrix'}), name='matrix-login'),
+    path('save_pg_refund', PGRefundViewset.as_view({'post': 'save_pg_refund'}), name='save-pg-refund'),
+    path('get_referral_amt', ReferralViewSet.as_view({'get': 'get_referral_amt'}), name='get-referral-amt'),
 ]

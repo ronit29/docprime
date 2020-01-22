@@ -6,6 +6,7 @@ from django.contrib.postgres.fields import JSONField
 # Create your models here.
 
 
+# Configuration of elastic service. On basis of configuration data is dumped to elastic.
 class DemoElastic(TimeStampedModel):
     query = models.TextField(null=True, blank=False)
 

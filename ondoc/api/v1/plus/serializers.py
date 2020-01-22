@@ -118,7 +118,7 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         model = PlusPlans
         fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected',
                   'tenure', 'total_allowed_members', 'default_single_booking', 'content', 'enabled_hospital_networks',
-                  'utilize', 'is_gold', 'show_consultation_text')
+                  'utilize', 'is_gold', 'show_consultation_text', 'is_corporate')
 
 
 class PlusProposerSerializer(serializers.ModelSerializer):
@@ -208,8 +208,8 @@ class PlusMemberListSerializer(serializers.Serializer):
     relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices(), required=False, allow_null=True, allow_blank=True)
     document_ids = serializers.ListField(required=False, allow_null=True, child=PlusMembersDocumentSerializer())
     is_primary_user = serializers.BooleanField(required=False, default=False)
-    # plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.all_active_plans(), allow_null=False, allow_empty=False)
-
+    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False, allow_null=True, allow_blank=True)
+    phone_number = serializers.CharField(max_length=10, required=False, allow_blank=True, allow_null=True)
 
 class PlusMembersSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=PlusMemberListSerializer())

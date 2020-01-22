@@ -162,6 +162,14 @@ class NotificationAction:
 
     IPDIntimateEmailNotification = 301
 
+    # Not for Medanta and Artimis Hospitals
+    PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT = 321
+    PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC = 322
+    PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT = 323
+    PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC = 324
+    REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS = 341
+    PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT = 331
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -1749,6 +1757,6 @@ class IPDIntimateEmailNotification(TimeStampedModel):
 
                 kwargs['email_obj'] = data
                 kwargs['ipd_email_obj'] = data
-                email_notification.send(receivers, *args, **kwargs)
+                # email_notification.send(receivers, *args, **kwargs)
                 IPDIntimateEmailNotification.objects.filter(user=data.user).update(is_sent=True)
                 print("ipd_obj: " + str(data.id))
