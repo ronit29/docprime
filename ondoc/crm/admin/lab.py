@@ -904,8 +904,10 @@ class LabAppointmentForm(RefundableAppointmentForm):
                 selected_date = cleaned_data.get('start_date')
                 thyrocare_obj = Thyrocare()
                 curr_time = thyrocare_obj.time_slot_extraction([cleaned_data.get('start_time')], selected_date)
-                if curr_time and curr_time.get(selected_date) and  curr_time.get(selected_date)[0].get('timing') and curr_time.get(selected_date)[0].get('timing')[0].get('value'):
-                    curr_time = curr_time.get(selected_date)[0].get('timing')[0].get('value')
+                if curr_time and curr_time.get(selected_date):
+                    for data in curr_time.get(selected_date):
+                        if data.get('timing') and data.get('timing')[0].get('value'):
+                            curr_time = data.get('timing')[0].get('value')
                 else:
                     curr_time = None
                 if not pincode:
