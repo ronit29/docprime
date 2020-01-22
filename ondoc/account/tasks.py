@@ -640,8 +640,8 @@ def update_convenience_charge():
     from ondoc.sms.backends.backend import NodeJsSmsBackend
     engine = NodeJsSmsBackend()
 
-    engine.send("Job Started", 9560488461, False)
-    engine.send("Job Started", 9871047545, False)
+    # engine.send("Job Started", 9560488461, False)
+    # engine.send("Job Started", 9871047545, False)
 
     chunk_size = 1000
     gold_plans = list(PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True))
@@ -680,8 +680,8 @@ def update_convenience_charge():
 
         start = upper
 
-    engine.send("Lab Completed", 9560488461, False)
-    engine.send("Lab Completed", 9871047545, False)
+    # engine.send("Lab Completed", 9560488461, False)
+    # engine.send("Lab Completed", 9871047545, False)
 
     # Update DoctorClinicTiming convenience_charge
 
@@ -710,5 +710,5 @@ def update_convenience_charge():
 
         start = upper
 
-    engine.send("Doctor Completed", 9560488461, False)
-    engine.send("Doctor Completed", 9871047545, False)
+    # engine.send("Doctor Completed", 9560488461, False)
+    # engine.send("Doctor Completed", 9871047545, False)

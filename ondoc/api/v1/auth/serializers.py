@@ -394,7 +394,7 @@ class TransactionSerializer(serializers.Serializer):
     orderId = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all())
     orderNo = serializers.CharField(max_length=200, required=False)
     paymentMode = serializers.CharField(max_length=200, required=False)
-
+    txAmount = serializers.DecimalField(max_digits=12, decimal_places=2)
     responseCode = serializers.CharField(max_length=200)
     bankTxId = serializers.CharField(max_length=200, allow_blank=True, required=False)
     txDate = serializers.CharField(max_length=100)
@@ -424,9 +424,10 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
     force_update = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
-        import hashlib
+        import hashlib, time
         token = attrs.get('token')
         reset = attrs.get('reset')
+        app_name = self.context.get('app_name')
         force_update = True if (attrs.get('force_update') and attrs['force_update']) else False
         request = self.context.get('request')
         payload, status = self.check_payload_v2(token)
@@ -437,12 +438,10 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         #     raise serializers.ValidationError("No Last Active sesssion found!")
         if status == 1 and not force_update:
             '''FAke Refresh, Return the original data [As required by Rohit Dhall]'''
-            return {
-                    'token': token,
-                    'user': payload.get('user_id'),
-                    'payload': payload
-            }
-        elif force_update or (status == 0 and reset):
+            attrs['token']= token
+            attrs['user'] = payload.get('user_id')
+            attrs['payload'] = payload
+        elif (force_update or reset):
             try:
                 passphrase = hashlib.md5("hpDqwzdpoQY8ymm5".encode())
                 passphrase = passphrase.hexdigest()[:16]
@@ -456,54 +455,54 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             get_date = data.split('.')
             if len(get_date) > 1:
                 uid = get_date[0]
-                date_generated = get_date[1]
-                time_format = '%Y-%m-%d %H:%M:%S'
-                date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
+                last_time_object = int(get_date[1])
+                current_object = time.time()
+                delta = current_object - last_time_object
+                time_elapsed = delta / 60
 
-                time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
-                if time_elapsed > 2:
-                    raise serializers.ValidationError('Reset Key Expired' + str(date_generated))
+                if time_elapsed > 10:
+                    logger.error('Reset Key Expired  --last ' + str(last_time_object) + '| current -- '+ str(current_object) + '| delta --' + str(delta))
+                    # raise serializers.ValidationError('Reset Key Expired' + ' '+str(date_generated) + '   elapsed '+str(time_elapsed)+ ' current '+ str(current_time_string))
+                    raise serializers.ValidationError('Reset Key Expired' +  ' last ' + str(last_time_object) + ' current  '+ str(current_object) + ' delta ' + str(delta) )
                 else:
                     user = User.objects.filter(id=uid).first()
-                    blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
+                    # blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
                     token_object = JWTAuthentication.generate_token(user, request)
-                    return {
-                        'token': token_object['token'],
-                        'user': user,
-                        'payload': token_object['payload']
-                    }
-
-        payload = self.check_payload_custom(token=token)
-        user = self.check_user_custom(payload=payload)
-        # Get and check 'orig_iat'
-        orig_iat = payload.get('orig_iat')
-
-        if orig_iat:
-            # Verify expiration
-            refresh_limit = settings.JWT_AUTH['JWT_REFRESH_EXPIRATION_DELTA']
-
-            if isinstance(refresh_limit, datetime.timedelta):
-                refresh_limit = (refresh_limit.days * 24 * 3600 +
-                                 refresh_limit.seconds)
-
-            expiration_timestamp = orig_iat + int(refresh_limit)
-            now_timestamp = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
-
-            if now_timestamp > expiration_timestamp:
-                msg = _('Token has expired.')
-                raise serializers.ValidationError(msg)
-        else:
-            msg = _('orig_iat missing')
-            raise serializers.ValidationError(msg)
-        blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
-        # if blacllist_token and isinstance(blacllist_token, tuple) and (blacllist_token[0] > 0):
-        token_object = JWTAuthentication.generate_token(user, request)
-        token_object['payload']['orig_iat'] = orig_iat
-        return {
-            'token': token_object['token'],
-            'user': user,
-            'payload': token_object['payload']
-        }
+                    attrs['token'] = token_object['token']
+                    attrs['user'] = user.id
+                    attrs['payload'] = token_object['payload']
+        return attrs
+        # payload = self.check_payload_custom(token=token)
+        # user = self.check_user_custom(payload=payload)
+        # # Get and check 'orig_iat'
+        # orig_iat = payload.get('orig_iat')
+        #
+        # if orig_iat:
+        #     # Verify expiration
+        #     refresh_limit = settings.JWT_AUTH['JWT_REFRESH_EXPIRATION_DELTA']
+        #
+        #     if isinstance(refresh_limit, datetime.timedelta):
+        #         refresh_limit = (refresh_limit.days * 24 * 3600 +
+        #                          refresh_limit.seconds)
+        #
+        #     expiration_timestamp = orig_iat + int(refresh_limit)
+        #     now_timestamp = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
+        #
+        #     if now_timestamp > expiration_timestamp:
+        #         msg = _('Token has expired.')
+        #         raise serializers.ValidationError(msg)
+        # else:
+        #     msg = _('orig_iat missing')
+        #     raise serializers.ValidationError(msg)
+        # blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
+        # # if blacllist_token and isinstance(blacllist_token, tuple) and (blacllist_token[0] > 0):
+        # token_object = JWTAuthentication.generate_token(user, request)
+        # token_object['payload']['orig_iat'] = orig_iat
+        # return {
+        #     'token': token_object['token'],
+        #     'user': user,
+        #     'payload': token_object['payload']
+        # }
         # else:
         # return serializers.ValidationError("Token Has expired")
 

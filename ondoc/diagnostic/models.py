@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from copy import deepcopy
 
+import pytz
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
@@ -40,7 +41,7 @@ from datetime import date
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from ondoc.diagnostic import tasks
 from ondoc.authentication.models import UserProfile, Address
-from dateutil import tz
+from dateutil import tz, relativedelta
 from django.conf import settings
 import logging
 import decimal
@@ -405,7 +406,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
             am_pm = 'AM'
         else:
             am_pm = 'PM'
-            hour -= 12
+            if not hour == 12:
+                hour -= 12
         min_str = self.convert_min(min)
         return str(hour) + ":" + min_str + " " + am_pm
 
@@ -461,8 +463,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     # Lab.lab_timings_today = get_lab_timings_today
 
     # Get lab timings for current and next day for lab listing page.
-    def lab_timings_today_and_next(self, day_now=timezone.now().weekday()):
-
+    def lab_timings_today_and_next(self, day_now=timezone.now().weekday(), test_obj=None):
         lab_timing = ""
         lab_timing_data = list()
         next_lab_timing_dict = {}
@@ -482,7 +483,21 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 "end": 23.75
             }}
         else:
-            timing_queryset = self.lab_timings.all()
+            if test_obj and test_obj.test_type == 1:
+                lab_test_group_mapping = LabTestGroupMapping.objects.filter(test=test_obj).first()
+                if lab_test_group_mapping:
+                    lab_test_group = LabTestGroup.objects.filter(id=lab_test_group_mapping.lab_test_group_id).first()
+                    if lab_test_group:
+                        timing_queryset = self.test_group_timings.filter(lab_test_group=lab_test_group)
+                        if not timing_queryset.exists():
+                            timing_queryset = self.lab_timings.all()
+                    else:
+                        timing_queryset = self.lab_timings.all()
+                else:
+                    timing_queryset = self.lab_timings.all()
+            else:
+                timing_queryset = self.lab_timings.all()
+
             for data in timing_queryset:
                 data_array[data.day].append(data)
             rotated_data_array = data_array[day_now:] + data_array[:day_now]
@@ -502,8 +517,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                     next_lab_timing_dict[day] = next_lab_timing
                     next_lab_timing_data_dict[day] = next_lab_timing_data
                     break
+
         return {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data,
-            'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
+                'next_lab_timing_dict': next_lab_timing_dict,
+                'next_lab_timing_data_dict': next_lab_timing_data_dict}
 
     # This method provides ratings of a lab.
     def get_ratings(self):
@@ -2226,6 +2243,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if old_instance and old_instance.status != self.COMPLETED and self.status == self.COMPLETED:
             self.check_merchant_payout_action()
+
+        # if (self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED) or (old_instance and self.status==self.BOOKED):
+        #     try:
+        #         notification_tasks.lab_send_notification_before_appointment.apply_async((self.id, self.time_slot_start.timestamp(),),
+        #             eta=self.time_slot_start - datetime.timedelta(minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION), )
+        #     except Exception as e:
+        #         logger.error(str(e))
         # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,
@@ -3470,7 +3494,9 @@ class CommonPackage(TimeStampedModel):
     # Get common test for home page
     @classmethod
     def get_packages(cls, count):
-        packages = cls.objects.prefetch_related('package', 'lab__lab_documents').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        packages = cls.objects.select_related('lab', 'package') \
+                              .prefetch_related('lab__lab_documents', 'lab__lab_pricing_group', 'lab__network') \
+                              .filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         return packages
 
 

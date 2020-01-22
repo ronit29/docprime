@@ -92,7 +92,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         user_id, is_agent = JWTAuthentication.get_unverified_user(token)
 
         if user_id:
-            if not is_agent and request and (('HTTP_APP_VERSION' not in request.META) or
+            if not is_agent and request and request.META.get("HTTP_APP_NAME") != 'd_web' and (('HTTP_APP_VERSION' not in request.META) or
                             (request.META.get("HTTP_APP_NAME") == 'docprime_consumer_app' and parse(
                                 request.META.get('HTTP_APP_VERSION')) > parse('2.7.2')) or \
                             (request.META.get("HTTP_APP_NAME") == "doc_prime_partner" and
@@ -103,12 +103,11 @@ class JWTAuthentication(authentication.BaseAuthentication):
                              )
 
             ):
-            # if request.get('app_version'):
-                is_whitelisted = WhiteListedLoginTokens.objects.filter(token=token, user_id=user_id).first()
-                if is_whitelisted:
-                    user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
-                    if user_key_object:
-                        user_key = user_key_object.key
+            #     is_whitelisted = WhiteListedLoginTokens.objects.filter(token=token, user_id=user_id).first()
+            #     if is_whitelisted:
+                user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
+                if user_key_object:
+                    user_key = user_key_object.key
                 else:
                     raise exceptions.AuthenticationFailed("Invalid Login")
             else:
@@ -155,7 +154,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         return {
             'agent_id': request.user.id,
             'user_id': created_user.pk,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=10),
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7),
             'orig_iat': calendar.timegm(
                 datetime.datetime.utcnow().utctimetuple()
             ),
@@ -176,7 +175,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
     @staticmethod
     def generate_token(user, request=None):
         user_key = UserSecretKey.objects.get_or_create(user=user)
-        if request and (('HTTP_APP_VERSION' not in request.META) or
+        if request and request.META.get("HTTP_APP_NAME") != 'd_web' and (('HTTP_APP_VERSION' not in request.META) or
                         (request.META.get("HTTP_APP_NAME")== 'docprime_consumer_app' and parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2')) or \
                          (request.META.get("HTTP_APP_NAME") == "doc_prime_partner" and
                          (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15') and request.META.get(
@@ -184,14 +183,13 @@ class JWTAuthentication(authentication.BaseAuthentication):
                           (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.200.11') and request.META.get(
                               'HTTP_PLATFORM') == 'ios')
                          )
-
         ):
             payload = JWTAuthentication.jwt_payload_handler(user)
         else:
             exp = datetime.datetime.utcnow() + datetime.timedelta(days=365)
             payload = JWTAuthentication.jwt_payload_handler(user, exp)
         token = jwt.encode(payload, user_key[0].key)
-        whitelist = WhiteListedLoginTokens.objects.create(token=token.decode('utf-8'), user=user)
+        # whitelist = WhiteListedLoginTokens.objects.create(token=token.decode('utf-8'), user=user)
         return {'token': token,
                 'payload': payload}
 
