@@ -224,7 +224,7 @@ class UserViewset(GenericViewSet):
         required_token = request.data.get("token", None)
         if required_token and request.user.is_authenticated:
             NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
-        WhiteListedLoginTokens.objects.filter(token=required_token).delete()
+        # WhiteListedLoginTokens.objects.filter(token=required_token).delete()
         return Response({"message": "success"})
 
     @transaction.atomic
@@ -1451,7 +1451,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         # pg_txn.payment_captured = True
                         pg_txn.save()
 
-                        ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                        ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
                                                                      action=ConsumerTransaction.PAYMENT).last()
                         ctx_txn.transaction_id = response.get('pgTxId')
                         ctx_txn.save()
@@ -1676,7 +1676,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                 #pg_txn.payment_captured = True
                                 pg_txn.save()
 
-                                ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                                ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
                                                                              action=ConsumerTransaction.PAYMENT).last()
                                 ctx_txn.transaction_id = response.get('pgTxId')
                                 ctx_txn.save()

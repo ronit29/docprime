@@ -436,13 +436,8 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         #     attrs['active_session_error'] = True
         #     return attrs
         #     raise serializers.ValidationError("No Last Active sesssion found!")
-        if app_name and status == 1 and not force_update:
+        if status == 1 and not force_update:
             '''FAke Refresh, Return the original data [As required by Rohit Dhall]'''
-            # return {
-            #         'token': token,
-            #         'user': payload.get('user_id'),
-            #         'payload': payload
-            # }
             attrs['token']= token
             attrs['user'] = payload.get('user_id')
             attrs['payload'] = payload
@@ -462,11 +457,6 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                 uid = get_date[0]
                 last_time_object = int(get_date[1])
                 current_object = time.time()
-                # time_format = '%Y-%m-%d %H:%M:%S'
-                # date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
-                # current_time_string = datetime.datetime.strftime(datetime.datetime.now(), time_format)
-                # last_time_object = datetime.datetime.strptime(date_generated, time_format)
-                # current_object = datetime.datetime.strptime(current_time_string, time_format)
                 delta = current_object - last_time_object
                 time_elapsed = delta / 60
 
@@ -476,13 +466,8 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                     raise serializers.ValidationError('Reset Key Expired' +  ' last ' + str(last_time_object) + ' current  '+ str(current_object) + ' delta ' + str(delta) )
                 else:
                     user = User.objects.filter(id=uid).first()
-                    blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
+                    # blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
                     token_object = JWTAuthentication.generate_token(user, request)
-                    # return {
-                    #     'token': token_object['token'],
-                    #     'user': user,
-                    #     'payload': token_object['payload']
-                    # }
                     attrs['token'] = token_object['token']
                     attrs['user'] = user.id
                     attrs['payload'] = token_object['payload']
