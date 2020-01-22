@@ -118,16 +118,19 @@ class DoctorSearchScore:
         return 'successfully inserted.'
 
     def get_partner_app_activity(self, doctor):
-        max_score = self.max_score_dict.get('partner_app_activity')
-        if max_score and doctor.doctor_clinics.all():
-            doctor_clinic = doctor.doctor_clinics.all()
-            hospital = doctor_clinic[0].hospital.hospital if doctor_clinic and doctor_clinic[0].hospital else None
-            if hospital and hospital.spoc_details.all():
-                spoc = hospital.spoc_details.all()[0]
-                last_usage_timestamp = LastUsageTimestamp.objects.filter(phone_number=spoc.number)
-                if(last_usage_timestamp):
-                    if((datetime.datetime.today().replace(tzinfo=datetime.timezone.utc) - last_usage_timestamp[0].last_app_open_timestamp).days >48):
-                        return max_score
+        try:
+            max_score = self.max_score_dict.get('partner_app_activity')
+            if max_score and doctor.doctor_clinics.all():
+                doctor_clinic = doctor.doctor_clinics.all()
+                hospital = doctor_clinic[0].hospital.hospital if doctor_clinic and doctor_clinic[0].hospital else None
+                if hospital and hospital.spoc_details.all():
+                    spoc = hospital.spoc_details.all()[0]
+                    last_usage_timestamp = LastUsageTimestamp.objects.filter(phone_number=spoc.number)
+                    if(last_usage_timestamp):
+                        if((datetime.datetime.today().replace(tzinfo=datetime.timezone.utc) - last_usage_timestamp[0].last_app_open_timestamp).days >48):
+                            return max_score
+        except:
+            return 0
         return 0
 
     def get_discount(self, doctor):
