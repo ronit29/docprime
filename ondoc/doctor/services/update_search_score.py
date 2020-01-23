@@ -102,7 +102,7 @@ class DoctorSearchScore:
                         doctor_models.SearchScore(doctor=doctor,
                                                   years_of_experience_score=years_of_experience_score,
                                                   doctors_in_clinic_score=doctors_in_clinic_score,
-                                                  avg_ratings_score=avg_ratings_score,
+                                                  avg_ratings_score=avg_ratings_score, discount = discount_score,
                                                   ratings_count_score=ratings_count_score, partner_app_activity=partner_app_activity_score,
                                                   final_score=final_score))
 
@@ -134,21 +134,24 @@ class DoctorSearchScore:
         return 0
 
     def get_discount(self, doctor):
-        max_score = self.max_score_dict.get('discount')
-        discount_percentage = self.scoring_data.get('discount_percentage')
-        if max_score and doctor.doctor_clinics.all():
-            doctor_clinic = doctor.doctor_clinics.all()[0]
-            clinic_time = doctor_clinic.availability.all()[0]
-            if clinic_time.fees and clinic_time.deal_price:
-                discount = (1-clinic_time.fees/clinic_time.deal_price)*100
-                for score in discount_percentage:
-                    if (discount == 0):
-                        return {'discount_percentage': 0}
-                    if discount >= 40:
-                        return {'discount_percentage': 10}
+        try:
+            max_score = self.max_score_dict.get('discount')
+            discount_percentage = self.scoring_data.get('discount_percentage')
+            if max_score and doctor.doctor_clinics.all():
+                doctor_clinic = doctor.doctor_clinics.all()[0]
+                clinic_time = doctor_clinic.availability.all()[0]
+                if clinic_time.fees and clinic_time.deal_price:
+                    discount = (1-clinic_time.fees/clinic_time.deal_price)*100
+                    for score in discount_percentage:
+                        if (discount == 0):
+                            return {'discount_percentage': 0}
+                        if discount >= 40:
+                            return {'discount_percentage': 10}
 
-                    elif discount >= score.get('min') and discount < score.get('max'):
-                        return {'discount_percentage': score.get('score') * max_score}
+                        elif discount >= score.get('min') and discount < score.get('max'):
+                            return {'discount_percentage': score.get('score')/10 * max_score}
+        except:
+            return {'discount_percentage': 0}
 
         return {'discount_percentage': 0}
 
@@ -161,7 +164,7 @@ class DoctorSearchScore:
                     return {'avg_ratings_score': max_score}
 
                 elif doctor.avg_rating >= score.get('min') and doctor.avg_rating < score.get('max'):
-                    return {'avg_ratings_score': score.get('score')/100 * max_score}
+                    return {'avg_ratings_score': score.get('score')/10 * max_score}
         else:
             if max_score and doctor.hospitals.all():
                 hospitals = doctor.hospitals.all()
@@ -180,7 +183,7 @@ class DoctorSearchScore:
                         return {'avg_ratings_score': max_score}
 
                     elif google_rating >= score.get('min') and google_rating < score.get('max'):
-                        return {'avg_ratings_score': score.get('score')/100 * max_score}
+                        return {'avg_ratings_score': score.get('score')/10 * max_score}
             return {'avg_ratings_score': 0}
 
     def get_doctor_ratings_count(self, doctor):
@@ -192,7 +195,7 @@ class DoctorSearchScore:
                     return {'ratings_count': max_score}
 
                 elif doctor.rating_data.get('rating_count') >= score.get('min') and doctor.rating_data.get('rating_count') < score.get('max'):
-                    return {'ratings_count': score.get('score')/100 * max_score}
+                    return {'ratings_count': score.get('score')/10 * max_score}
 
         return {'ratings_count': 0}
 
@@ -220,7 +223,7 @@ class DoctorSearchScore:
                     return {'experience_score': max_score}
 
                 elif years_of_experience>=score.get('min') and years_of_experience <score.get('max'):
-                    return {'experience_score': score.get('score')/100 * max_score}
+                    return {'experience_score': score.get('score')/10 * max_score}
 
         else:
             return {'experience_score':0}
@@ -242,7 +245,7 @@ class DoctorSearchScore:
                     return {'doctors_in_clinic_score': max_score}
 
                 elif doctors_count >= score.get('min') and doctors_count < score.get('max'):
-                    return {'doctors_in_clinic_score': score.get('score')/100 * max_score}
+                    return {'doctors_in_clinic_score': score.get('score')/10 * max_score}
         return {'doctors_in_clinic_score': 0}
 
     def get_final_score(self, doctor, *args, **kwargs):
