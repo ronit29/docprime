@@ -57,6 +57,25 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
                   $scope.markers = markers;
              }
           }
+
+          $scope.multiSelect = function(){
+            var abc = []
+            var entered_val = [];
+            if($scope.multi_select){
+                entered_val = $scope.multi_select.split(",")
+
+                if(entered_val.length){
+                 entered_val.forEach(myFunction);
+                    function myFunction(value, index, array) {
+                      abc = abc.concat(markers.filter((x=>x.label == value)))
+                    }
+                  $scope.markers = abc;
+                }
+            }else{
+                alert('please enter some value')
+            }
+         }
+
     <!--console.log($scope.markers)-->
           $scope.detectLocation = function () { //detect location
               if (navigator.geolocation) {
@@ -75,6 +94,25 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
 
               }
           }
+
+          $scope.submitHandler = function(){
+             console.log($scope.user_lat);
+             console.log($scope.user_long);
+             if($scope.user_long && $scope.user_lat){
+                 markers.coords = {
+                    latitude: $scope.user_lat,
+                    longitude: $scope.user_long
+                 }
+                 $scope.user_location = markers;
+                 $scope.location_data();
+             }else{
+                if(!$scope.user_long){
+                    alert('enter valid longitutde')
+                }else if(!$scope.user_lat){
+                    alert('enter valid latitude')
+                }
+             }
+         }
 
           $scope.location_data = function (){ //after detecting location fetch new results
 
@@ -157,13 +195,25 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
   }
 
   </style>
-      <button ng-click="detectLocation()">locate me</button>
+      <div>
+        <button ng-click="detectLocation()">locate me</button>
+        </div>
+      <div>
+          lat: <input type="text" name="lat"  value="" ng-model="user_lat">
+          long: <input type="text" name="long" value="" ng-model="user_long">
+            <button ng-click="submitHandler()" >Get New Results</button>
+      </div>
+
   <!--<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addrecord">Open Modal</button>-->
   <br/><br/>
   <div class="btn-row">
       <button  style="margin:5px;" ng-repeat="label in labels" idkey="[label.label]" ng-click="tabClick(label.label)">
           [label.label]
       </button>
+      <br>
+      Multi Select: <input type="text" name="lat"  value="" ng-model="multi_select">
+            <button ng-click="multiSelect()" >Get MultiSelect Results</button>
+            <span>enter comma separated value eg:(1,2,3)</span>
   </div>
   <ui-gmap-google-map center="map.center" zoom="map.zoom" options="map.options">
     <ui-gmap-marker ng-repeat="marker in markers" coords="marker.coords" options="marker.options" events="marker.events" idkey="marker.id">
