@@ -598,7 +598,7 @@ class SMSNotification:
 
         if template_obj and template_obj.template_name == 'booking_confirmed_doctor_cod_with_google_link':
             self.context['Google_link'] = generate_short_url('https://www.google.com/maps/search/?api=1&query=%f,%f' % (self.context.get('instance').hospital.location.y, self.context.get('instance').hospital.location.x))
-            self.context['code'] = instance.otp
+            self.context['code'] = self.context.get('instance').otp
 
         return self.context
 
