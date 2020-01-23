@@ -916,7 +916,7 @@ class LabAppointmentForm(RefundableAppointmentForm):
                     raise forms.ValidationError("Home Pickup not enabled")
 
                 available_slots = self.instance.lab.get_available_slots(pathology_home_pickup, pincode, selected_date)
-                selected_day_slots = available_slots.get('time_slots').get(selected_date)
+                selected_day_slots = available_slots.get('time_slots').get(selected_date) if available_slots.get('time_slots') else None
                 if not selected_day_slots:
                     raise forms.ValidationError("No time slots available")
                 serializer_obj = LabAppointmentCreateSerializer()
