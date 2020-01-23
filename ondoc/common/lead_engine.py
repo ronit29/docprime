@@ -237,7 +237,7 @@ class DocAds(AbstractLead):
             "PrimaryNo": request_data.get('phone_number') if not user else str(user.phone_number),
             "UtmCampaign": request_data.get('source', {}).get('utm_campaign', ''),
             "UTMMedium": request_data.get('source', {}).get('utm_medium', ''),
-            "Name": user.full_name if user else 'none',
+            "Name": user.full_name if user and user.full_name else 'none',
             "UtmSource": request_data.get('source', {}).get('utm_source', ''),
             "ExitPointUrl": request_data.get('exitpoint_url', '')
         }
