@@ -66,4 +66,5 @@ urlpatterns = [
     path('lab-test-category-landing-urls', LabTestCategoryLandingUrlViewSet.as_view({'get': 'category_landing_url'}), name='lab_test_category_landing_urls'),
     path('ipdmedicinepagelead', IPDMedicinePageLeadViewSet.as_view({'post': 'store'}), name='ipd_medicine_page_lead'),
     path('allmatrixcities', AllMatrixCitiesViewSet.as_view({'get': 'retrieve'}), name='get_all_cities'),
+    path('labappointment/detail/<int:pk>', LabAppointmentView.as_view({'get': 'retrieve_detail'}), name='lab-appointment-retrieve-detail'),
 ]
