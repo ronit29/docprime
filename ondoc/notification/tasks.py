@@ -1878,7 +1878,7 @@ def process_leads_to_matrix(self, data):
         if not general_lead_obj:
             raise Exception("GeneralMatrix object could not found against id - " + str(id))
 
-        if general_lead_obj.lead_type in ['DROPOFF', 'LABADS', 'CANCELDROPOFFLEADVIAAPPOINTMENT']:
+        if general_lead_obj.lead_type in ['DROPOFF', 'LABADS', 'CANCELDROPOFFLEADVIAAPPOINTMENT', 'DOCADS']:
             plus_obj = PlusUser.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
             insurance_obj = UserInsurance.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
             earlier_date = timezone.now() - timedelta(minutes=10)
