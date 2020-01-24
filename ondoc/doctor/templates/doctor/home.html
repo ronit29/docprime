@@ -30,8 +30,31 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
         center: { latitude: 28.4485, longitude: 77.0759 }
       };
 
+
+       var polygonData = [
+            {lat:28.445642, lng:77.033551},
+            {lat:28.448288, lng:77.021452},
+            {lat:28.435727, lng:77.010201},
+            {lat:28.455029, lng:76.991727},
+            {lat:28.458546, lng:76.964193},
+            {lat:28.472674, lng:76.962541},
+            {lat:28.489109, lng:77.019593},
+            {lat:28.485445, lng:77.019684},
+            {lat:28.462055, lng:77.032061},
+            {lat:28.452296, lng:77.041535}
+            ]
       $scope.markers = [];
       $scope.new_markers = [];
+
+        <!--var newPolygon = new google.maps.Polygon({-->
+            <!--paths:polygonData,-->
+            <!--strokeColor:'#FF0000',-->
+            <!--strokeOpactiy:0.8,-->
+            <!--storkeWeight:3,-->
+            <!--fillColor:'#FF0000',-->
+            <!--fillOpacity:0.35-->
+        <!--})-->
+        <!--newPolygon.setMap($scope.new_map);-->
 
       $http.get(LocFac).then(function(data) {
           var markers = data.data.map_data;
@@ -193,28 +216,52 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
        min-height: 500px;
        width: auto;
   }
-
+.mb-5{
+margin-bottom:10px;
+}
   </style>
-      <div>
-        <button ng-click="detectLocation()">locate me</button>
+      <div class="text-center mb-5">
+        <button class="btn btn-success" ng-click="detectLocation()">locate me</button>
         </div>
-      <div>
-          lat: <input type="text" name="lat"  value="" ng-model="user_lat">
-          long: <input type="text" name="long" value="" ng-model="user_long">
-            <button ng-click="submitHandler()" >Get New Results</button>
+      <div class="container container-fluid">
+          <div class="row">
+          <div class="col-md-6 mb-5">
+          lat: <input type="text" name="lat" class="form-control"   value="" ng-model="user_lat">
+          </div>
+          <div class="col-md-6 mb-5">
+            long: <input type="text" class="form-control" name="long" value="" ng-model="user_long">
+          </div>
+
+            <div class="text-center mb-5">
+                <button class="btn btn-submit btn-primary" ng-click="submitHandler()" >Get New Results</button>
+            </div>
+      </div>
+
+
+          <div class="btn-row pagination text-center" style="width:100%">
+      <li  style="margin:5px; display:inline-block;" ng-repeat="label in labels" idkey="[label.label]" ng-click="tabClick(label.label)">
+          <a href="#">[label.label]</a>
+      </li>
+  </div>
+  <div class="mb-5 row">
+
+<div class="col-md-12">
+      Multi Select:
+    <input type="text" name="lat"  value="" ng-model="multi_select" class="form-control">
+    <p>enter comma separated value eg:(1,2,3)</p>
+    <div class="text-center">
+        <button class="btn btn-primary" ng-click="multiSelect()" >Get MultiSelect Results</button>
+    </div>
+
+</div>
+
+  </div>
       </div>
 
   <!--<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addrecord">Open Modal</button>-->
-  <br/><br/>
-  <div class="btn-row">
-      <button  style="margin:5px;" ng-repeat="label in labels" idkey="[label.label]" ng-click="tabClick(label.label)">
-          [label.label]
-      </button>
-      <br>
-      Multi Select: <input type="text" name="lat"  value="" ng-model="multi_select">
-            <button ng-click="multiSelect()" >Get MultiSelect Results</button>
-            <span>enter comma separated value eg:(1,2,3)</span>
-  </div>
+
+
+
   <ui-gmap-google-map center="map.center" zoom="map.zoom" options="map.options">
     <ui-gmap-marker ng-repeat="marker in markers" coords="marker.coords" options="marker.options" events="marker.events" idkey="marker.id">
         <ui-gmap-window>
@@ -239,7 +286,8 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
             </div>
         </ui-gmap-window>
     </ui-gmap-marker>
-
+   <ui-gmap-polygon ng-repeat="p in polygons track by p.id" path="p.path" stroke="p.stroke" visible="p.visible"
+                 geodesic="p.geodesic" fill="p.fill" fit="false" editable="p.editable" draggable="p.draggable"></ui-gmap-polygon>
   </ui-gmap-google-map>
  </div>
 </div>
