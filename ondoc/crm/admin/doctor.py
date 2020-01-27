@@ -2651,5 +2651,10 @@ class RecordAdmin(VersionAdmin, ActionAdmin):
 
 
 class SearchScoreParamsAdmin(admin.ModelAdmin):
-    fields = ('param', 'max_score', 'is_enabled', 'is_live')
-    list_display = ('param', 'max_score', 'is_enabled', 'is_live')
+    fields = ('param', 'score_values', 'max_score', 'is_enabled', 'is_live', 'score_weightage')
+    list_display = ('param', 'score_values', 'max_score', 'is_enabled', 'is_live', 'score_weightage')
+
+
+class ScoreWeightageAdmin(admin.ModelAdmin):
+    fields = ('param', 'weightage')
+    list_display = ('param', 'weightage')

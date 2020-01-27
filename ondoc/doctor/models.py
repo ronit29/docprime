@@ -4913,14 +4913,24 @@ class SearchScore(auth_model.TimeStampedModel):
         db_table = 'search_score'
 
 
+class ScoreWeightage(auth_model.TimeStampedModel):
+    param = models.CharField(max_length=200, null=True, blank=True)
+    weightage = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'score_weightage'
+
+    def __str__(self):
+        return self.param
+
+
 class SearchScoreParams(auth_model.TimeStampedModel):
     param = models.CharField(max_length=200, null=True, blank=True)
-    min_value = models.PositiveIntegerField(null=True, blank=True)
-    max_value = models.PositiveIntegerField(null=True, blank=True)
-    score = models.PositiveIntegerField(null=True, blank=True)
+    score_values = JSONField(blank=True, null=True)
     max_score = models.PositiveIntegerField(null=True, blank=True)
     is_enabled = models.NullBooleanField(default=False)
     is_live = models.NullBooleanField(default=False)
+    score_weightage = models.ForeignKey(ScoreWeightage, related_name="weightage_percentage", on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
         db_table = 'search_score_params'
