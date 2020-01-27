@@ -591,11 +591,20 @@ class SMSNotification:
             instance = self.context.get('instance')
             self.context['code'] = instance.otp
             self.context['address'] = instance.lab.get_lab_address()
+            self.context['spoc_number'] = None
+            if instance.lab and instance.lab.network and instance.lab.network.spoc_details.all():
+                spoc = instance.lab.network.spoc_details.all()[0]
+                self.context['spoc_number'] = str(spoc.std_code) + str(spoc.number)
+
             self.context['Google_link'] = generate_short_url('https://www.google.com/maps/search/?api=1&query=%f,%f' % (instance.lab.location.y, instance.lab.location.x))
 
         if template_obj and template_obj.template_name == 'booking_confirmed_doctor_prepaid_with_google_link':
             instance = self.context.get('instance')
             self.context['code'] = instance.otp
+            self.context['spoc_number'] = None
+            if instance.hospital and instance.hospital.spoc_details.all():
+                spoc = instance.hospital.spoc_details.all()[0]
+                self.context['spoc_number'] = str(spoc.std_code) + str(spoc.number)
             self.context['Google_link'] = generate_short_url('https://www.google.com/maps/search/?api=1&query=%f,%f' % (instance.hospital.location.y, instance.hospital.location.x))
 
         if template_obj and template_obj.template_name == 'booking_confirmed_doctor_cod_with_google_link':
