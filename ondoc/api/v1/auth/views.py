@@ -224,7 +224,7 @@ class UserViewset(GenericViewSet):
         required_token = request.data.get("token", None)
         if required_token and request.user.is_authenticated:
             NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
-        WhiteListedLoginTokens.objects.filter(token=required_token).delete()
+        # WhiteListedLoginTokens.objects.filter(token=required_token).delete()
         return Response({"message": "success"})
 
     @transaction.atomic
@@ -1451,7 +1451,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         # pg_txn.payment_captured = True
                         pg_txn.save()
 
-                        ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                        ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
                                                                      action=ConsumerTransaction.PAYMENT).last()
                         ctx_txn.transaction_id = response.get('pgTxId')
                         ctx_txn.save()
@@ -1676,7 +1676,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                 #pg_txn.payment_captured = True
                                 pg_txn.save()
 
-                                ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                                ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
                                                                              action=ConsumerTransaction.PAYMENT).last()
                                 ctx_txn.transaction_id = response.get('pgTxId')
                                 ctx_txn.save()
@@ -2370,15 +2370,19 @@ class RefreshJSONWebToken(GenericViewSet):
         data = {}
         if hasattr(request, 'agent') and request.agent is not None:
             return Response({})
-        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request})
+        app_name = True if (request.META.get("HTTP_APP_NAME") and
+                            (request.META.get("HTTP_APP_NAME") == 'docprime_consumer_app' or request.META.get("HTTP_APP_NAME") == 'd_web'))\
+                        else None
+        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request, 'app_name': app_name})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         # if 'active_session_error' in valid_data and valid_data['active_session_error']:
         #     return Response({'error': 'No Last Acctive Session Found'}, status=status.HTTP_401_UNAUTHORIZED)
         # if not serializer.is_valid():
         #     return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_400_BAD_REQUEST)
-        data['token'] = valid_data['token']
-        data['payload'] = valid_data['payload']
+        data['token'] = valid_data.get('token', '')
+        data['user'] = valid_data.get('user', '')
+        data['payload'] = valid_data.get('payload','')
         return Response(data)
 
 

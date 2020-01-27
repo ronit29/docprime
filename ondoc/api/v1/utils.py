@@ -604,7 +604,7 @@ def payment_details(request, order):
     else:
         uemail = "dummyemail@docprime.com"
 
-    if request.data and request.data.get('utm_sbi_tags') and request.data.get('utm_sbi_tags').get('utm_source') == 'sbi_utm':
+    if request.data and request.data.get('utm_sbi_tags') and request.data.get('utm_sbi_tags').get('utm_tags') and request.data.get('utm_sbi_tags').get('utm_tags').get('utm_source') == 'sbi_utm':
         is_sbig = True
 
     if is_sbig:
