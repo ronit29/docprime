@@ -683,9 +683,6 @@ class WHTSAPPNotification:
         data = []
         # if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
         #         notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
-<<<<<<< HEAD
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
-=======
 
         if notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT and user:
             body_template = "appointment_completion_prepaid"
@@ -755,7 +752,6 @@ class WHTSAPPNotification:
             click_login_token_obj.save()
 
         elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
->>>>>>> 44bd1f6588ddc92633e7e2e5e00df37614bcbb09
             body_template = "appointment_accepted_opd_patient"
 
             data.append(self.context.get('patient_name'))
