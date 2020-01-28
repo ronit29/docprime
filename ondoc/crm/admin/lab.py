@@ -899,31 +899,34 @@ class LabAppointmentForm(RefundableAppointmentForm):
 
         if cleaned_data.get('status') not in [LabAppointment.CANCELLED, LabAppointment.COMPLETED, None]:
             if self.instance and self.instance.is_thyrocare:
-                pathology_home_pickup = self.instance.is_home_pickup
-                pincode = self.instance.address.get('pincode', None)
-                selected_date = cleaned_data.get('start_date')
-                thyrocare_obj = Thyrocare()
-                curr_time = thyrocare_obj.time_slot_extraction([cleaned_data.get('start_time')], selected_date)
-                if curr_time and curr_time.get(selected_date):
-                    for data in curr_time.get(selected_date):
-                        if data.get('timing') and data.get('timing')[0].get('value'):
-                            curr_time = data.get('timing')[0].get('value')
+                if self.instance.status == LabAppointment.BOOKED and cleaned_data.get('status') == LabAppointment.ACCEPTED:
+                    pass
                 else:
-                    curr_time = None
-                if not pincode:
-                    raise forms.ValidationErrorr("PinCode not found")
-                if not pathology_home_pickup:
-                    raise forms.ValidationError("Home Pickup not enabled")
+                    pathology_home_pickup = self.instance.is_home_pickup
+                    pincode = self.instance.address.get('pincode', None)
+                    selected_date = cleaned_data.get('start_date')
+                    thyrocare_obj = Thyrocare()
+                    curr_time = thyrocare_obj.time_slot_extraction([cleaned_data.get('start_time')], selected_date)
+                    if curr_time and curr_time.get(selected_date):
+                        for data in curr_time.get(selected_date):
+                            if data.get('timing') and data.get('timing')[0].get('value'):
+                                curr_time = data.get('timing')[0].get('value')
+                    else:
+                        curr_time = None
+                    if not pincode:
+                        raise forms.ValidationErrorr("PinCode not found")
+                    if not pathology_home_pickup:
+                        raise forms.ValidationError("Home Pickup not enabled")
 
-                available_slots = self.instance.lab.get_available_slots(pathology_home_pickup, pincode, selected_date)
-                selected_day_slots = available_slots.get('time_slots').get(selected_date) if available_slots.get('time_slots') else None
-                if not selected_day_slots:
-                    raise forms.ValidationError("No time slots available")
-                serializer_obj = LabAppointmentCreateSerializer()
-                current_day_slots = serializer_obj.get_slots_list(selected_day_slots)
+                    available_slots = self.instance.lab.get_available_slots(pathology_home_pickup, pincode, selected_date)
+                    selected_day_slots = available_slots.get('time_slots').get(selected_date) if available_slots.get('time_slots') else None
+                    if not selected_day_slots:
+                        raise forms.ValidationError("No time slots available")
+                    serializer_obj = LabAppointmentCreateSerializer()
+                    current_day_slots = serializer_obj.get_slots_list(selected_day_slots)
 
-                if not curr_time in current_day_slots:
-                    raise forms.ValidationError("Invalid Time slot")
+                    if not curr_time in current_day_slots:
+                        raise forms.ValidationError("Invalid Time slot")
             else:
                 if self.instance.id:
                     selected_test_ids = lab_test.values_list('test', flat=True)
