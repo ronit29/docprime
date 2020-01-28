@@ -279,10 +279,10 @@ class CancelDropOffLeadViaAppointment(AbstractLead):
         return data
 
 
-class MembershipsLabtestPrescription(AbstractLead):
+class PrescriptionsLabtestPrescription(AbstractLead):
 
     def __init__(self, obj):
-        super(MembershipsLabtestPrescription, self).__init__(obj, None)
+        super(PrescriptionsLabtestPrescription, self).__init__(obj, None)
 
     def update_matrix_lead_id(self, response, *args, **kwargs):
         from ondoc.common.models import GeneralMatrixLeads
@@ -327,7 +327,7 @@ lead_class_mapping = {
     'LABADS': LabAds,
     'CANCELDROPOFFLEADVIAAPPOINTMENT': CancelDropOffLeadViaAppointment,
     'DOCADS': DocAds,
-    'MEMBERSHIPS': MembershipsLabtestPrescription
+    'PRESCRIPTIONS': PrescriptionsLabtestPrescription
 }
 
 
