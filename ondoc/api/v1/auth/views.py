@@ -2450,24 +2450,24 @@ class SendBookingUrlViewSet(GenericViewSet):
         if purchase_type == PlusDummyData.DataType.SINGLE_PURCHASE:
             if not landing_url:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'No Landing url found.'})
-            SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url)
+            SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url, user_id=request.user.id)
             return Response({"status": 1})
 
         if purchase_type == 'vip_purchase':
-            SmsNotification.send_vip_booking_url(token, str(request.user.phone_number), utm_source=utm_source)
+            SmsNotification.send_vip_booking_url(token, str(request.user.phone_number), utm_source=utm_source, user_id=request.user.id)
             return Response({"status": 1})
 
         if not user_profile:
             return Response({"status": 1})
         if purchase_type == 'insurance':
-            SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number))
-            EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email)
+            SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number), user=user_profile.user)
+            EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email, user=user_profile.user)
         elif purchase_type == 'endorsement':
-            SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
-            EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)
+            SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number), user=user_profile.user)
+            EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email, user=user_profile.user)
         else:
-            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name)
-            EmailNotification.send_booking_url(token=token, email=user_profile.email)
+            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name,  user=user_profile.user)
+            EmailNotification.send_booking_url(token=token, email=user_profile.email, user=user_profile.user)
 
         return Response({"status": 1})
 
@@ -2506,7 +2506,7 @@ class SendCartUrlViewSet(GenericViewSet):
         if not user_profile:
             return Response({"status": 1})
 
-        SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number), utm=utm_parameters)
+        SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number), utm=utm_parameters, user= user_profile.user)
 
         return Response({"status": 1})
 
@@ -2948,7 +2948,7 @@ class MatrixUserViewset(GenericViewSet):
         if not token:
             return JsonResponse(response, status=400)
 
-        base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token['token'].decode("utf-8"))
+        base_landing_url = settings.BASE_URL + '/sms/booking?token={}&user_id={}'.format(token['token'].decode("utf-8"), user_data.get('user_id'))
         # redirect_url = 'search' if redirect_type == 'lab' else '/'
         redirect_url = 'opd/doctor/{}/{}/bookdetails?is_matrix=true'.format(doctor.id, hospital.id)
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
@@ -2985,7 +2985,7 @@ class ExternalLoginViewSet(GenericViewSet):
         if ext_type == 1:
             base_url = settings.SBIG_BASE_URL
 
-        base_landing_url = base_url + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        base_landing_url = base_url + '/sms/booking?token={}&user_id={}'.format(token_object['token'].decode("utf-8"), user_data.get('user_id'))
         redirect_url = 'lab' if redirect_type == 'lab' else 'opd'
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
         docprime_login_url = generate_short_url(callback_url)
