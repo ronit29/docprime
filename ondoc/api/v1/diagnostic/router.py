@@ -3,7 +3,7 @@ from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet,
                     AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
                     DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet,
                     CompareLabPackagesViewSet, DigitalReports, LabTestCategoryLandingUrlViewSet,
-                    IPDMedicinePageLeadViewSet, AllMatrixCitiesViewSet)
+                    IPDMedicinePageLeadViewSet, AllMatrixCitiesViewSet, LabTestPrecriptionViewSet)
 
 # from rest_framework.routers import DefaultRouter
 #
@@ -67,4 +67,5 @@ urlpatterns = [
     path('ipdmedicinepagelead', IPDMedicinePageLeadViewSet.as_view({'post': 'store'}), name='ipd_medicine_page_lead'),
     path('allmatrixcities', AllMatrixCitiesViewSet.as_view({'get': 'retrieve'}), name='get_all_cities'),
     path('labappointment/detail/<int:pk>', LabAppointmentView.as_view({'get': 'retrieve_detail'}), name='lab-appointment-retrieve-detail'),
+    path('lab_test_prescription/upload', LabTestPrecriptionViewSet.as_view({'post': 'upload_test_prescription'}), name='upload-test-prescription'),
 ]

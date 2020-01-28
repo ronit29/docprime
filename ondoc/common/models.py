@@ -863,8 +863,6 @@ class SponsorListingSpecialization(auth_model.TimeStampedModel):
     #     return self.id
 
 
-
-
 class SponsorListingUtmTerm(auth_model.TimeStampedModel):
     poc = models.ForeignKey('doctor.PurchaseOrderCreation', on_delete=models.CASCADE, related_name='poc_utm_term', null=True)
     utm_term = models.CharField(max_length=1000, null=True, blank=True)
@@ -1043,3 +1041,20 @@ class GeneralMatrixLeads(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'general_matrix_leads'
+
+
+class GenericPrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
+
+    name = models.FileField(upload_to='general_prescriptions', blank=False, null=False)
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = 'general_prescription_file'
+
+
+

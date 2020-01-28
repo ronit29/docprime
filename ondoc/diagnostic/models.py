@@ -65,7 +65,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria, Certifications
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria, Certifications, GenericPrescriptionFile
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -3908,7 +3908,6 @@ class LabTestCategoryLandingURLS(TimeStampedModel):
         db_table = "lab_test_category_landing_urls"
 
 
-
 class IPDMedicinePageLead(auth_model.TimeStampedModel):
     name = models.CharField(max_length=500)
     phone_number = models.BigIntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
@@ -3929,3 +3928,12 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
 
         if not self.matrix_lead_id:
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
+
+
+class LabTestPrecsriptions(auth_model.TimeStampedModel):
+    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE, null=True, blank=True)
+    primary_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    file = GenericRelation(GenericPrescriptionFile, related_query_name="labtest_prescription_file", null=True, blank=True)
+
+    class Meta:
+        db_table = 'lab_test_prescriptions'

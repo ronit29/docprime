@@ -17,7 +17,7 @@ from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.common.middleware import use_slave
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity, SearchCriteria
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity, SearchCriteria, GenericPrescriptionFile
 from ondoc.plus.models import PlusUser, PlusPlans, TempPlusUser
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.plus.models import PlusUser, PlusPlans
@@ -28,7 +28,7 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
                                      LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds,
-                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead)
+                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead, LabTestPrecsriptions)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -4235,3 +4235,36 @@ class AllMatrixCitiesViewSet(viewsets.GenericViewSet):
         main_queryset = MatrixMappedCity.objects.all().values("id", "name")
 
         return Response(main_queryset)
+
+
+class LabTestPrecriptionViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication, )
+
+    def get_queryset(self):
+        return None
+
+    def upload_test_prescription(self, request):
+        resp = {}
+        user = request.user
+        primary_number = user.phone_number
+        if user.active_insurance:
+            return Response({'error': 'For insured customers, prescription is required at the time of booking'},
+                             status=status.HTTP_400_BAD_REQUEST)
+        serialize_data = serializers.LabTestPrescriptionSerializer(data=request.data, context={'request':request})
+        serialize_data.is_valid(raise_exception=True)
+        validated_data = serialize_data.validated_data
+        try:
+            obj = LabTestPrecsriptions(user=user, primary_number=primary_number)
+            obj.save()
+            file_obj = GenericPrescriptionFile(name=validated_data.get('file'), content_object=obj)
+            file_obj.save()
+
+            resp['status'] = 1
+            resp['lab_obj'] = obj.id
+            resp['file_url'] = request.build_absolute_uri(file_obj.name.url)
+            return Response(resp)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
