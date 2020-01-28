@@ -1262,7 +1262,7 @@ class EMAILNotification:
 
             if context.get("instance").is_credit_letter_required_for_appointment() and not context.get("instance").is_payment_type_cod():
                 credit_letter = context.get("instance").get_valid_credit_letter()
-                if not credit_letter:
+                if not credit_letter or not credit_letter.file or not credit_letter.file.url:
                     logger.error("Got error while getting pdf for opd credit letter")
                     return '', ''
                 context.update({"credit_letter": credit_letter})
