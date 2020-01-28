@@ -28,7 +28,7 @@
 
 <body>
     <div class="text-center mb-5">
-        <button class="btn btn-success locate_me_btn">locate me</button>
+        <button class="btn btn-success locate_me_btn">Locate Me</button>
     </div>
 
     <div class="container container-fluid">
@@ -51,6 +51,10 @@
     <div class="btn-row pagination text-center label_btn_group" style="width:100%">
     </div>
 
+    <div id="info">
+
+    </div>
+
     <div class="mb-5 row">
         <div class="col-md-12">
               Multi Select:
@@ -64,6 +68,18 @@
     <div id="map_wrapper">
         <div id="map_canvas" class="mapping"></div>
     </div>
+
+
+    <hr>
+
+    <div>
+        <table class="table">
+            <thead>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
   </div>
     <script>
         jQuery(function($) {
@@ -72,84 +88,88 @@
             script.src = "//maps.googleapis.com/maps/api/js?sensor=false&callback=initialize&key=AIzaSyCxzOncSHC1FRfKCTYCAnjOctzsMjMtxj0";
             document.body.appendChild(script);
         });
-            var url = window.location.search;
-            var tabs_array = [1,2,3,4,5,6];
-            function initialize(){
-            var map;
-            var new_markers = [];
-            var all_markers = [];
-            var all_labels = [];
-            var markers = [];
-            var map_markers = [];
-            var bounds = new google.maps.LatLngBounds();
-            var mapOptions = {
-                mapTypeId: 'roadmap'
-            };
 
-            // Display a map on the page
-            map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
-            map.setTilt(45);
+        var url = window.location.search;
+        var tabs_array = [1,2,3,4,5,6];
+        function initialize(){
+        var map;
+        var new_markers = [];
+        var all_markers = [];
+        var all_labels = [];
+        var markers = [];
+        var map_markers = [];
+        var bounds = new google.maps.LatLngBounds();
+        var mapOptions = {
+            mapTypeId: 'roadmap'
+        };
+        var markerCnt = {}
 
-            $.ajax({
-                url: '/api/v1/doctor/record_api',
-                success: function( data ) {
-                    buildMarkers(data.map_data,data.labels,'initial')
-                }
-            });
+        // Display a map on the page
+        map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
+        map.setTilt(45);
 
-            function buildMarkers(markers_data,labels,fromWhere){
-                console.log('rrr');
-                if(fromWhere == 'initial'){
-                    all_markers = markers_data;
-                    markers = all_markers;
-                }else{
-                    markers = markers_data;
-                }
-                all_labels = labels;
-                // Info Window Content
-                var infoWindowContent = [
-                    ['<div class="info_content">' +
-                    '<h3>London Eye</h3>' +
-                    '<p>The London Eye is a giant Ferris wheel situated on the banks of the River Thames. The entire structure is 135 metres (443 ft) tall and the wheel has a diameter of 120 metres (394 ft).</p>' +        '</div>'],
-                    ['<div class="info_content">' +
-                    '<h3>Palace of Westminster</h3>' +
-                    '<p>The Palace of Westminster is the meeting place of the House of Commons and the House of Lords, the two houses of the Parliament of the United Kingdom. Commonly known as the Houses of Parliament after its tenants.</p>' +
-                    '</div>']
-                ];
-
-                // Display multiple markers on a map
-                var infoWindow = new google.maps.InfoWindow(), marker, i;
-
-                // Loop through our array of markers & place each one on the map
-                for( i = 0; i < markers.length; i++ ) {
-                    var position = new google.maps.LatLng(markers[i]['latitude'], markers[i]['longitude']);
-                    bounds.extend(position);
-                    marker = new google.maps.Marker({
-                        position: position,
-                        title: markers[i]['hospital_name'],
-                        icon: markers[i]['image']
-                    });
-                    marker.setMap(map)
-                    map_markers.push(marker)
-
-                    // Allow each marker to have an info window
-                    google.maps.event.addListener(marker, 'click', (function(marker, i) {
-                        return function() {
-                            infoWindow.setContent(infoWindowContent[i]['hospital_name']);
-                            infoWindow.open(map, marker);
-                        }
-                    })(marker, i));
-
-                    // Automatically center the map fitting all markers on the screen
-                    map.fitBounds(bounds);
-                }
-
-                // Override our map zoom level once our fitBounds function runs (Make sure it only runs once)
-                var boundsListener = google.maps.event.addListener((map), 'bounds_changed', function(event) {
-                    this.setZoom(14);
-                    google.maps.event.removeListener(boundsListener);
-                });
+        $.ajax({
+            url: '/api/v1/doctor/record_api',
+            success: function( data ) {
+                buildMarkers(data.map_data,data.labels,'initial')
+                addPolyPoints()
             }
+        });
+
+        function buildMarkers(markers_data,labels,fromWhere){
+            console.log('rrr');
+            if(fromWhere == 'initial'){
+                all_markers = markers_data;
+                markers = all_markers;
+            }else{
+                markers = markers_data;
+            }
+            all_labels = labels;
+            // Info Window Content
+            var infoWindowContent = [
+                ['<div class="info_content">' +
+                '<h3>London Eye</h3>' +
+                '<p>The London Eye is a giant Ferris wheel situated on the banks of the River Thames. The entire structure is 135 metres (443 ft) tall and the wheel has a diameter of 120 metres (394 ft).</p>' +        '</div>'],
+                ['<div class="info_content">' +
+                '<h3>Palace of Westminster</h3>' +
+                '<p>The Palace of Westminster is the meeting place of the House of Commons and the House of Lords, the two houses of the Parliament of the United Kingdom. Commonly known as the Houses of Parliament after its tenants.</p>' +
+                '</div>']
+            ];
+
+            // Display multiple markers on a map
+            var infoWindow = new google.maps.InfoWindow(), marker, i;
+
+            // Loop through our array of markers & place each one on the map
+            for( i = 0; i < markers.length; i++ ) {
+                var position = new google.maps.LatLng(markers[i]['latitude'], markers[i]['longitude']);
+                bounds.extend(position);
+                marker = new google.maps.Marker({
+                    position: position,
+                    title: markers[i]['hospital_name'],
+                    icon: markers[i]['image'],
+                    label: markers[i]['label']
+                });
+                marker.setMap(map)
+                map_markers.push(marker)
+
+                // Allow each marker to have an info window
+                google.maps.event.addListener(marker, 'click', (function(marker, i) {
+                    return function() {
+                        infoWindow.setContent(infoWindowContent[i]['hospital_name']);
+                        infoWindow.open(map, marker);
+                    }
+                })(marker, i));
+
+                // Automatically center the map fitting all markers on the screen
+                map.fitBounds(bounds);
+            }
+
+            // Override our map zoom level once our fitBounds function runs (Make sure it only runs once)
+            var boundsListener = google.maps.event.addListener((map), 'bounds_changed', function(event) {
+                this.setZoom(14);
+                google.maps.event.removeListener(boundsListener);
+            });
+        }
 
          function clearOverlays() {
           for( i = 0; i < map_markers.length; i++ ) {
@@ -160,6 +180,7 @@
         $(document).on('click', '.locate_me_btn', function() {
             detectLocation()
         })
+
         function detectLocation(){
             if (navigator.geolocation) {
                   navigator.geolocation.getCurrentPosition((position) => {
@@ -193,7 +214,7 @@
         }
 
         for(i=1; i <= tabs_array.length; i++) {
-            $('.label_btn_group').append("<li style='margin:5px; display:inline-block;' value="+i+"><a href=''>" + i + "</a></li>")
+            $('.label_btn_group').append("<li style='margin:5px; display:inline-block;' value="+i+"><a href='#'>" + i + "</a></li>")
         }
 
         $(document).on('click', '.label_btn_group li', function(){
@@ -229,7 +250,7 @@
              }
          })
 
-         $(document).on('click', '#multi_select_click', function(){
+        $(document).on('click', '#multi_select_click', function(){
             var abc = []
             var entered_val = [];
             var multi_select = $("#multi_select").val();
@@ -247,7 +268,123 @@
                 alert('please enter some value')
             }
 
-         })
+        })
+
+        var polygonDataA = [
+            {lat:28.445642, lng:77.033551},
+            {lat:28.448288, lng:77.021452},
+            {lat:28.435727, lng:77.010201},
+            {lat:28.455029, lng:76.991727},
+            {lat:28.458546, lng:76.964193},
+            {lat:28.472674, lng:76.962541},
+            {lat:28.489109, lng:77.019593},
+            {lat:28.485445, lng:77.019684},
+            {lat:28.462055, lng:77.032061},
+            {lat:28.452296, lng:77.041535}
+        ]
+
+        var polygonDataB = [
+            {lat:28.476882, lng:77.003057},
+            {lat:28.485707, lng:77.019679},
+            {lat:28.532587, lng:77.053114},
+            {lat:28.518295, lng:77.080712},
+            {lat:28.499633, lng:77.065222},
+            {lat:28.461633, lng:77.081433}
+            ]
+
+       var polygonDataC = [
+            {lat:28.445721, lng:77.033695},
+            {lat:28.459143, lng:77.034371},
+            {lat:28.467382, lng:77.026988},
+            {lat:28.478582, lng:77.034983},
+            {lat:28.489136, lng:77.055795},
+            {lat:28.477976, lng:77.071115}
+            ]
+
+        var newPolygonA = new google.maps.Polygon({
+            paths:polygonDataA,
+            strokeColor:'#FF0000',
+            strokeOpactiy:0.5,
+            storkeWeight:1,
+            fillColor:'#FF0000',
+            fillOpacity:0.15
+        })
+
+        var newPolygonB = new google.maps.Polygon({
+            paths:polygonDataB,
+            strokeColor:'#00FF00',
+            strokeOpactiy:0.5,
+            storkeWeight:1,
+            fillColor:'#00FF00',
+            fillOpacity:0.15
+        })
+
+        var newPolygonC = new google.maps.Polygon({
+            paths:polygonDataC,
+            strokeColor:'#0000FF',
+            strokeOpactiy:0.5,
+            storkeWeight:1,
+            fillColor:'#0000FF',
+            fillOpacity:0.15
+        })
+
+        newPolygonA.setMap(map);
+        newPolygonB.setMap(map);
+        newPolygonC.setMap(map);
+
+        polygonArr = [newPolygonA, newPolygonB, newPolygonC]
+
+        var polyA = newPolygonA.getPath();
+        //var polyB = newPolygonA.getPath();
+        //var polyC = newPolygonA.getPath();
+
+        function addPolyPoints() {
+            //polyA.push(e.latLng);
+            for(var i=0; i < polygonArr.length; i++) {
+                markerCnt[i] = {}
+
+                for(var j=1; j <= 6; j++) {
+                    markerCnt[i][j] = 0
+                }
+            }
+
+            for (var k = 0; k < map_markers.length; k++) {  //1000
+                for(var i=0; i < polygonArr.length; i++) {  //3
+                    if (google.maps.geometry.poly.containsLocation(map_markers[k].getPosition(), polygonArr[i])) {
+                        for(var j=1; j <= 6; j++) {
+                            if (parseInt(map_markers[k].label) == j) {
+                                markerCnt[i][j] = markerCnt[i][j] + 1
+                            }
+                        }
+                    }
+                }
+            }
+            console.log(markerCnt)
+            $('.table thead').empty()
+            $('.table tbody').empty()
+            $('.table thead').append("<tr><th></th></tr>")
+
+            var markerCntRows = Object.keys(markerCnt).length
+            var markerCntColumns = 0
+            if (markerCntRows > 0) {
+                markerCntColumns = Object.keys(markerCnt[0]).length
+                for(var j=1; j<=markerCntColumns; j++) {
+                    $('.table thead tr').append("<th>L" + j + "</th>")
+                }
+             }
+
+            console.log(markerCntRows)
+            console.log(markerCntColumns)
+            for(var i=0; i< markerCntRows; i++) {
+                $('.table tbody').append("<tr><td>P" + i + "</td></tr>")
+                for(var j=1; j<= markerCntColumns; j++) {
+                    $(".table tbody tr:eq(" + i + ")").append("<td>" + markerCnt[i][j] + "</td>")
+                }
+            }
+        }
+        google.maps.event.addListener(map, 'click', addPolyPoints);
+
+
     }
 
     </script>
