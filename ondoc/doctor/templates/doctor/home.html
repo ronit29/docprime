@@ -85,7 +85,7 @@
         jQuery(function($) {
             // Asynchronously Load the map API
             var script = document.createElement('script');
-            script.src = "//maps.googleapis.com/maps/api/js?sensor=false&callback=initialize&key=AIzaSyCxzOncSHC1FRfKCTYCAnjOctzsMjMtxj0";
+            script.src = "//maps.googleapis.com/maps/api/js?sensor=false&callback=initialize&libraries=geometry&key=AIzaSyCxzOncSHC1FRfKCTYCAnjOctzsMjMtxj0";
             document.body.appendChild(script);
         });
 
@@ -103,6 +103,7 @@
             mapTypeId: 'roadmap'
         };
         var markerCnt = {}
+        var polygonArr = []
 
         // Display a map on the page
         map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
@@ -111,8 +112,8 @@
         $.ajax({
             url: '/api/v1/doctor/record_api',
             success: function( data ) {
-                buildMarkers(data.map_data,data.labels,'initial')
-                addPolyPoints()
+                buildMarkers(data.map_data, data.labels, 'initial')
+                getPolygonData()
             }
         });
 
@@ -125,16 +126,7 @@
                 markers = markers_data;
             }
             all_labels = labels;
-            // Info Window Content
-            var infoWindowContent = [
-                ['<div class="info_content">' +
-                '<h3>London Eye</h3>' +
-                '<p>The London Eye is a giant Ferris wheel situated on the banks of the River Thames. The entire structure is 135 metres (443 ft) tall and the wheel has a diameter of 120 metres (394 ft).</p>' +        '</div>'],
-                ['<div class="info_content">' +
-                '<h3>Palace of Westminster</h3>' +
-                '<p>The Palace of Westminster is the meeting place of the House of Commons and the House of Lords, the two houses of the Parliament of the United Kingdom. Commonly known as the Houses of Parliament after its tenants.</p>' +
-                '</div>']
-            ];
+            map_markers = []
 
             // Display multiple markers on a map
             var infoWindow = new google.maps.InfoWindow(), marker, i;
@@ -147,7 +139,25 @@
                     position: position,
                     title: markers[i]['hospital_name'],
                     icon: markers[i]['image'],
-                    label: markers[i]['label']
+                    label: markers[i]['label'],
+                    data: {
+                            hospital_name: markers[i]['hospital_name'],
+                            address: markers[i]['address'],
+                            place_id: markers[i]['place_id'],
+                            reason: markers[i]['reason'],
+                            multi_speciality: markers[i]['multi_speciality'],
+                            has_phone: markers[i]['has_phone'],
+                            lead_rank: markers[i]['lead_rank'],
+                            combined_rating: markers[i]['combined_rating'],
+                            combined_rating_count: markers[i]['combined_rating_count'],
+                            is_potential: markers[i]['is_potential'],
+                            has_booking: markers[i]['has_booking'],
+                            monday_timing: markers[i]['monday_timing'],
+                            is_bookable: markers[i]['is_bookable'],
+                            phone_number: markers[i]['phone_number'],
+                            hospital_id: markers[i]['hospital_id'],
+                            link: markers[i]['link']
+                           }
                 });
                 marker.setMap(map)
                 map_markers.push(marker)
@@ -155,7 +165,8 @@
                 // Allow each marker to have an info window
                 google.maps.event.addListener(marker, 'click', (function(marker, i) {
                     return function() {
-                        infoWindow.setContent(infoWindowContent[i]['hospital_name']);
+                        infoContent = '<b><span style="color:blue">hospital name: </span></b><span>' + marker.data['hospital_name'] + '</span><br><b><span style="color:blue">address: </span></b><span>' + marker.data['address'] +'</span><br><b><span style="color:blue">place id: </span></b><span>'+ marker.data['place_id'] +'</span><br><b><span style="color:blue">reason: </span></b><span>'+ marker.data['reason'] +'</span><br><b><span style="color:blue">multi speciality: </span></b><span>'+ marker.data['multi_speciality'] +'</span><br><b><span style="color:blue">has phone: </span></b><span>'+ marker.data['has_phone'] +'</span><br><b><span style="color:blue">lead rank: </span></b><span>'+ marker.data['lead_rank'] +'</span><br><b><span style="color:blue">combined rating: </span></b><span>'+ marker.data['combined_rating'] +'</span><br><b><span style="color:blue">combined rating count: </span></b><span>'+ marker.data['combined_rating_count'] +'</span><br><b><span style="color:blue">is potential: </span></b><span>'+ marker.data['is_potential'] +'</span><br><b><span style="color:blue">has booking: </span></b><span>'+ marker.data['has_booking'] +'</span><br><b><span style="color:blue">time: </span></b><span>'+ marker.data['monday_timing'] +'</span><br><b><span style="color:blue">is bookable: </span></b><span>'+ marker.data['is_bookable'] +'</span><br><b><span style="color:blue">phone_number: </span></b><span>'+ marker.data['phone_number'] +'</span><br><b><span style="color:blue">hospital_id: </span></b><span>'+ marker.data['hospital_id'] +'</span><br><a href='+ marker.data['link'] +' target="_blank">click me</a>'
+                        infoWindow.setContent(infoContent);
                         infoWindow.open(map, marker);
                     }
                 })(marker, i));
@@ -208,7 +219,9 @@
             $.ajax({
                 url: new_url,
                 success: function( data ) {
-                    buildMarkers(data)
+                    buildMarkers(data.map_data, data.labels, 'initial')
+                    //buildMarkers(data.map_data,data.labels,'initial')
+                    getPolygonData()
                 }
             });
         }
@@ -270,75 +283,39 @@
 
         })
 
-        var polygonDataA = [
-            {lat:28.445642, lng:77.033551},
-            {lat:28.448288, lng:77.021452},
-            {lat:28.435727, lng:77.010201},
-            {lat:28.455029, lng:76.991727},
-            {lat:28.458546, lng:76.964193},
-            {lat:28.472674, lng:76.962541},
-            {lat:28.489109, lng:77.019593},
-            {lat:28.485445, lng:77.019684},
-            {lat:28.462055, lng:77.032061},
-            {lat:28.452296, lng:77.041535}
-        ]
+       function getPolygonData() {
+           $.ajax({
+                url: 'https://bitbucket.org/!api/2.0/snippets/rohitdocprime/LrGk8E/f76b1384e713b075d7e1157a888ff86a44740b4c/files/snippet.json',
+                success: function( data ) {
+                    var newJson = data.replace(/([a-zA-Z0-9]+?):/g, '"$1":');
+                    newJson = newJson.replace(/'/g, '"');
+                    json_response = JSON.parse(newJson)
+                    polygonData = Object.values(json_response)
+                    polygonArr = []
+                    for (var i=0; i<polygonData.length; i++) {
+                        newPolygon = new google.maps.Polygon({
+                            paths:polygonData[i].nodes,
+                            strokeColor:polygonData[i].color,
+                            strokeOpactiy:0.5,
+                            storkeWeight:1,
+                            fillColor:polygonData[i].color,
+                            fillOpacity:0.15
+                       })
+                       newPolygon.setMap(map);
+                       polygonArr.push(newPolygon)
+                    }
 
-        var polygonDataB = [
-            {lat:28.476882, lng:77.003057},
-            {lat:28.485707, lng:77.019679},
-            {lat:28.532587, lng:77.053114},
-            {lat:28.518295, lng:77.080712},
-            {lat:28.499633, lng:77.065222},
-            {lat:28.461633, lng:77.081433}
-            ]
+                    //var polyA = newPolygonA.getPath();
+                    //var polyB = newPolygonA.getPath();
+                    //var polyC = newPolygonA.getPath();
 
-       var polygonDataC = [
-            {lat:28.445721, lng:77.033695},
-            {lat:28.459143, lng:77.034371},
-            {lat:28.467382, lng:77.026988},
-            {lat:28.478582, lng:77.034983},
-            {lat:28.489136, lng:77.055795},
-            {lat:28.477976, lng:77.071115}
-            ]
+                     addPolyPoints(polygonArr)
+                }
+           });
+        }
 
-        var newPolygonA = new google.maps.Polygon({
-            paths:polygonDataA,
-            strokeColor:'#FF0000',
-            strokeOpactiy:0.5,
-            storkeWeight:1,
-            fillColor:'#FF0000',
-            fillOpacity:0.15
-        })
-
-        var newPolygonB = new google.maps.Polygon({
-            paths:polygonDataB,
-            strokeColor:'#00FF00',
-            strokeOpactiy:0.5,
-            storkeWeight:1,
-            fillColor:'#00FF00',
-            fillOpacity:0.15
-        })
-
-        var newPolygonC = new google.maps.Polygon({
-            paths:polygonDataC,
-            strokeColor:'#0000FF',
-            strokeOpactiy:0.5,
-            storkeWeight:1,
-            fillColor:'#0000FF',
-            fillOpacity:0.15
-        })
-
-        newPolygonA.setMap(map);
-        newPolygonB.setMap(map);
-        newPolygonC.setMap(map);
-
-        polygonArr = [newPolygonA, newPolygonB, newPolygonC]
-
-        var polyA = newPolygonA.getPath();
-        //var polyB = newPolygonA.getPath();
-        //var polyC = newPolygonA.getPath();
-
-        function addPolyPoints() {
+        function addPolyPoints(polygonArr) {
+            console.log(polygonArr)
             //polyA.push(e.latLng);
             for(var i=0; i < polygonArr.length; i++) {
                 markerCnt[i] = {}
@@ -350,6 +327,7 @@
 
             for (var k = 0; k < map_markers.length; k++) {  //1000
                 for(var i=0; i < polygonArr.length; i++) {  //3
+                    //console.log(google.maps.geometry.poly)
                     if (google.maps.geometry.poly.containsLocation(map_markers[k].getPosition(), polygonArr[i])) {
                         for(var j=1; j <= 6; j++) {
                             if (parseInt(map_markers[k].label) == j) {
@@ -359,7 +337,7 @@
                     }
                 }
             }
-            console.log(markerCnt)
+            //console.log(markerCnt)
             $('.table thead').empty()
             $('.table tbody').empty()
             $('.table thead').append("<tr><th></th></tr>")
@@ -373,17 +351,15 @@
                 }
              }
 
-            console.log(markerCntRows)
-            console.log(markerCntColumns)
+            //console.log(markerCntRows)
+            //console.log(markerCntColumns)
             for(var i=0; i< markerCntRows; i++) {
-                $('.table tbody').append("<tr><td>P" + i + "</td></tr>")
+                $('.table tbody').append("<tr><td style='background-color: " + polygonArr[i].fillColor + ";'>P" + i + "</td></tr>")
                 for(var j=1; j<= markerCntColumns; j++) {
                     $(".table tbody tr:eq(" + i + ")").append("<td>" + markerCnt[i][j] + "</td>")
                 }
             }
         }
-        google.maps.event.addListener(map, 'click', addPolyPoints);
-
 
     }
 
