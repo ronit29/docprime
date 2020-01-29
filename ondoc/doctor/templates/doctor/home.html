@@ -34,13 +34,13 @@
     <div class="container container-fluid">
           <div class="row">
               <div class="col-md-6 mb-5">
-              lat: <input type="text" name="lat" class="form-control"   value="" id="myInputlat">
+              lat: <input type="text" name="lat" class="form-control"  value="28.450367" id="myInputlat">
               </div>
               <div class="col-md-6 mb-5">
-                long: <input type="text" class="form-control" name="long" value="" id="myInputlng">
+                long: <input type="text" class="form-control" name="long" value="77.071848" id="myInputlng">
               </div>
               <div class="col-md-6 mb-5">
-                radius: <input type="text" class="form-control" name="radius" value="" id="myInputrad">
+                radius: <input type="text" class="form-control" name="radius" value="2000" id="myInputrad">
               </div>
 
               <div class="text-center mb-5">
@@ -313,22 +313,27 @@
 
         function addPolyPoints(polygonArr) {
             console.log(polygonArr)
+            var totalCntInPolygon = []
+            var totalCntInLevel = []
             //polyA.push(e.latLng);
             for(var i=0; i < polygonArr.length; i++) {
                 markerCnt[i] = {}
+                totalCntInPolygon[i] = 0
 
                 for(var j=1; j <= 6; j++) {
                     markerCnt[i][j] = 0
+                    totalCntInLevel[j] = 0
                 }
             }
 
             for (var k = 0; k < map_markers.length; k++) {  //1000
                 for(var i=0; i < polygonArr.length; i++) {  //3
-                    //console.log(google.maps.geometry.poly)
                     if (google.maps.geometry.poly.containsLocation(map_markers[k].getPosition(), polygonArr[i])) {
                         for(var j=1; j <= 6; j++) {
                             if (parseInt(map_markers[k].label) == j) {
                                 markerCnt[i][j] = markerCnt[i][j] + 1
+                                totalCntInPolygon[i] = totalCntInPolygon[i] + 1
+                                totalCntInLevel[j] = totalCntInLevel[j] + 1
                             }
                         }
                     }
@@ -337,21 +342,27 @@
             //console.log(markerCnt)
             $('.table thead').empty()
             $('.table tbody').empty()
-            $('.table thead').append("<tr><th></th></tr>")
+            $('.table thead').append("<tr><th></th></tr><tr><th></th></tr>")
 
             var markerCntRows = Object.keys(markerCnt).length
             var markerCntColumns = 0
             if (markerCntRows > 0) {
                 markerCntColumns = Object.keys(markerCnt[0]).length
+                //$('.table thead').append('<tr></tr>')
+                $('.table thead tr').append("<th></th><th></th>")
+                //$('.table thead tr').append("<th></th><th></th>")
                 for(var j=1; j<=markerCntColumns; j++) {
-                    $('.table thead tr').append("<th>L" + j + "</th>")
+                    $('.table thead tr:eq(0)').append("<th>L" + j + "</th>")
+                    $('.table thead tr:eq(1)').append("<td><strong>" + totalCntInLevel[j] + "</strong></td>")
                 }
              }
 
             //console.log(markerCntRows)
             //console.log(markerCntColumns)
             for(var i=0; i< markerCntRows; i++) {
-                $('.table tbody').append("<tr><td style='background-color: " + polygonArr[i].fillColor + ";'>P" + i + "</td></tr>")
+                polygon_count = i + 1
+                $('.table tbody').append("<tr><td style='background-color: " + polygonArr[i].fillColor + ";'>P" + polygon_count + "<td></tr>")
+                $('.table tbody tr:eq('+ i +')').append("<td><strong>" + totalCntInPolygon[i] + "</strong></td>")
                 for(var j=1; j<= markerCntColumns; j++) {
                     $(".table tbody tr:eq(" + i + ")").append("<td>" + markerCnt[i][j] + "</td>")
                 }
