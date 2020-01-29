@@ -33,44 +33,41 @@
 
     <div class="container container-fluid">
           <div class="row">
-          <div class="col-md-6 mb-5">
-          lat: <input type="text" name="lat" class="form-control"   value="" id="myInputlat">
-          </div>
-          <div class="col-md-6 mb-5">
-            long: <input type="text" class="form-control" name="long" value="" id="myInputlng">
-          </div>
-            <div class="col-md-6 mb-5">
-            radius: <input type="text" class="form-control" name="radius" value="" id="myInputrad">
-            </div>
+              <div class="col-md-6 mb-5">
+              lat: <input type="text" name="lat" class="form-control"   value="" id="myInputlat">
+              </div>
+              <div class="col-md-6 mb-5">
+                long: <input type="text" class="form-control" name="long" value="" id="myInputlng">
+              </div>
+              <div class="col-md-6 mb-5">
+                radius: <input type="text" class="form-control" name="radius" value="" id="myInputrad">
+              </div>
 
-            <div class="text-center mb-5">
+              <div class="text-center mb-5">
                 <button class="btn btn-submit btn-primary" id="user_lat_lng" >Get New Results</button>
-            </div>
-      </div>
+              </div>
+          </div>
 
-    <div class="btn-row pagination text-center label_btn_group" style="width:100%">
-    </div>
+          <hr>
 
-    <div id="info">
+          <div class="btn-row pagination text-center label_btn_group" style="width:100%">
+          </div>
 
-    </div>
-
-    <div class="mb-5 row">
-        <div class="col-md-12">
-              Multi Select:
-            <input type="text" name="lat"  value="" id="multi_select" class="form-control">
-            <p>enter comma separated value eg:(1,2,3)</p>
-            <div class="text-center">
-                <button class="btn btn-primary" id="multi_select_click" >Get MultiSelect Results</button>
+        <div class="mb-5 row">
+            <div class="col-md-12">
+                  Multi Select:
+                <input type="text" name="lat"  value="" id="multi_select" class="form-control">
+                <p>enter comma separated value eg:(1,2,3)</p>
+                <div class="text-center">
+                    <button class="btn btn-primary" id="multi_select_click" >Get MultiSelect Results</button>
+                </div>
             </div>
         </div>
-    </div>
-    <div id="map_wrapper">
-        <div id="map_canvas" class="mapping"></div>
-    </div>
+        <div id="map_wrapper">
+            <div id="map_canvas" class="mapping"></div>
+        </div>
 
-
-    <hr>
+        <hr>
 
     <div>
         <table class="table">
@@ -227,7 +224,7 @@
         }
 
         for(i=1; i <= tabs_array.length; i++) {
-            $('.label_btn_group').append("<li style='margin:5px; display:inline-block;' value="+i+"><a href='#'>" + i + "</a></li>")
+            $('.label_btn_group').append("<li style='margin:5px; display:inline-block;' value="+i+"><a href='javascript:void(0)'>" + i + "</a></li>")
         }
 
         $(document).on('click', '.label_btn_group li', function(){
@@ -285,7 +282,7 @@
 
        function getPolygonData() {
            $.ajax({
-                url: 'https://bitbucket.org/!api/2.0/snippets/rohitdocprime/LrGk8E/f76b1384e713b075d7e1157a888ff86a44740b4c/files/snippet.json',
+                url: 'https://bitbucket.org/!api/2.0/snippets/rohitdocprime/LrGk8E/a913ccd2fc307a7354e22a75377dbf249c2c828e/files/snippet.json',
                 success: function( data ) {
                     var newJson = data.replace(/([a-zA-Z0-9]+?):/g, '"$1":');
                     newJson = newJson.replace(/'/g, '"');
