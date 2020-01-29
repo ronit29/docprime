@@ -1,88 +1,206 @@
 {% extends 'doctor/base.html' %}
 
-{% block content %} 
-<div ng-app="appMaps" class="container">
+{% block content %}
+<html>
+<head>
+    <script
+  src="https://code.jquery.com/jquery-3.4.1.min.js"
+  integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+  crossorigin="anonymous"></script>
+    <!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
-  <div id="map_canvas" ng-controller="mainCtrl" class="row">
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCxzOncSHC1FRfKCTYCAnjOctzsMjMtxj0"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.0.1/lodash.js" type="text/javascript"></script>
-  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-simple-logger/0.1.7/angular-simple-logger.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-google-maps/2.4.1/angular-google-maps.min.js"></script>
-  <script type="text/javascript">
-      var url = window.location.search;
-url = url.replace("?", '');
-<!--console.log(url);-->
-LocFac =  "/api/v1/doctor/record_api?" + url;
+</head>
 
-angular.module('appMaps', ['uiGmapgoogle-maps'])
-  .config(function($interpolateProvider) {
-         $interpolateProvider.startSymbol('[');
-         $interpolateProvider.endSymbol(']');
-  })
+<style>
+    #map_wrapper {
+        height: 400px;
+    }
 
-  .controller('mainCtrl', function($scope, $http, uiGmapGoogleMapApi, uiGmapIsReady) {
-      $scope.user_location = []
-      $scope.new_map ={}
-      $scope.map = {
-        zoom:14,
-        bounds: {},
-        center: { latitude: 28.4485, longitude: 77.0759 }
-      };
+    #map_canvas {
+        width: 100%;
+        height: 100%;
+    }
+    .mb-5{
+        margin-bottom:10px;
+    }
+</style>
 
-      $scope.markers = [];
-      $scope.new_markers = [];
+<body>
+    <div class="text-center mb-5">
+        <button class="btn btn-success locate_me_btn">Locate Me</button>
+    </div>
 
-      $http.get(LocFac).then(function(data) {
-          var markers = data.data.map_data;
-          var labels  = data.data.labels;
+    <div class="container container-fluid">
+          <div class="row">
+              <div class="col-md-6 mb-5">
+              lat: <input type="text" name="lat" class="form-control"  value="28.450367" id="myInputlat">
+              </div>
+              <div class="col-md-6 mb-5">
+                long: <input type="text" class="form-control" name="long" value="77.071848" id="myInputlng">
+              </div>
+              <div class="col-md-6 mb-5">
+                radius: <input type="text" class="form-control" name="radius" value="2000" id="myInputrad">
+              </div>
 
-          angular.forEach(markers, function (marker) {
+              <div class="text-center mb-5">
+                <button class="btn btn-submit btn-primary" id="user_lat_lng" >Get New Results</button>
+              </div>
+          </div>
 
-             marker.coords = {
-                latitude: marker.latitude,
-                longitude: marker.longitude
-             }
-             marker.options= {icon: marker.image, label: marker.label};
-          })
+          <hr>
 
-          $scope.labels = labels;
-          $scope.markers = markers;
+          <div class="btn-row pagination text-center label_btn_group" style="width:100%">
+          </div>
 
-          $scope.tabClick =  function(id){ //tabs_click
-          $scope.new_markers =  markers.filter((x=>x.label == id));
-             if($scope.new_markers.length > 0){
-                  $scope.markers = $scope.new_markers;
-             }else{
-                  $scope.markers = markers;
-             }
-          }
+        <div class="mb-5 row">
+            <div class="col-md-12">
+                  Multi Select:
+                <input type="text" name="lat"  value="" id="multi_select" class="form-control">
+                <p>enter comma separated value eg:(1,2,3)</p>
+                <div class="text-center">
+                    <button class="btn btn-primary" id="multi_select_click" >Get MultiSelect Results</button>
+                </div>
+            </div>
+        </div>
+        <div id="map_wrapper">
+            <div id="map_canvas" class="mapping"></div>
+        </div>
 
-          $scope.multiSelect = function(){
-            var abc = []
-            var entered_val = [];
-            if($scope.multi_select){
-                entered_val = $scope.multi_select.split(",")
+        <hr>
 
-                if(entered_val.length){
-                 entered_val.forEach(myFunction);
-                    function myFunction(value, index, array) {
-                      abc = abc.concat(markers.filter((x=>x.label == value)))
-                    }
-                  $scope.markers = abc;
-                }
-            }else{
-                alert('please enter some value')
+    <div>
+        <table class="table">
+            <thead>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+  </div>
+    <script>
+        jQuery(function($) {
+            // Asynchronously Load the map API
+            var script = document.createElement('script');
+            script.src = "//maps.googleapis.com/maps/api/js?sensor=false&callback=initialize&libraries=geometry&key=AIzaSyCxzOncSHC1FRfKCTYCAnjOctzsMjMtxj0";
+            document.body.appendChild(script);
+        });
+
+        var url = window.location.search;
+        var tabs_array = [1,2,3,4,5,6];
+        function initialize(){
+        var map;
+        var new_markers = [];
+        var all_markers = [];
+        var all_labels = [];
+        var markers = [];
+        var map_markers = [];
+        var bounds = new google.maps.LatLngBounds();
+        var mapOptions = {
+            mapTypeId: 'roadmap'
+        };
+        var markerCnt = {}
+        var polygonArr = []
+
+        // Display a map on the page
+        map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
+        map.setTilt(45);
+
+        $.ajax({
+            url: '/api/v1/doctor/record_api',
+            success: function( data ) {
+                buildMarkers(data.map_data, data.labels, 'initial')
+                getPolygonData()
             }
-         }
+        });
 
-    <!--console.log($scope.markers)-->
-          $scope.detectLocation = function () { //detect location
-              if (navigator.geolocation) {
+        function buildMarkers(markers_data,labels,fromWhere){
+            console.log('rrr');
+            if(fromWhere == 'initial'){
+                all_markers = markers_data;
+                markers = all_markers;
+            }else{
+                markers = markers_data;
+            }
+            all_labels = labels;
+            map_markers = []
+
+            // Display multiple markers on a map
+            var infoWindow = new google.maps.InfoWindow(), marker, i;
+
+            // Loop through our array of markers & place each one on the map
+            for( i = 0; i < markers.length; i++ ) {
+                var position = new google.maps.LatLng(markers[i]['latitude'], markers[i]['longitude']);
+                bounds.extend(position);
+                marker = new google.maps.Marker({
+                    position: position,
+                    title: markers[i]['hospital_name'],
+                    icon: markers[i]['image'],
+                    label: markers[i]['label'],
+                    data: {
+                            hospital_name: markers[i]['hospital_name'],
+                            address: markers[i]['address'],
+                            place_id: markers[i]['place_id'],
+                            reason: markers[i]['reason'],
+                            multi_speciality: markers[i]['multi_speciality'],
+                            has_phone: markers[i]['has_phone'],
+                            lead_rank: markers[i]['lead_rank'],
+                            combined_rating: markers[i]['combined_rating'],
+                            combined_rating_count: markers[i]['combined_rating_count'],
+                            is_potential: markers[i]['is_potential'],
+                            has_booking: markers[i]['has_booking'],
+                            monday_timing: markers[i]['monday_timing'],
+                            is_bookable: markers[i]['is_bookable'],
+                            phone_number: markers[i]['phone_number'],
+                            hospital_id: markers[i]['hospital_id'],
+                            link: markers[i]['link']
+                           }
+                });
+                marker.setMap(map)
+                map_markers.push(marker)
+
+                // Allow each marker to have an info window
+                google.maps.event.addListener(marker, 'click', (function(marker, i) {
+                    return function() {
+                        infoContent = '<b><span style="color:blue">hospital name: </span></b><span>' + marker.data['hospital_name'] + '</span><br><b><span style="color:blue">address: </span></b><span>' + marker.data['address'] +'</span><br><b><span style="color:blue">place id: </span></b><span>'+ marker.data['place_id'] +'</span><br><b><span style="color:blue">reason: </span></b><span>'+ marker.data['reason'] +'</span><br><b><span style="color:blue">multi speciality: </span></b><span>'+ marker.data['multi_speciality'] +'</span><br><b><span style="color:blue">has phone: </span></b><span>'+ marker.data['has_phone'] +'</span><br><b><span style="color:blue">lead rank: </span></b><span>'+ marker.data['lead_rank'] +'</span><br><b><span style="color:blue">combined rating: </span></b><span>'+ marker.data['combined_rating'] +'</span><br><b><span style="color:blue">combined rating count: </span></b><span>'+ marker.data['combined_rating_count'] +'</span><br><b><span style="color:blue">is potential: </span></b><span>'+ marker.data['is_potential'] +'</span><br><b><span style="color:blue">has booking: </span></b><span>'+ marker.data['has_booking'] +'</span><br><b><span style="color:blue">time: </span></b><span>'+ marker.data['monday_timing'] +'</span><br><b><span style="color:blue">is bookable: </span></b><span>'+ marker.data['is_bookable'] +'</span><br><b><span style="color:blue">phone_number: </span></b><span>'+ marker.data['phone_number'] +'</span><br><b><span style="color:blue">hospital_id: </span></b><span>'+ marker.data['hospital_id'] +'</span><br><a href='+ marker.data['link'] +' target="_blank">click me</a>'
+                        infoWindow.setContent(infoContent);
+                        infoWindow.open(map, marker);
+                    }
+                })(marker, i));
+
+                // Automatically center the map fitting all markers on the screen
+                map.fitBounds(bounds);
+            }
+
+            // Override our map zoom level once our fitBounds function runs (Make sure it only runs once)
+            var boundsListener = google.maps.event.addListener((map), 'bounds_changed', function(event) {
+                this.setZoom(14);
+                google.maps.event.removeListener(boundsListener);
+            });
+        }
+
+         function clearOverlays() {
+          for( i = 0; i < map_markers.length; i++ ) {
+            map_markers[i].setMap(null)
+         }
+        }
+
+        $(document).on('click', '.locate_me_btn', function() {
+            detectLocation()
+        })
+
+        function detectLocation(){
+            if (navigator.geolocation) {
                   navigator.geolocation.getCurrentPosition((position) => {
 
-                  $scope.user_location = position;
-                  $scope.location_data();
+                 var user_location = position;
+                 var new_url = "/api/v1/doctor/record_api?" + url.replace("?", '');
+                  if(user_location && user_location.coords){
+
+                    new_url += '&lat='+ user_location.coords.latitude
+                    new_url += '&long='+ user_location.coords.longitude
+                    location_data(new_url);
+                  }
                   }, (a, b, c) => {
                       alert('Could not fetch location.')
                   }, (a, b, c) => {
@@ -93,188 +211,172 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
               else {
 
               }
-          }
+        }
+        function location_data(new_url){
+            $.ajax({
+                url: new_url,
+                success: function( data ) {
+                    buildMarkers(data.map_data, data.labels, 'initial')
+                    //buildMarkers(data.map_data,data.labels,'initial')
+                    getPolygonData()
+                }
+            });
+        }
 
-          $scope.submitHandler = function(){
-             console.log($scope.user_lat);
-             console.log($scope.user_long);
-             if($scope.user_long && $scope.user_lat){
-                 markers.coords = {
-                    latitude: $scope.user_lat,
-                    longitude: $scope.user_long
-                 }
-                 $scope.user_location = markers;
-                 $scope.location_data();
-             }else{
-                if(!$scope.user_long){
+        for(i=1; i <= tabs_array.length; i++) {
+            $('.label_btn_group').append("<li style='margin:5px; display:inline-block;' value="+i+"><a href='javascript:void(0)'>" + i + "</a></li>")
+        }
+
+        $(document).on('click', '.label_btn_group li', function(){
+            var value = $(this).val()
+              clearOverlays();
+             new_markers = all_markers.filter((x=>x.label == value));
+             if(new_markers.length > 0){
+                buildMarkers(new_markers,all_labels,'other')
+             }else {
+                buildMarkers(all_markers,all_labels,'other')
+             }
+        })
+
+        $(document).on('click', '#user_lat_lng', function(){
+            var user_lat = $("#myInputlat").val();
+            var user_lng = $("#myInputlng").val();
+            var user_rad = $("#myInputrad").val();
+            if(user_lat & user_lng){
+                var new_url = "/api/v1/doctor/record_api?" + url.replace("?", '');
+                    new_url += '&lat='+ user_lat;
+                    new_url += '&long='+ user_lng;
+                    new_url += '&radius=' + user_rad;
+                    clearOverlays();
+                    location_data(new_url);
+            }else{
+                if(!user_lng){
                     alert('enter valid longitutde')
-                }else if(!$scope.user_lat){
+                }else if(!user_lat){
                     alert('enter valid latitude')
+                }else if(!user_rad){
+                    alert('enter valid radius')
                 }
              }
-         }
+         })
 
-          $scope.location_data = function (){ //after detecting location fetch new results
+        $(document).on('click', '#multi_select_click', function(){
+            var abc = []
+            var entered_val = [];
+            var multi_select = $("#multi_select").val();
+            if(multi_select){
+                entered_val = multi_select.split(",")
+                if(entered_val.length){
+                 entered_val.forEach(myFunction);
+                    function myFunction(value, index, array) {
+                      abc = abc.concat(all_markers.filter((x=>x.label == value)))
+                    }
+                    clearOverlays();
+                    buildMarkers(abc,all_labels,'other')
+                }
+            }else{
+                alert('please enter some value')
+            }
 
-          <!--var new_url = url.replace("?", '');-->
+        })
 
-          var new_url = "/api/v1/doctor/record_api?" + url.replace("?", '');
-          if($scope.user_location && $scope.user_location.coords){
+       function getPolygonData() {
+           $.ajax({
+                url: 'https://bitbucket.org/!api/2.0/snippets/rohitdocprime/LrGk8E/a913ccd2fc307a7354e22a75377dbf249c2c828e/files/snippet.json',
+                success: function( data ) {
+                    var newJson = data.replace(/([a-zA-Z0-9]+?):/g, '"$1":');
+                    newJson = newJson.replace(/'/g, '"');
+                    json_response = JSON.parse(newJson)
+                    polygonData = Object.values(json_response)
+                    polygonArr = []
+                    for (var i=0; i<polygonData.length; i++) {
+                        newPolygon = new google.maps.Polygon({
+                            paths:polygonData[i].nodes,
+                            strokeColor:polygonData[i].color,
+                            strokeOpactiy:0.5,
+                            storkeWeight:1,
+                            fillColor:polygonData[i].color,
+                            fillOpacity:0.15
+                       })
+                       newPolygon.setMap(map);
+                       polygonArr.push(newPolygon)
+                    }
 
-            new_url += '&lat='+ $scope.user_location.coords.latitude
-            new_url += '&long='+ $scope.user_location.coords.longitude
-            $scope.new_map = {
-                zoom:14,
-                bounds: {},
-                center: { latitude: $scope.user_location.coords.latitude, longitude: $scope.user_location.coords.longitude }
-                <!--center: { latitude: 12.972442, longitude: 77.580643 }-->
-              }
-              $scope.map = $scope.new_map;
-           }
-           <!--console.log($scope.map)-->
-           <!--console.log(new_url);-->
-              $http.get(new_url).then(function(data) {
-                  var markers = data.data.map_data;
+                    //var polyA = newPolygonA.getPath();
+                    //var polyB = newPolygonA.getPath();
+                    //var polyC = newPolygonA.getPath();
 
-                  var existing_merkers ={
-                            latitude: $scope.user_location.coords.latitude,
-                            longitude: $scope.user_location.coords.longitude,
-                            image:'https://cdn.docprime.com/media/web/custom_images/man-user_1.png',
-                            coords:{latitude: $scope.user_location.coords.latitude, longitude: $scope.user_location.coords.longitude},
-                            address: "",
-                            combined_rating: 0,
-                            combined_rating_count: 0,
-                            created_at: "",
-                            has_booking: 0,
-                            has_phone: 0,
-                            hospital_name: "",
-                            id: 1215000,
-                            is_bookable: 1,
-                            is_potential: 1,
-                            lead_rank: " ",
-                            location: "SRID=4326;POINT (77.062023 28.438662)",
-                            monday_timing: " ",
-                            multi_speciality: "",
-                            place_id: "",
-                            reason: "",
-                            text: "current user",
-                            updated_at: ""}
-                  markers.push(existing_merkers)
-                  var labels  = data.data.labels;
+                     addPolyPoints(polygonArr)
+                }
+           });
+        }
 
-                  angular.forEach(markers, function (marker) {
+        function addPolyPoints(polygonArr) {
+            console.log(polygonArr)
+            var totalCntInPolygon = []
+            var totalCntInLevel = []
+            //polyA.push(e.latLng);
+            for(var i=0; i < polygonArr.length; i++) {
+                markerCnt[i] = {}
+                totalCntInPolygon[i] = 0
 
-                     marker.coords = {
-                        latitude: marker.latitude,
-                        longitude: marker.longitude
-                     }
-                     marker.options= {icon: marker.image, label: marker.label};
-                  })
+                for(var j=1; j <= 6; j++) {
+                    markerCnt[i][j] = 0
+                    totalCntInLevel[j] = 0
+                }
+            }
 
-                  $scope.labels = labels;
-                  $scope.markers = markers;
+            for (var k = 0; k < map_markers.length; k++) {  //1000
+                for(var i=0; i < polygonArr.length; i++) {  //3
+                    if (google.maps.geometry.poly.containsLocation(map_markers[k].getPosition(), polygonArr[i])) {
+                        for(var j=1; j <= 6; j++) {
+                            if (parseInt(map_markers[k].label) == j) {
+                                markerCnt[i][j] = markerCnt[i][j] + 1
+                                totalCntInPolygon[i] = totalCntInPolygon[i] + 1
+                                totalCntInLevel[j] = totalCntInLevel[j] + 1
+                            }
+                        }
+                    }
+                }
+            }
+            //console.log(markerCnt)
+            $('.table thead').empty()
+            $('.table tbody').empty()
+            $('.table thead').append("<tr><th></th></tr><tr><th></th></tr>")
 
-                  $scope.tabClick =  function(id){ //tabs_click
-                  $scope.new_markers =  markers.filter((x=>x.label == id));
-                     if($scope.new_markers.length > 0){
-                          $scope.markers = $scope.new_markers;
-                     }else{
-                          $scope.markers = markers;
-                     }
-                  }
-               })
-          }
-       });
-    });
-  </script>
+            var markerCntRows = Object.keys(markerCnt).length
+            var markerCntColumns = 0
+            if (markerCntRows > 0) {
+                markerCntColumns = Object.keys(markerCnt[0]).length
+                //$('.table thead').append('<tr></tr>')
+                $('.table thead tr').append("<th></th><th></th>")
+                //$('.table thead tr').append("<th></th><th></th>")
+                for(var j=1; j<=markerCntColumns; j++) {
+                    $('.table thead tr:eq(0)').append("<th>L" + j + "</th>")
+                    $('.table thead tr:eq(1)').append("<td><strong>" + totalCntInLevel[j] + "</strong></td>")
+                }
+             }
 
- <style>
- .angular-google-map-container {
-       min-height: 500px;
-       width: auto;
-  }
+            //console.log(markerCntRows)
+            //console.log(markerCntColumns)
+            for(var i=0; i< markerCntRows; i++) {
+                polygon_count = i + 1
+                $('.table tbody').append("<tr><td style='background-color: " + polygonArr[i].fillColor + ";'>P" + polygon_count + "<td></tr>")
+                $('.table tbody tr:eq('+ i +')').append("<td><strong>" + totalCntInPolygon[i] + "</strong></td>")
+                for(var j=1; j<= markerCntColumns; j++) {
+                    $(".table tbody tr:eq(" + i + ")").append("<td>" + markerCnt[i][j] + "</td>")
+                }
+            }
+        }
 
-  </style>
-      <div>
-        <button ng-click="detectLocation()">locate me</button>
-        </div>
-      <div>
-          lat: <input type="text" name="lat"  value="" ng-model="user_lat">
-          long: <input type="text" name="long" value="" ng-model="user_long">
-            <button ng-click="submitHandler()" >Get New Results</button>
-      </div>
+    }
 
-  <!--<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addrecord">Open Modal</button>-->
-  <br/><br/>
-  <div class="btn-row">
-      <button  style="margin:5px;" ng-repeat="label in labels" idkey="[label.label]" ng-click="tabClick(label.label)">
-          [label.label]
-      </button>
-      <br>
-      Multi Select: <input type="text" name="lat"  value="" ng-model="multi_select">
-            <button ng-click="multiSelect()" >Get MultiSelect Results</button>
-            <span>enter comma separated value eg:(1,2,3)</span>
-  </div>
-  <ui-gmap-google-map center="map.center" zoom="map.zoom" options="map.options">
-    <ui-gmap-marker ng-repeat="marker in markers" coords="marker.coords" options="marker.options" events="marker.events" idkey="marker.id">
-        <ui-gmap-window>
-           <div id="infowindow">
-               <b><span style="color:blue">hospital name: </span></b><span>[marker.hospital_name]</span><br>
-               <b><span style="color:blue">address: </span></b><span>[marker.address]</span><br>
-               <b><span style="color:blue">place id: </span></b><span>[marker.place_id]</span><br>
-               <b><span style="color:blue">reason: </span></b><span>[marker.reason]</span><br>
-               <b><span style="color:blue">multi speciality: </span></b><span>[marker.multi_speciality]</span><br>
-               <b><span style="color:blue">has phone: </span></b><span>[marker.has_phone]</span><br>
-               <b><span style="color:blue">lead rank: </span></b><span>[marker.lead_rank]</span><br>
-               <b><span style="color:blue">combined rating: </span></b><span>[marker.combined_rating]</span><br>
-               <b><span style="color:blue">combined rating count: </span></b><span>[marker.combined_rating_count] </span><br>
-               <b><span style="color:blue">is potential: </span></b><span>[marker.is_potential]</span><br>
-               <b><span style="color:blue">has booking: </span></b><span>[marker.has_booking]</span><br>
-               <b><span style="color:blue">time: </span></b><span>[marker.monday_timing]</span><br>
-               <b><span style="color:blue">is bookable: </span></b><span>[marker.is_bookable]</span><br>
-               <b><span style="color:blue">phone_number: </span></b><span>[marker.phone_number]</span><br>
-                <b><span style="color:blue">hospital_id: </span></b><span>[marker.hospital_id]</span><br>
-               <a href=[marker.link] target="_blank">click me</a>
+    </script>
 
-            </div>
-        </ui-gmap-window>
-    </ui-gmap-marker>
+</body>
 
-  </ui-gmap-google-map>
- </div>
-</div>
 
-<!--modal to add a new location-->
-<!--<div id="addrecord" class="modal fade" role="dialog">-->
-  <!--<div class="modal-dialog">-->
+</html>
 
-    <!--&lt;!&ndash; Modal content&ndash;&gt;-->
-    <!--<div class="modal-content">-->
-      <!--<div class="modal-header">-->
-        <!--<button type="button" class="close" data-dismiss="modal">&times;</button>-->
-        <!--<h4 class="modal-title">New Record</h4>-->
-      <!--</div>-->
-      <!--<div class="modal-body">-->
-        <!--&lt;!&ndash;form to add a new record&ndash;&gt;-->
-        <!--<form action="/record/create/"  method="POST" enctype="multipart/form-data"> {% csrf_token %}-->
-         <!--<label>Location</label>-->
-         <!--<input name="location" id="location" class="form-control">-->
-         <!--<label>Text</label>-->
-         <!--<textarea name="text" id="text" class="form-control"></textarea>-->
-
-         <!--<br/>-->
-
-         <!--<input type="submit" value="Save" class="btn btn-md btn-primary">-->
-        <!--</form>-->
-        <!--&lt;!&ndash;end form to add a new record&ndash;&gt;-->
-      <!--</div>-->
-      <!--<div class="modal-footer">-->
-        <!--<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>-->
-      <!--</div>-->
-    <!--</div>-->
-
-  <!--</div>-->
-<!--</div>-->
-<!--end modal-->
 
 {% endblock %}
