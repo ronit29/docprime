@@ -2451,23 +2451,7 @@ class SendBookingUrlViewSet(GenericViewSet):
         if purchase_type == PlusDummyData.DataType.SINGLE_PURCHASE:
             if not landing_url:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'No Landing url found.'})
-            if message_medium == 'WHATSAPP':
-                whatsapp_template = 'gold_general_template'
-                utm_source = utm_source.get('utm_source', '')
-                landing_url = utm_source.get('landing_url', '')
-                booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
-                if utm_source:
-                    booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
-                        landing_url=landing_url, utm_source=utm_source)
-                else:
-                    booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false".format(
-                        landing_url=landing_url)
-
-                short_url = generate_short_url(booking_url)
-                whatsapp_payload = [short_url]
-                WhtsappNotification.send_whatsapp(request.user.phone_number, whatsapp_template, whatsapp_payload, None)
-            else:
-                SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url)
+            SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url)
             return Response({"status": 1})
 
         if purchase_type == 'vip_purchase':
@@ -2485,6 +2469,22 @@ class SendBookingUrlViewSet(GenericViewSet):
         else:
             booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name)
             EmailNotification.send_booking_url(token=token, email=user_profile.email)
+
+        if message_medium == 'WHATSAPP':
+            whatsapp_template = 'gold_payment_template'
+            utm_source = utm_source.get('utm_source', '')
+            landing_url = utm_source.get('landing_url', '')
+            booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+            if utm_source:
+                booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
+                    landing_url=landing_url, utm_source=utm_source)
+            else:
+                booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false".format(
+                    landing_url=landing_url)
+
+            short_url = generate_short_url(booking_url)
+            whatsapp_payload = [short_url]
+            WhtsappNotification.send_whatsapp(request.user.phone_number, whatsapp_template, whatsapp_payload, None)
 
         return Response({"status": 1})
 
