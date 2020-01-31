@@ -2368,8 +2368,6 @@ class RefreshJSONWebToken(GenericViewSet):
 
     def refresh(self, request):
         data = {}
-        if hasattr(request, 'agent') and request.agent is not None:
-            return Response({})
         app_name = True if (request.META.get("HTTP_APP_NAME") and
                             (request.META.get("HTTP_APP_NAME") == 'docprime_consumer_app' or request.META.get("HTTP_APP_NAME") == 'd_web'))\
                         else None
@@ -2382,7 +2380,10 @@ class RefreshJSONWebToken(GenericViewSet):
         #     return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_400_BAD_REQUEST)
         data['token'] = valid_data.get('token', '')
         data['user'] = valid_data.get('user', '')
-        data['payload'] = valid_data.get('payload','')
+        data['payload'] = valid_data.get('payload', '')
+        data['is_agent'] = False
+        if hasattr(request, 'agent') and request.agent is not None:
+            data['is_agent'] = True
         return Response(data)
 
 
