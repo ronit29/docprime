@@ -10,7 +10,7 @@ import json
 import logging
 import datetime
 from ondoc.authentication.models import Address, SPOCDetails, QCModel
-from ondoc.api.v1.utils import log_requests_on
+from ondoc.api.v1.utils import log_requests_on, generate_short_url
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids, constants
 
@@ -1493,13 +1493,20 @@ def create_prescription_lead_to_matrix(self, data):
             phone_number = appointment.profile.phone_number
         else:
             phone_number = appointment.user.phone_number
+        feedback_url = "%s/api/v1/diagnostic/feedback_to_matrix?" \
+                         "&appointment_id=%s" \
+                         % (settings.BASE_URL, appointment.id)
+        tiny_feedback_url = generate_short_url(feedback_url)
 
         request_data = {
             "Name": appointment.profile.name if appointment.profile else "",
             "ProductId": 14,
             "PrimaryNo": phone_number,
             "LeadSource": "Prescriptions",
-            "ExitPointUrl": booking_url
+            "ExitPointUrl": booking_url,
+            "VIPPlanName": None,
+            "IPDBookingId": appointment.id,
+            "url": tiny_feedback_url
         }
 
         url = settings.MATRIX_API_URL

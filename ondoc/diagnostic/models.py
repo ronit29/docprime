@@ -3929,3 +3929,12 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
 
         if not self.matrix_lead_id:
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
+
+
+class LabAppointmentFeedback(auth_model.TimeStampedModel):
+    appointment = models.ForeignKey(LabAppointment, on_delete=models.DO_NOTHING, null=True)
+    ratings = models.PositiveIntegerField(max_length=10)
+    comment = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'lab_appointment_feedback'
