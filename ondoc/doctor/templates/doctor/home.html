@@ -282,7 +282,8 @@
 
        function getPolygonData() {
            $.ajax({
-                url: 'https://bitbucket.org/!api/2.0/snippets/rohitdocprime/LrGk8E/a913ccd2fc307a7354e22a75377dbf249c2c828e/files/snippet.json',
+                url: 'https://bitbucket.org/!api/2.0/snippets/rohitdocprime/LrGk8E/f746e46adba6fad656bf3f9e3e2ede252ad68ba9/files/snippet.json',
+                crossOrigin: true,
                 success: function( data ) {
                     var newJson = data.replace(/([a-zA-Z0-9]+?):/g, '"$1":');
                     newJson = newJson.replace(/'/g, '"');
@@ -348,11 +349,12 @@
             var markerCntColumns = 0
             if (markerCntRows > 0) {
                 markerCntColumns = Object.keys(markerCnt[0]).length
-                //$('.table thead').append('<tr></tr>')
-                $('.table thead tr').append("<th></th><th></th>")
-                //$('.table thead tr').append("<th></th><th></th>")
+                $('.table thead tr').append("<th></th>")
+                $('.table thead tr:eq(0) th:eq(1)').text("Total")
+
                 for(var j=1; j<=markerCntColumns; j++) {
                     $('.table thead tr:eq(0)').append("<th>L" + j + "</th>")
+                    $('.table thead tr:eq(1) th:eq(1)').text(map_markers.length)
                     $('.table thead tr:eq(1)').append("<td><strong>" + totalCntInLevel[j] + "</strong></td>")
                 }
              }
@@ -361,7 +363,7 @@
             //console.log(markerCntColumns)
             for(var i=0; i< markerCntRows; i++) {
                 polygon_count = i + 1
-                $('.table tbody').append("<tr><td style='background-color: " + polygonArr[i].fillColor + ";'>P" + polygon_count + "<td></tr>")
+                $('.table tbody').append("<tr><td style='background-color: " + polygonArr[i].fillColor + ";'>P" + polygon_count + "</td></tr>")
                 $('.table tbody tr:eq('+ i +')').append("<td><strong>" + totalCntInPolygon[i] + "</strong></td>")
                 for(var j=1; j<= markerCntColumns; j++) {
                     $(".table tbody tr:eq(" + i + ")").append("<td>" + markerCnt[i][j] + "</td>")
