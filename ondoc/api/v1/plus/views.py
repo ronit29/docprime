@@ -391,7 +391,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         #     resp['is_member_allowed'] = False
         # else:
         #     resp['is_member_allowed'] = True
-        if len(plus_members) == int(total_member_allowed):
+        if len(plus_members) >= int(total_member_allowed):
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
