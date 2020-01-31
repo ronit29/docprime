@@ -4246,12 +4246,12 @@ class MatrixViewSet(viewsets.GenericViewSet):
             return Response({'result': 'appointment id not present'})
         data = self.request.data
         comment = data.get('comment') if data.get('comment') else None
-        rating = data.get('rating') if data.get('rating') else None
+        ratings = data.get('ratings') if data.get('ratings') else None
 
-        if appointment_id and rating:
+        if appointment_id and ratings:
             app_feedback = LabAppointmentFeedback.objects.filter(appointment_id=appointment_id)
             if not app_feedback:
-                LabAppointmentFeedback.objects.create(appointment_id= appointment_id, comment=comment, rating=rating)
+                LabAppointmentFeedback.objects.create(appointment_id= appointment_id, comment=comment, ratings=ratings)
             else:
                 return Response({'result': 'feedback already exists'})
         else:
