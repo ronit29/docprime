@@ -1506,7 +1506,7 @@ def create_prescription_lead_to_matrix(self, data):
             "ExitPointUrl": booking_url,
             "VIPPlanName": None,
             "IPDBookingId": appointment.id,
-            "url": tiny_feedback_url
+            "URL": tiny_feedback_url
         }
 
         url = settings.MATRIX_API_URL
