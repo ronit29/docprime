@@ -2371,9 +2371,13 @@ class RefreshJSONWebToken(GenericViewSet):
         app_name = True if (request.META.get("HTTP_APP_NAME") and
                             (request.META.get("HTTP_APP_NAME") == 'docprime_consumer_app' or request.META.get("HTTP_APP_NAME") == 'd_web'))\
                         else None
-        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request, 'app_name': app_name})
+        is_agent = False
+        if hasattr(request, 'agent') and request.agent is not None:
+            is_agent = True
+        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request, 'app_name': app_name, 'is_agent':is_agent})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
+
         # if 'active_session_error' in valid_data and valid_data['active_session_error']:
         #     return Response({'error': 'No Last Acctive Session Found'}, status=status.HTTP_401_UNAUTHORIZED)
         # if not serializer.is_valid():
@@ -2381,9 +2385,7 @@ class RefreshJSONWebToken(GenericViewSet):
         data['token'] = valid_data.get('token', '')
         data['user'] = valid_data.get('user', '')
         data['payload'] = valid_data.get('payload', '')
-        data['is_agent'] = False
-        if hasattr(request, 'agent') and request.agent is not None:
-            data['is_agent'] = True
+        data['is_agent'] = is_agent
         return Response(data)
 
 
