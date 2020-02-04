@@ -4,7 +4,7 @@ from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Ma
     SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization, SearchCriteria, Certifications, GoogleLatLong
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
-from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
+from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin, ClusterMapAdmin
 from ondoc.crm.admin.corporate_booking import CorporateDealAdmin, CorporatesAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
@@ -36,7 +36,7 @@ from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, MerchantPayout, Order, MerchantPayoutBulkProcess, \
     AdvanceMerchantPayout, AdvanceMerchantAmount
 from ondoc.location.admin import EntityUrlsAdmin
-from ondoc.location.models import EntityUrls, CompareSEOUrls
+from ondoc.location.models import EntityUrls, CompareSEOUrls, ClusterMap
 from ondoc.notification import models as notifcation_model
 from ondoc.notification.models import DynamicTemplates
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
@@ -262,6 +262,7 @@ admin.site.register(AdvanceMerchantAmount, AdvanceMerchantAmountAdmin)
 admin.site.register(DoctorMobileOtp)
 admin.site.register(NewDynamic, NewDynamicAdmin)
 admin.site.register(EntityUrls, EntityUrlsAdmin)
+admin.site.register(ClusterMap, ClusterMapAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
 admin.site.register(UserConfig, UserConfigAdmin)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
