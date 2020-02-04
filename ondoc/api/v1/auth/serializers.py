@@ -428,6 +428,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         token = attrs.get('token')
         reset = attrs.get('reset')
         app_name = self.context.get('app_name')
+        is_agent = self.context.get('is_agent', None)
         force_update = True if (attrs.get('force_update') and attrs['force_update']) else False
         request = self.context.get('request')
         payload, status = self.check_payload_v2(token)
@@ -436,11 +437,13 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         #     attrs['active_session_error'] = True
         #     return attrs
         #     raise serializers.ValidationError("No Last Active sesssion found!")
-        if status == 1 and not force_update:
+        if is_agent or (status == 1 and not force_update):
             '''FAke Refresh, Return the original data [As required by Rohit Dhall]'''
             attrs['token']= token
             attrs['user'] = payload.get('user_id')
             attrs['payload'] = payload
+            if payload.get('agent_id',None):
+                attrs['agent_id'] = payload.get('agent_id')
         elif (force_update or reset):
             try:
                 passphrase = hashlib.md5("hpDqwzdpoQY8ymm5".encode())
@@ -546,7 +549,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
 
     def check_payload_v2(self, token):
         user_key = None
-        user_id = JWTAuthentication.get_unverified_user(token)
+        user_id, agent_id = JWTAuthentication.get_unverified_user(token)
         if user_id:
             user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
             if user_key_object:
