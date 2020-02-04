@@ -5432,6 +5432,11 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
 
 class GoogleMapRecords(auth_model.TimeStampedModel):
+    NA = 1
+    YES = 2
+    NO = 3
+    PHLEBO_CHOICES = [(NA, "NA"), (YES, "Yes"), (NO, "No")]
+
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     text = models.CharField(max_length=500)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
@@ -5453,6 +5458,8 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     is_bookable = models.SmallIntegerField(null=True, blank=True)
     phone_number = models.CharField(max_length=500, null=True, blank=True)
     hospital_id = models.IntegerField(null=True, blank=True)
+    has_phlebo = models.SmallIntegerField(choices=PHLEBO_CHOICES, default=NA)
+    serial_number = models.IntegerField(blank=True, null=True)
 
     class Meta:
         db_table = "google_map_records"

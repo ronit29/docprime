@@ -3,13 +3,8 @@
 {% block content %}
 <html>
 <head>
-    <script
-  src="https://code.jquery.com/jquery-3.4.1.min.js"
-  integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
-  crossorigin="anonymous"></script>
-    <!-- Latest compiled and minified CSS -->
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 </head>
 
 <style>
@@ -27,57 +22,103 @@
 </style>
 
 <body>
-    <div class="text-center mb-5">
-        <button class="btn btn-success locate_me_btn">Locate Me</button>
-    </div>
 
-    <div class="container container-fluid">
-          <div class="row">
-              <div class="col-md-6 mb-5">
-              lat: <input type="text" name="lat" class="form-control"  value="28.450367" id="myInputlat">
-              </div>
-              <div class="col-md-6 mb-5">
-                long: <input type="text" class="form-control" name="long" value="77.071848" id="myInputlng">
-              </div>
-              <div class="col-md-6 mb-5">
-                radius: <input type="text" class="form-control" name="radius" value="2000" id="myInputrad">
-              </div>
+    <div class="container">
 
-              <div class="text-center mb-5">
-                <button class="btn btn-submit btn-primary" id="user_lat_lng" >Get New Results</button>
-              </div>
-          </div>
-
-          <hr>
-
-          <div class="btn-row pagination text-center label_btn_group" style="width:100%">
-          </div>
-
-        <div class="mb-5 row">
-            <div class="col-md-12">
-                  Multi Select:
-                <input type="text" name="lat"  value="" id="multi_select" class="form-control">
-                <p>enter comma separated value eg:(1,2,3)</p>
-                <div class="text-center">
-                    <button class="btn btn-primary" id="multi_select_click" >Get MultiSelect Results</button>
+        <form class="form-horizontal">
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Center Point</label>
+                <div class="col-sm-10">
+                    <select class="form-control" id="selectCenterPoint">
+                        <option value="near_me">Near Me</option>
+                    </select>
                 </div>
             </div>
-        </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Lat</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" id="inputLat" placeholder="28.445721">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Lng</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" id="inputLng" placeholder="77.033695">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Radius</label>
+                <div class="col-sm-10">
+                    <input type="number" class="form-control" id="inputRadius" placeholder="2000" min="200">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Clinic Rank</label>
+                <div class="col-sm-10 rank-selection">
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="rank-1" value="1"> 1
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="rank-2" value="2"> 2
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="rank-3" value="3"> 3
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="rank-4" value="4"> 4
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="rank-5" value="5"> 5
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="rank-6" value="6"> 6
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Has Phlebo</label>
+                <div class="col-sm-10 phlebo-selection">
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="phlebo-1" value="1"> NA
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="phlebo-2" value="2"> Yes
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="phlebo-3" value="3"> No
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-sm-offset-2 col-sm-10">
+                    <button type="submit" class="btn btn-primary" id="update_map">Update</button>
+                </div>
+            </div>
+        </form>
+
+        <hr>
+
         <div id="map_wrapper">
             <div id="map_canvas" class="mapping"></div>
         </div>
 
         <hr>
 
-    <div>
-        <table class="table">
+        <table class="table polygonMarkersList">
+            <thead>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+        <table class="table clinicsList">
             <thead>
             </thead>
             <tbody>
             </tbody>
         </table>
     </div>
-  </div>
+
     <script>
         jQuery(function($) {
             // Asynchronously Load the map API
@@ -86,44 +127,193 @@
             document.body.appendChild(script);
         });
 
-        var url = window.location.search;
-        var tabs_array = [1,2,3,4,5,6];
-        function initialize(){
-        var map;
-        var new_markers = [];
-        var all_markers = [];
-        var all_labels = [];
-        var markers = [];
-        var map_markers = [];
-        var bounds = new google.maps.LatLngBounds();
-        var mapOptions = {
-            mapTypeId: 'roadmap'
-        };
+        var polygonData = polygonArr = []
+        var centerPointData = map_markers = []
+        var map
         var markerCnt = {}
-        var polygonArr = []
+        phlebos = {1: 'NA', 2: 'Yes', 3: 'No'}
 
-        // Display a map on the page
-        map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
-        map.setTilt(45);
+        $(document).ready(function() {
+            $.ajax({
+                url: '/api/v1/location/cluster_map_data',
+                success: function( data ) {
+                    polygon_data = data['polygon_data']
+                    center_point_data = data['center_point_data']
+                    polygonData = convertJsonStringToObjects(polygon_data)
+                    centerPointData = convertJsonStringToObjects(center_point_data)
+                    detectLocation()
+                    setCenterPointData()
+                    setPolygonData()
+                    getAndUpdateLocation()
+                }
+            })
+        })
 
-        $.ajax({
-            url: '/api/v1/doctor/record_api',
-            success: function( data ) {
-                buildMarkers(data.map_data, data.labels, 'initial')
-                getPolygonData()
+        function initialize() {
+            generateMap()
+        }
+
+        function setPolygonData() {
+            newPolygonData = Object.values(polygonData)
+            polygonArr = []
+            for (var i=0; i<newPolygonData.length; i++) {
+                newPolygon = new google.maps.Polygon({
+                    paths:newPolygonData[i].nodes,
+                    strokeColor:newPolygonData[i].color,
+                    strokeOpactiy:0.5,
+                    storkeWeight:1,
+                    fillColor:newPolygonData[i].color,
+                    fillOpacity:0.15
+               })
+               newPolygon.setMap(map);
+               polygonArr.push(newPolygon)
             }
-        });
+        }
 
-        function buildMarkers(markers_data,labels,fromWhere){
-            console.log('rrr');
-            if(fromWhere == 'initial'){
-                all_markers = markers_data;
-                markers = all_markers;
-            }else{
-                markers = markers_data;
+        $(document).on('change', '#selectCenterPoint', function() {
+            selected_point = $(this).val()
+            if (selected_point == 'near_me') {
+                detectLocation()
+            } else {
+                center_points = centerPointData.center_points[selected_point].points
+                setLatLong(center_points.lat, center_points.lng)
             }
+        })
+
+        function convertJsonStringToObjects(json_string){
+            var new_json = json_string.replace(/([a-zA-Z0-9]+?):/g, '"$1":');
+            new_json = new_json.replace(/'/g, '"');
+            json_response = JSON.parse(new_json)
+            return json_response
+        }
+
+        string_parameterize = function (str) {
+           return str.trim().toLowerCase().replace(/[^a-zA-Z0-9 -]/, "").replace(/\s/g, "-");
+        };
+
+        function setCenterPointData() {
+            if (centerPointData.defaults) {
+                $('#inputRadius').val(centerPointData.defaults.radius)
+                $.each(centerPointData.defaults.clinic_rank, function(index, value) {
+                    $("#rank-" + value).prop( "checked", true );
+                })
+                $.each(centerPointData.defaults.has_phlebo, function(index, value) {
+                    $("#phlebo-" + value).prop( "checked", true );
+                })
+            }
+            if (centerPointData.center_points) {
+                $.each(centerPointData.center_points, function( index, value ) {
+                    $('#selectCenterPoint').append(new Option(value.name, index))
+                })
+            }
+        }
+
+        function setLatLong(lat, long) {
+            $("#inputLat").val(lat)
+            $("#inputLng").val(long)
+        }
+
+        function getSelectedRank() {
+            var selected_rank = []
+            $.each($(".rank-selection input[type='checkbox']:checked"), function(){
+                selected_rank.push($(this).val());
+            });
+            return selected_rank
+        }
+
+        function getSelectedPhlebo() {
+            var selected_phlebo = []
+            $.each($(".phlebo-selection input[type='checkbox']:checked"), function(){
+                selected_phlebo.push($(this).val());
+            });
+            return selected_phlebo
+        }
+
+        function detectLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    setLatLong(position.coords.latitude, position.coords.longitude)
+                    var pos = {
+                       lat: position.coords.latitude,
+                       lng: position.coords.longitude
+                    };
+                    var infoWindow = new google.maps.InfoWindow({
+                       map: map
+                    });
+                    infoWindow.setPosition(pos);
+                    infoWindow.setContent('<b>You are here.</b>');
+                    map.setCenter(pos);
+                    var marker = new google.maps.Marker({
+                        position: pos,
+                        map: map,
+                        title: String(pos.lat) + ", " + String(pos.lng),
+                    });
+                })
+            }
+        }
+
+        $(document).on('click', '#update_map', function(e) {
+            e.preventDefault()
+            getAndUpdateLocation()
+        })
+
+        function getAndUpdateLocation() {
+            lat = $("#inputLat").val()
+            lng = $("#inputLng").val()
+            radius = $("#inputRadius").val()
+            selected_rank = getSelectedRank();
+            selected_phlebo = getSelectedPhlebo()
+
+            updateLocationData(lat, lng, radius, selected_rank, selected_phlebo)
+        }
+
+        function generateMap() {
+            var bounds = new google.maps.LatLngBounds();
+            var mapOptions = {
+                mapTypeId: 'roadmap'
+            };
+            // Display a map on the page
+            map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
+            map.setTilt(45);
+        }
+
+        function updateLocationData(lat=null, lng=null, radius=null, rank=[], phlebo=[]){
+            var url = "/api/v1/doctor/record_api?"
+            if (lat && lng){
+                url += '&lat='+ lat
+                url += '&long='+ lng
+            }
+            if (radius){
+                url += '&radius='+ radius
+            }
+            if (rank.length) {
+                url += '&rank='+ rank
+            }
+            if (phlebo.length) {
+                url += '&phlebo='+ phlebo
+            }
+            $.ajax({
+                url: url,
+                success: function( data ) {
+                    buildMarkers(data.map_data, data.labels)
+                    addPolyPoints(polygonArr)
+                    //addMarkersToClinicList()
+                }
+            });
+        }
+
+        function clearOverlays() {
+            for( i = 0; i < map_markers.length; i++ ) {
+                map_markers[i].setMap(null)
+            }
+        }
+
+        function buildMarkers(markers_data, labels){
+            clearOverlays()
+            markers = markers_data;
             all_labels = labels;
             map_markers = []
+            var bounds = new google.maps.LatLngBounds();
 
             // Display multiple markers on a map
             var infoWindow = new google.maps.InfoWindow(), marker, i;
@@ -153,7 +343,9 @@
                             is_bookable: markers[i]['is_bookable'],
                             phone_number: markers[i]['phone_number'],
                             hospital_id: markers[i]['hospital_id'],
-                            link: markers[i]['link']
+                            link: markers[i]['link'],
+                            has_phlebo: phlebos[markers[i]['has_phlebo']],
+                            serial_number: markers[i]['serial_number']
                            }
                 });
                 marker.setMap(map)
@@ -162,7 +354,7 @@
                 // Allow each marker to have an info window
                 google.maps.event.addListener(marker, 'click', (function(marker, i) {
                     return function() {
-                        infoContent = '<b><span style="color:blue">hospital name: </span></b><span>' + marker.data['hospital_name'] + '</span><br><b><span style="color:blue">address: </span></b><span>' + marker.data['address'] +'</span><br><b><span style="color:blue">place id: </span></b><span>'+ marker.data['place_id'] +'</span><br><b><span style="color:blue">reason: </span></b><span>'+ marker.data['reason'] +'</span><br><b><span style="color:blue">multi speciality: </span></b><span>'+ marker.data['multi_speciality'] +'</span><br><b><span style="color:blue">has phone: </span></b><span>'+ marker.data['has_phone'] +'</span><br><b><span style="color:blue">lead rank: </span></b><span>'+ marker.data['lead_rank'] +'</span><br><b><span style="color:blue">combined rating: </span></b><span>'+ marker.data['combined_rating'] +'</span><br><b><span style="color:blue">combined rating count: </span></b><span>'+ marker.data['combined_rating_count'] +'</span><br><b><span style="color:blue">is potential: </span></b><span>'+ marker.data['is_potential'] +'</span><br><b><span style="color:blue">has booking: </span></b><span>'+ marker.data['has_booking'] +'</span><br><b><span style="color:blue">time: </span></b><span>'+ marker.data['monday_timing'] +'</span><br><b><span style="color:blue">is bookable: </span></b><span>'+ marker.data['is_bookable'] +'</span><br><b><span style="color:blue">phone_number: </span></b><span>'+ marker.data['phone_number'] +'</span><br><b><span style="color:blue">hospital_id: </span></b><span>'+ marker.data['hospital_id'] +'</span><br><a href='+ marker.data['link'] +' target="_blank">click me</a>'
+                        infoContent = '<a class="btn btn-info btn-xs" href='+ marker.data['link'] +' target="_blank">Get Direction</a><br><b><span style="color:blue">hospital name: </span></b><span>' + marker.data['hospital_name'] + '</span><br><b><span style="color:blue">address: </span></b><span>' + marker.data['address'] +'</span><br><b><span style="color:blue">place id: </span></b><span>'+ marker.data['place_id'] +'</span><br><b><span style="color:blue">reason: </span></b><span>'+ marker.data['reason'] +'</span><br><b><span style="color:blue">multi speciality: </span></b><span>'+ marker.data['multi_speciality'] +'</span><br><b><span style="color:blue">has phone: </span></b><span>'+ marker.data['has_phone'] +'</span><br><b><span style="color:blue">lead rank: </span></b><span>'+ marker.data['lead_rank'] +'</span><br><b><span style="color:blue">combined rating: </span></b><span>'+ marker.data['combined_rating'] +'</span><br><b><span style="color:blue">combined rating count: </span></b><span>'+ marker.data['combined_rating_count'] +'</span><br><b><span style="color:blue">is potential: </span></b><span>'+ marker.data['is_potential'] +'</span><br><b><span style="color:blue">has booking: </span></b><span>'+ marker.data['has_booking'] +'</span><br><b><span style="color:blue">time: </span></b><span>'+ marker.data['monday_timing'] +'</span><br><b><span style="color:blue">is bookable: </span></b><span>'+ marker.data['is_bookable'] +'</span><br><b><span style="color:blue">phone_number: </span></b><span>'+ marker.data['phone_number'] +'</span><br><b><span style="color:blue">hospital_id: </span></b><span>'+ marker.data['hospital_id'] +'</span><br><b><span style="color:blue">has_phlebo: </span></b><span>'+ marker.data['has_phlebo'] +'</span><br><b><span style="color:blue">serial_number: </span></b><span>'+ marker.data['serial_number'] +'</span>'
                         infoWindow.setContent(infoContent);
                         infoWindow.open(map, marker);
                     }
@@ -179,141 +371,7 @@
             });
         }
 
-         function clearOverlays() {
-          for( i = 0; i < map_markers.length; i++ ) {
-            map_markers[i].setMap(null)
-         }
-        }
-
-        $(document).on('click', '.locate_me_btn', function() {
-            detectLocation()
-        })
-
-        function detectLocation(){
-            if (navigator.geolocation) {
-                  navigator.geolocation.getCurrentPosition((position) => {
-
-                 var user_location = position;
-                 var new_url = "/api/v1/doctor/record_api?" + url.replace("?", '');
-                  if(user_location && user_location.coords){
-
-                    new_url += '&lat='+ user_location.coords.latitude
-                    new_url += '&long='+ user_location.coords.longitude
-                    location_data(new_url);
-                  }
-                  }, (a, b, c) => {
-                      alert('Could not fetch location.')
-                  }, (a, b, c) => {
-
-                      alert('Could not fetch location.')
-                  })
-              }
-              else {
-
-              }
-        }
-        function location_data(new_url){
-            $.ajax({
-                url: new_url,
-                success: function( data ) {
-                    buildMarkers(data.map_data, data.labels, 'initial')
-                    //buildMarkers(data.map_data,data.labels,'initial')
-                    getPolygonData()
-                }
-            });
-        }
-
-        for(i=1; i <= tabs_array.length; i++) {
-            $('.label_btn_group').append("<li style='margin:5px; display:inline-block;' value="+i+"><a href='javascript:void(0)'>" + i + "</a></li>")
-        }
-
-        $(document).on('click', '.label_btn_group li', function(){
-            var value = $(this).val()
-              clearOverlays();
-             new_markers = all_markers.filter((x=>x.label == value));
-             if(new_markers.length > 0){
-                buildMarkers(new_markers,all_labels,'other')
-             }else {
-                buildMarkers(all_markers,all_labels,'other')
-             }
-        })
-
-        $(document).on('click', '#user_lat_lng', function(){
-            var user_lat = $("#myInputlat").val();
-            var user_lng = $("#myInputlng").val();
-            var user_rad = $("#myInputrad").val();
-            if(user_lat & user_lng){
-                var new_url = "/api/v1/doctor/record_api?" + url.replace("?", '');
-                    new_url += '&lat='+ user_lat;
-                    new_url += '&long='+ user_lng;
-                    new_url += '&radius=' + user_rad;
-                    clearOverlays();
-                    location_data(new_url);
-            }else{
-                if(!user_lng){
-                    alert('enter valid longitutde')
-                }else if(!user_lat){
-                    alert('enter valid latitude')
-                }else if(!user_rad){
-                    alert('enter valid radius')
-                }
-             }
-         })
-
-        $(document).on('click', '#multi_select_click', function(){
-            var abc = []
-            var entered_val = [];
-            var multi_select = $("#multi_select").val();
-            if(multi_select){
-                entered_val = multi_select.split(",")
-                if(entered_val.length){
-                 entered_val.forEach(myFunction);
-                    function myFunction(value, index, array) {
-                      abc = abc.concat(all_markers.filter((x=>x.label == value)))
-                    }
-                    clearOverlays();
-                    buildMarkers(abc,all_labels,'other')
-                }
-            }else{
-                alert('please enter some value')
-            }
-
-        })
-
-       function getPolygonData() {
-           $.ajax({
-                url: 'https://bitbucket.org/!api/2.0/snippets/rohitdocprime/LrGk8E/f746e46adba6fad656bf3f9e3e2ede252ad68ba9/files/snippet.json',
-                crossOrigin: true,
-                success: function( data ) {
-                    var newJson = data.replace(/([a-zA-Z0-9]+?):/g, '"$1":');
-                    newJson = newJson.replace(/'/g, '"');
-                    json_response = JSON.parse(newJson)
-                    polygonData = Object.values(json_response)
-                    polygonArr = []
-                    for (var i=0; i<polygonData.length; i++) {
-                        newPolygon = new google.maps.Polygon({
-                            paths:polygonData[i].nodes,
-                            strokeColor:polygonData[i].color,
-                            strokeOpactiy:0.5,
-                            storkeWeight:1,
-                            fillColor:polygonData[i].color,
-                            fillOpacity:0.15
-                       })
-                       newPolygon.setMap(map);
-                       polygonArr.push(newPolygon)
-                    }
-
-                    //var polyA = newPolygonA.getPath();
-                    //var polyB = newPolygonA.getPath();
-                    //var polyC = newPolygonA.getPath();
-
-                     addPolyPoints(polygonArr)
-                }
-           });
-        }
-
         function addPolyPoints(polygonArr) {
-            console.log(polygonArr)
             var totalCntInPolygon = []
             var totalCntInLevel = []
             //polyA.push(e.latLng);
@@ -327,8 +385,8 @@
                 }
             }
 
-            for (var k = 0; k < map_markers.length; k++) {  //1000
-                for(var i=0; i < polygonArr.length; i++) {  //3
+            for (var k = 0; k < map_markers.length; k++) {
+                for(var i=0; i < polygonArr.length; i++) {
                     if (google.maps.geometry.poly.containsLocation(map_markers[k].getPosition(), polygonArr[i])) {
                         for(var j=1; j <= 6; j++) {
                             if (parseInt(map_markers[k].label) == j) {
@@ -340,39 +398,39 @@
                     }
                 }
             }
-            //console.log(markerCnt)
-            $('.table thead').empty()
-            $('.table tbody').empty()
-            $('.table thead').append("<tr><th></th></tr><tr><th></th></tr>")
+            $('.table.polygonMarkersList thead').empty()
+            $('.table.polygonMarkersList tbody').empty()
+            $('.table.polygonMarkersList thead').append("<tr><th></th></tr><tr><th></th></tr>")
 
             var markerCntRows = Object.keys(markerCnt).length
             var markerCntColumns = 0
             if (markerCntRows > 0) {
                 markerCntColumns = Object.keys(markerCnt[0]).length
-                $('.table thead tr').append("<th></th>")
-                $('.table thead tr:eq(0) th:eq(1)').text("Total")
+                $('.table.polygonMarkersList thead tr').append("<th></th>")
+                $('.table.polygonMarkersList thead tr:eq(0) th:eq(1)').text("Total")
 
                 for(var j=1; j<=markerCntColumns; j++) {
-                    $('.table thead tr:eq(0)').append("<th>L" + j + "</th>")
-                    $('.table thead tr:eq(1) th:eq(1)').text(map_markers.length)
-                    $('.table thead tr:eq(1)').append("<td><strong>" + totalCntInLevel[j] + "</strong></td>")
+                    $('.table.polygonMarkersList thead tr:eq(0)').append("<th>L" + j + "</th>")
+                    $('.table.polygonMarkersList thead tr:eq(1) th:eq(1)').text(map_markers.length)
+                    $('.table.polygonMarkersList thead tr:eq(1)').append("<td><strong>" + totalCntInLevel[j] + "</strong></td>")
                 }
              }
 
-            //console.log(markerCntRows)
-            //console.log(markerCntColumns)
             for(var i=0; i< markerCntRows; i++) {
                 polygon_count = i + 1
-                $('.table tbody').append("<tr><td style='background-color: " + polygonArr[i].fillColor + ";'>P" + polygon_count + "</td></tr>")
-                $('.table tbody tr:eq('+ i +')').append("<td><strong>" + totalCntInPolygon[i] + "</strong></td>")
+                $('.table.polygonMarkersList tbody').append("<tr><td style='background-color: " + polygonArr[i].fillColor + ";'>P" + polygon_count + "</td></tr>")
+                $('.table.polygonMarkersList tbody tr:eq('+ i +')').append("<td><strong>" + totalCntInPolygon[i] + "</strong></td>")
                 for(var j=1; j<= markerCntColumns; j++) {
-                    $(".table tbody tr:eq(" + i + ")").append("<td>" + markerCnt[i][j] + "</td>")
+                    $(".table.polygonMarkersList tbody tr:eq(" + i + ")").append("<td>" + markerCnt[i][j] + "</td>")
                 }
             }
         }
 
-    }
-
+        function addMarkersToClinicList() {
+            for (var i = 0; i < map_markers.length; i++) {
+                $('.table.clinicsList tbody').append('<tr><td>'+ map_markers[i].title +'</td></tr>')
+            }
+        }
     </script>
 
 </body>
