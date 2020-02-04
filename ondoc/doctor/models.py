@@ -5432,10 +5432,16 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
 
 class GoogleMapRecords(auth_model.TimeStampedModel):
-    NA = 1
-    YES = 2
-    NO = 3
-    PHLEBO_CHOICES = [(NA, "NA"), (YES, "Yes"), (NO, "No")]
+    PHLEBO_NA = 1
+    PHLEBO_YES = 2
+    PHLEBO_NO = 3
+    PHLEBO_CHOICES = [(PHLEBO_NA, "NA"), (PHLEBO_YES, "Yes"), (PHLEBO_NO, "No")]
+
+    ONBOARDED_NA = 1
+    ONBOARDED_YES = 2
+    ONBOARDED_NO = 3
+    ONBOARDED_MAYBE = 4
+    ONBOARDED_CHOICES = [(ONBOARDED_YES, "Yes"), (ONBOARDED_NO, "No"), (ONBOARDED_MAYBE, "Maybe"), (ONBOARDED_NA, "Null")]
 
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     text = models.CharField(max_length=500)
@@ -5458,8 +5464,9 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     is_bookable = models.SmallIntegerField(null=True, blank=True)
     phone_number = models.CharField(max_length=500, null=True, blank=True)
     hospital_id = models.IntegerField(null=True, blank=True)
-    has_phlebo = models.SmallIntegerField(choices=PHLEBO_CHOICES, default=NA)
+    has_phlebo = models.SmallIntegerField(choices=PHLEBO_CHOICES, default=PHLEBO_NA)
     serial_number = models.IntegerField(blank=True, null=True)
+    onboarded = models.SmallIntegerField(choices=ONBOARDED_CHOICES, default=ONBOARDED_NA)
 
     class Meta:
         db_table = "google_map_records"

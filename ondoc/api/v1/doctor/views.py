@@ -5345,6 +5345,7 @@ class RecordAPIView(viewsets.GenericViewSet):
         radius = int(params.get('radius')) if params.get('radius') else 2000
         rank = params.get('rank', [])
         phlebo = params.get('phlebo', '').split(',')
+        onboarded = params.get('onboarded', '').split(',')
         response = dict()
 
         queryset = GoogleMapRecords.objects.all()
@@ -5352,6 +5353,8 @@ class RecordAPIView(viewsets.GenericViewSet):
             queryset = queryset.filter(label__in=rank)
         if phlebo:
             queryset = queryset.filter(has_phlebo__in=phlebo)
+        if onboarded:
+            queryset = queryset.filter(onboarded__in=onboarded)
         if lat and long and radius:
             point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
