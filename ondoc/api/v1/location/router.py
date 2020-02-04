@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import SearchUrlsViewSet, DoctorsCitySearchViewSet
+from .views import SearchUrlsViewSet, DoctorsCitySearchViewSet, ClusterMapViewSet
 
 urlpatterns = [
     path('entity/list', SearchUrlsViewSet.as_view({'get': 'list'}), name='entity-list'),
@@ -15,4 +15,5 @@ urlpatterns = [
          name='top_specialities_in_top_cities'),
     path('city-inventory-hospitals', SearchUrlsViewSet.as_view({'get': 'list_cities_for_hospitals'}), name='list-all-cities'),
     path('locality-inventory-hospitals', SearchUrlsViewSet.as_view({'get': 'list_localities_for_hospitals'}), name='list-all-localities'),
+    path('cluster_map_data', ClusterMapViewSet.as_view({'get': 'cluster_map_data'}), name='cluster-map-data'),
 ]
