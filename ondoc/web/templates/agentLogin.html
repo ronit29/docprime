@@ -81,6 +81,13 @@ Agent Login
                     }
                     return cookieValue;
                 }
+
+                function eraseCookie(name) {
+                   if (document) {
+                       document.cookie = name + '=; Max-Age=-99999999;';
+                   }
+                }
+
                 var csrftoken = getCookie('csrftoken');
                 function csrfSafeMethod(method) {
                     // these HTTP methods do not require CSRF protection
@@ -103,6 +110,8 @@ Agent Login
                       type: 'GET',
                       cache: false,
                       success: function(request, data){
+                        eraseCookie('tokenauth')
+                        eraseCookie('tokenRefreshTime')
                         window.open("{{appDomain}}?token=" + request['token']);
                       },
                       error: function(request, err){

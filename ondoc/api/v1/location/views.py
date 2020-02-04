@@ -14,7 +14,7 @@ from rest_framework import mixins, viewsets, status
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 
-from ondoc.location.models import CityInventory, EntityUrls, EntityAddress
+from ondoc.location.models import CityInventory, EntityUrls, EntityAddress, ClusterMap
 from . import serializers
 from ondoc.api.v1.doctor.serializers import DoctorListSerializer
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
@@ -1047,3 +1047,21 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
             resp[data.get('city')]['urls'].append({'url': data.get('url'),'title': data.get('title')})
 
         return Response(resp.values())
+
+
+class ClusterMapViewSet(viewsets.GenericViewSet):
+
+    def cluster_map_data(self, request):
+        polygon_data = center_point_data = {}
+        cluster_map_data = ClusterMap.objects.filter(is_active=True).order_by("-updated_at").first()
+
+        if cluster_map_data:
+            polygon_data = str(cluster_map_data.polygon_data)
+            center_point_data = str(cluster_map_data.center_point_data)
+
+        response = {
+            'polygon_data': polygon_data,
+            'center_point_data': center_point_data
+        }
+
+        return Response(response)

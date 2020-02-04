@@ -1721,9 +1721,9 @@ class OpdNotification(Notification):
         if self.appointment.hospital.assoc_doctors.filter(enabled=True).count() > 10:
             clinic_or_hospital = "Hospital"
         token_object = JWTAuthentication.generate_token(self.appointment.user)
-        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        booking_url = settings.BASE_URL + '/sms/booking?token={}&user_id={}'.format(token_object['token'].decode("utf-8"), self.appointment.user_id)
         opd_appointment_cod_to_prepaid_url, cod_to_prepaid_discount = self.appointment.get_cod_to_prepaid_url_and_discount(
-            token_object['token'].decode("utf-8"))
+            token_object['token'].decode("utf-8"), self.appointment.user_id)
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(
             self.appointment.id)
         appointment_type = 'opd'
@@ -1951,7 +1951,7 @@ class LabNotification(Notification):
         tests = self.appointment.get_tests_and_prices()
         report_file_links = instance.get_report_urls()
         token_object = JWTAuthentication.generate_token(self.appointment.user)
-        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        booking_url = settings.BASE_URL + '/sms/booking?token={}&user_id={}'.format(token_object['token'].decode("utf-8"), instance.user_id)
         lab_appointment_complete_url = booking_url + "&callbackurl=lab/appointment/{}?complete=true".format(self.appointment.id)
         lab_appointment_feedback_url = booking_url + "&callbackurl=lab/appointment/{}".format(self.appointment.id)
         reschedule_appointment_bypass_url = booking_url + "&callbackurl=lab/{}/timeslots?reschedule=true".format(self.appointment.lab.id)
