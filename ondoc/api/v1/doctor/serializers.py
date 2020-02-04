@@ -3129,4 +3129,4 @@ class RecordSerializer(serializers.ModelSerializer):
        model = GoogleMapRecords
        fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label", "reason", "hospital_name",    "place_id",
                   "multi_speciality", "has_phone", "lead_rank", "combined_rating", "combined_rating_count", "is_potential", "has_booking", "monday_timing",
-                 "address" , "is_bookable", "link", "hospital_id", "phone_number"])
+                 "address", "is_bookable", "link", "hospital_id", "phone_number", "has_phlebo", "serial_number", "onboarded"])

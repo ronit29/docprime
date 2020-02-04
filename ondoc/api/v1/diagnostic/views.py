@@ -28,7 +28,8 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
                                      LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds,
-                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead)
+                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead,
+                                     LabAppointmentFeedback)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -4235,3 +4236,25 @@ class AllMatrixCitiesViewSet(viewsets.GenericViewSet):
         main_queryset = MatrixMappedCity.objects.all().values("id", "name")
 
         return Response(main_queryset)
+
+
+class MatrixViewSet(viewsets.GenericViewSet):
+
+    def send_feedback_to_matrix(self, request):
+        appointment_id = self.request.query_params.get('appointment_id')
+        if not appointment_id:
+            return Response({'result': 'appointment id not present'})
+        data = self.request.data
+        comment = data.get('comment') if data.get('comment') else None
+        ratings = data.get('ratings') if data.get('ratings') else None
+
+        if appointment_id and ratings:
+            app_feedback = LabAppointmentFeedback.objects.filter(appointment_id=appointment_id)
+            if not app_feedback:
+                LabAppointmentFeedback.objects.create(appointment_id= appointment_id, comment=comment, ratings=ratings)
+            else:
+                return Response({'result': 'feedback already exists'})
+        else:
+            return Response({'result': 'either appointment id or rating not present'})
+
+        return Response(status=status.HTTP_200_OK)

@@ -872,8 +872,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, email):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_booking_url(cls, token, email, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         short_url = generate_short_url(booking_url)
         html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         email_subject = "Booking Url"
@@ -892,8 +893,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
-    def send_insurance_booking_url(cls, token, email):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_insurance_booking_url(cls, token, email, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
@@ -934,8 +936,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
-    def send_endorsement_request_url(cls, token, email):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_endorsement_request_url(cls, token, email, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id )
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
         short_url = generate_short_url(booking_url)
         html_body = "Your Endorsement Request url is - {} . Please confirm to process".format(short_url)
@@ -1200,8 +1203,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, phone_number, name):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_booking_url(cls, token, phone_number, name, user):
+        user_id = user.id if user  else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         short_url = generate_short_url(booking_url)
         html_body = "Dear {}, \n" \
                     "Please click on the link to review your appointment details and make an online payment.\n" \
@@ -1222,8 +1226,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_insurance_booking_url(cls, token, phone_number):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_insurance_booking_url(cls, token, phone_number, user):
+        user_id = user.id if user  else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
@@ -1243,7 +1248,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     @classmethod
     def send_vip_booking_url(cls, token, phone_number, *args, **kwargs):
         utm_source = kwargs.get('utm_source', '')
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, kwargs.get('user_id'))
         if utm_source:
             booking_url = booking_url + "&callbackurl=vip-club-member-details&utm_source={utm_source}&is_agent=false".format(utm_source=utm_source)
         else:
@@ -1270,7 +1275,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     def send_single_purchase_booking_url(cls, token, phone_number, *args, **kwargs):
         utm_source = kwargs.get('utm_source', '')
         landing_url = kwargs.get('landing_url', '')
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, kwargs.get('user_id'))
         if utm_source:
             booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
                 landing_url=landing_url, utm_source=utm_source)
@@ -1296,8 +1301,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_endorsement_request_url(cls, token, phone_number):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_endorsement_request_url(cls, token, phone_number, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user-id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance Endorsement request url is - {} . Please confirm to process".format(short_url)
@@ -1315,10 +1321,11 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_cart_url(cls, token, phone_number, utm):
+    def send_cart_url(cls, token, phone_number, utm, user):
+        user_id = user.id if user else None
         callback_url = "cart"
-        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}&{}".format(settings.CONSUMER_APP_DOMAIN,
-                                                                                         token, callback_url, utm)
+        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}&{}&user_id={}".format(settings.CONSUMER_APP_DOMAIN,
+                                                                                         token, callback_url, utm, user_id)
         short_url = generate_short_url(payment_page_url)
         html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         if phone_number:

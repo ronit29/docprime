@@ -4211,12 +4211,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 result = None, None
         return result
 
-    def get_cod_to_prepaid_url_and_discount(self, token):
+    def get_cod_to_prepaid_url_and_discount(self, token, user_id):
         result = None, None
         order_id, discount = self.get_master_order_id_and_discount()
         if order_id:
 	        #url = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
-            url = settings.BASE_URL + '/opd/doctor/{}/{}/bookdetails?appointment_id={}&token={}&cod_to_prepaid=true'.format(self.doctor_id, self.hospital_id, self.id, token)
+            url = settings.BASE_URL + '/opd/doctor/{}/{}/bookdetails?appointment_id={}&token={}&cod_to_prepaid=true&user_id={}'.format(self.doctor_id, self.hospital_id, self.id, token, user_id)
             result = url, discount
         return result
 
@@ -5432,6 +5432,17 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
 
 class GoogleMapRecords(auth_model.TimeStampedModel):
+    PHLEBO_NA = 1
+    PHLEBO_YES = 2
+    PHLEBO_NO = 3
+    PHLEBO_CHOICES = [(PHLEBO_NA, "NA"), (PHLEBO_YES, "Yes"), (PHLEBO_NO, "No")]
+
+    ONBOARDED_NA = 1
+    ONBOARDED_YES = 2
+    ONBOARDED_NO = 3
+    ONBOARDED_MAYBE = 4
+    ONBOARDED_CHOICES = [(ONBOARDED_YES, "Yes"), (ONBOARDED_NO, "No"), (ONBOARDED_MAYBE, "Maybe"), (ONBOARDED_NA, "Null")]
+
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     text = models.CharField(max_length=500)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
@@ -5453,6 +5464,9 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     is_bookable = models.SmallIntegerField(null=True, blank=True)
     phone_number = models.CharField(max_length=500, null=True, blank=True)
     hospital_id = models.IntegerField(null=True, blank=True)
+    has_phlebo = models.SmallIntegerField(choices=PHLEBO_CHOICES, default=PHLEBO_NA)
+    serial_number = models.IntegerField(blank=True, null=True)
+    onboarded = models.SmallIntegerField(choices=ONBOARDED_CHOICES, default=ONBOARDED_NA)
 
     class Meta:
         db_table = "google_map_records"
