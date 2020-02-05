@@ -199,14 +199,18 @@ class WhatsappNotificationViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, )
 
     def send_landing_whatsapp(self, request):
-        # if not hasattr(request, 'agent'):
-        #     return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Only agent is allowed to perform this action.'})
+        if not hasattr(request, 'agent'):
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Only agent is allowed to perform this action.'})
 
         callback = request.data.get('callback')
         template = request.data.get('template')
         user_token = JWTAuthentication.generate_token(request.user, request)
         token = user_token['token'].decode("utf-8") if 'token' in user_token else None
-        short_url = "{}/{}?token={}".format(settings.CONSUMER_APP_DOMAIN, callback, token)
+        if '?' not in callback:
+            short_url = "{}/{}?token={}".format(settings.CONSUMER_APP_DOMAIN, callback, token)
+        else:
+            short_url = "{}/{}&token={}".format(settings.CONSUMER_APP_DOMAIN, callback, token)
+
         short_url = generate_short_url(short_url)
         whatsapp_payload = [short_url]
         WhtsappNotification.send_whatsapp(request.user.phone_number, template, whatsapp_payload, None)
