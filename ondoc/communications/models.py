@@ -422,7 +422,7 @@ class SMSNotification:
         obj = None
         if notification_type == NotificationAction.COD_TO_PREPAID_REQUEST:
             obj = DynamicTemplates.objects.filter(template_name="COD_to_Prepaid_SMS_to_customer", approved=True).first()
-        elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+        elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED and self.context.get('instance') and self.context.get('instance').hospital and self.context.get('instance').hospital.network and self.context.get('instance').hospital.network.id == 1883:
             obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 2):
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
@@ -460,6 +460,14 @@ class SMSNotification:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_provider", approved=True).first()
         elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_patient", approved=True).first()
+        elif user and user.user_type == User.CONSUMER and notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED and self.context.get('visit_type') == 'home':
+            obj = DynamicTemplates.objects.filter(template_name="booking_confirmed_lab_prepaid_home_collection_with_google_link", approved=True).first()
+        elif user and user.user_type == User.CONSUMER and notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED and self.context.get('visit_type') == 'lab':
+            obj = DynamicTemplates.objects.filter(template_name="booking_confirmed_lab_prepaid_lab_visit_with_google_link", approved=True).first()
+        elif user and user.user_type == User.CONSUMER and notification_type == NotificationAction.APPOINTMENT_ACCEPTED and self.context.get('is_payment_type_cod'):
+            obj = DynamicTemplates.objects.filter(template_name="booking_confirmed_doctor_cod_with_google_link", approved=True).first()
+        elif user and user.user_type == User.CONSUMER and notification_type == NotificationAction.APPOINTMENT_ACCEPTED and not self.context.get('is_payment_type_cod'):
+            obj = DynamicTemplates.objects.filter(template_name="booking_confirmed_doctor_prepaid_with_google_link", approved=True).first()
         elif notification_type == NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS:
             obj = DynamicTemplates.objects.filter(template_name="Reminder_message_Medanta_Artemis", approved=True).first()
         return obj
@@ -575,6 +583,36 @@ class SMSNotification:
                 self.trigger(receiver, template, context)
         ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
+    def update_context(self, template_obj):
+        if template_obj and template_obj.template_name == 'booking_confirmed_lab_prepaid_home_collection_with_google_link':
+            self.context['code'] = self.context.get('instance').otp
+
+        if template_obj and template_obj.template_name == 'booking_confirmed_lab_prepaid_lab_visit_with_google_link':
+            instance = self.context.get('instance')
+            self.context['code'] = instance.otp
+            self.context['address'] = instance.lab.get_lab_address()
+            self.context['spoc_number'] = None
+            if instance.lab and instance.lab.network and instance.lab.network.spoc_details.all():
+                spoc = instance.lab.network.spoc_details.all()[0]
+                self.context['spoc_number'] = str(spoc.std_code) if spoc.std_code else "" + str(spoc.number) if spoc.number else ""
+
+            self.context['Google_link'] = generate_short_url('https://www.google.com/maps/search/?api=1&query=%f,%f' % (instance.lab.location.y, instance.lab.location.x))
+
+        if template_obj and template_obj.template_name == 'booking_confirmed_doctor_prepaid_with_google_link':
+            instance = self.context.get('instance')
+            self.context['code'] = instance.otp
+            self.context['spoc_number'] = None
+            if instance.hospital and instance.hospital.spoc_details.all():
+                spoc = instance.hospital.spoc_details.all()[0]
+                self.context['spoc_number'] = str(spoc.std_code) if spoc.std_code else "" + str(spoc.number) if spoc.number else ""
+            self.context['Google_link'] = generate_short_url('https://www.google.com/maps/search/?api=1&query=%f,%f' % (instance.hospital.location.y, instance.hospital.location.x))
+
+        if template_obj and template_obj.template_name == 'booking_confirmed_doctor_cod_with_google_link':
+            self.context['Google_link'] = generate_short_url('https://www.google.com/maps/search/?api=1&query=%f,%f' % (self.context.get('instance').hospital.location.y, self.context.get('instance').hospital.location.x))
+            self.context['code'] = self.context.get('instance').otp
+
+        return self.context
+
     def dispatch(self, receivers):
         context = self.context
         instance = context.get("instance")
@@ -596,6 +634,8 @@ class SMSNotification:
             if not obj:
                 receivers_left.append(receiver)
             else:
+                # update context
+                context = self.update_context(obj)
                 # click_login_token_objects = list()
                 user = receiver.get('user')
                 phone_number = receiver.get('phone_number')
@@ -1222,7 +1262,7 @@ class EMAILNotification:
 
             if context.get("instance").is_credit_letter_required_for_appointment() and not context.get("instance").is_payment_type_cod():
                 credit_letter = context.get("instance").get_valid_credit_letter()
-                if not credit_letter:
+                if not credit_letter or not credit_letter.file or not credit_letter.file.url:
                     logger.error("Got error while getting pdf for opd credit letter")
                     return '', ''
                 context.update({"credit_letter": credit_letter})
@@ -1681,9 +1721,9 @@ class OpdNotification(Notification):
         if self.appointment.hospital.assoc_doctors.filter(enabled=True).count() > 10:
             clinic_or_hospital = "Hospital"
         token_object = JWTAuthentication.generate_token(self.appointment.user)
-        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        booking_url = settings.BASE_URL + '/sms/booking?token={}&user_id={}'.format(token_object['token'].decode("utf-8"), self.appointment.user_id)
         opd_appointment_cod_to_prepaid_url, cod_to_prepaid_discount = self.appointment.get_cod_to_prepaid_url_and_discount(
-            token_object['token'].decode("utf-8"))
+            token_object['token'].decode("utf-8"), self.appointment.user_id)
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(
             self.appointment.id)
         appointment_type = 'opd'
@@ -1911,7 +1951,7 @@ class LabNotification(Notification):
         tests = self.appointment.get_tests_and_prices()
         report_file_links = instance.get_report_urls()
         token_object = JWTAuthentication.generate_token(self.appointment.user)
-        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        booking_url = settings.BASE_URL + '/sms/booking?token={}&user_id={}'.format(token_object['token'].decode("utf-8"), instance.user_id)
         lab_appointment_complete_url = booking_url + "&callbackurl=lab/appointment/{}?complete=true".format(self.appointment.id)
         lab_appointment_feedback_url = booking_url + "&callbackurl=lab/appointment/{}".format(self.appointment.id)
         reschedule_appointment_bypass_url = booking_url + "&callbackurl=lab/{}/timeslots?reschedule=true".format(self.appointment.lab.id)
