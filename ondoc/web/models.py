@@ -127,9 +127,12 @@ class TinyUrlHits(TimeStampedModel):
         db_table = 'tiny_url_hits'
 
 
+'''Upload Any File to CDN'''
 class UploadImage(TimeStampedModel):
     name = models.CharField(blank=True, max_length=84)
-    image = models.ImageField(upload_to='web/custom_images')
+    # image = models.ImageField(upload_to='web/custom_images')
+    # image = models.FileField(upload_to='web/custom_images', blank=False, null=False, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
+    image = models.FileField(upload_to='web/custom_images', blank=False, null=False)
 
     def __str__(self):
         return "{}".format(self.name)

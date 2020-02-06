@@ -30,14 +30,17 @@ logger = logging.getLogger(__name__)
 
 class PlusListViewSet(viewsets.GenericViewSet):
 
+    # Get default queryset.
     def get_queryset(self):
         return PlusProposer.objects.filter(is_live=True)
 
+    # Get plan queryset.
     def get_plan_queryset(self, utm_source):
         plans = PlusPlans.objects.filter(is_live=True, utm_source__contains={'utm_source': utm_source})
         # plans_with_utm = plans.filter()
         return plans
 
+    # get list of plans with proposer.
     @use_slave
     def list(self, request):
         resp = {}
@@ -64,10 +67,12 @@ class PlusListViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
+# Plus leads viewset.
 class PlusOrderLeadViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     # permission_classes = (IsAuthenticated,)
 
+    # create plus lead from request. Request contains all the lead data.
     def create_plus_lead(self, request):
         # latitude = request.data.get('latitude', None)
         # longitude = request.data.get('longitude', None)
@@ -122,6 +127,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    # Api for policy purchase, do validation, serialization, create order, and ask for payment if required.
     @transaction.atomic
     def create_order(self, request):
         user = request.user
@@ -162,51 +168,72 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['title'] = member['title']
                     pre_insured_members['first_name'] = member['first_name']
                     pre_insured_members['last_name'] = member.get('last_name') if member.get('last_name') else ''
-                    pre_insured_members['address'] = member['address']
-                    pre_insured_members['pincode'] = member['pincode']
-                    pre_insured_members['city'] = member['city']
-                    pre_insured_members['city_code'] = member['city_code']
-                    pre_insured_members['email'] = member['email']
-                    pre_insured_members['relation'] = member['relation']
+                    # pre_insured_members['address'] = member['address']
+                    # pre_insured_members['pincode'] = member['pincode']
+                    # pre_insured_members['city'] = member['city']
+                    # pre_insured_members['city_code'] = member['city_code']
+                    # pre_insured_members['email'] = member['email']
+                    # pre_insured_members['relation'] = member['relation']
+                    pre_insured_members['address'] = member.get('address', None)
+                    pre_insured_members['pincode'] = member.get('pincode', None)
+                    pre_insured_members['city'] = member.get('city', None)
+                    pre_insured_members['city_code'] = member.get('city_code', None)
+                    pre_insured_members['email'] = member.get('email', None)
+                    pre_insured_members['relation'] = member.get('relation', None)
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
                         'profile') is not None else None
+                    pre_insured_members['is_primary_user'] = True
 
                     plus_members.append(pre_insured_members.copy())
 
-                    if member['relation'] == PlusMembers.Relations.SELF:
-                        if member['profile']:
-                            user_profile = UserProfile.objects.filter(id=member['profile'].id,
-                                                                      user_id=request.user.pk).values('id', 'name',
-                                                                                                      'email',
-                                                                                                      'gender',
-                                                                                                      'user_id',
-                                                                                                      'phone_number').first()
+                    # if member['relation'] == PlusMembers.Relations.SELF:
+                    if member['profile']:
+                        user_profile = UserProfile.objects.filter(id=member['profile'].id,
+                                                                  user_id=request.user.pk).values('id', 'name',
+                                                                                                  'email',
+                                                                                                  'gender',
+                                                                                                  'user_id',
+                                                                                                  'phone_number').first()
 
-                            user_profile['dob'] = member['dob']
+                        user_profile['dob'] = member['dob']
 
-                        else:
-                            last_name = member.get('last_name') if member.get('last_name') else ''
-                            user_profile = {"name": member['first_name'] + " " + last_name, "email":
-                                member['email'], "dob": member['dob']}
+                    else:
+                        last_name = member.get('last_name') if member.get('last_name') else ''
+                        user_profile = {"name": member.get('first_name') + " " + last_name, "email":
+                            member.get('email'), "dob": member.get('dob'), "gender": member.get('gender')}
+
+            if not user_profile['dob']:
+                return Response({"message": "DOB for primary user is not updated"}, status=status.HTTP_400_BAD_REQUEST)
 
             utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
             utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
             utm_campaign = request.data.get('utm_spo_tags', {}).get('utm_campaign', None)
             utm_medium = request.data.get('utm_spo_tags', {}).get('utm_medium', None)
             is_utm_agent = request.data.get('utm_spo_tags', {}).get('is_agent', None)
+            utm_sbi_tags = request.data.get('utm_sbi_tags', {})
             utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent, 'utm_term': utm_term, 'utm_campaign': utm_campaign, 'utm_medium': utm_medium}
-            plus_plan = PlusPlans.objects.get(id=plus_plan_id)
+            plus_plan = PlusPlans.objects.filter(id=plus_plan_id, is_live=True).first()
+            if not plus_plan:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "Plan is not identified"})
             transaction_date = datetime.datetime.now()
             amount = plus_plan.deal_price
+
+            price_data = plus_plan.get_price_details(valid_data, amount)
 
             expiry_date = transaction_date + relativedelta(months=int(plus_plan.tenure))
             expiry_date = expiry_date - timedelta(days=1)
             expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
             plus_user_data = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,
-                                   'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
-                                   'user': request.user.pk, "plus_members": plus_members}
+                              'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': int(amount),
+                              'user': request.user.pk, "plus_members": plus_members,
+                              'coupon': price_data.get('coupon_list', []),
+                              'effective_price': int(price_data.get('effective_price')),
+                              'coupon_discount': int(price_data.get('coupon_discount')),
+                              'coupon_cashback': int(price_data.get('coupon_cashback')),
+                              'random_coupon_list': price_data.get('random_coupon_list')}
+
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
-                              "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter}
+                              "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter, "utm_sbi_tags": utm_sbi_tags}
 
             # consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
             # consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
@@ -230,10 +257,15 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             # if balance < amount or resp['is_agent']:
             # payable_amount = amount - balance
-            payable_amount = amount
+
+            product_id = account_models.Order.VIP_PRODUCT_ID if not plus_plan.is_gold else account_models.Order.GOLD_PRODUCT_ID
+            product_create_id = account_models.Order.VIP_CREATE if not plus_plan.is_gold else account_models.Order.GOLD_CREATE
+
+            # payable_amount = amount
+            payable_amount = price_data.get('effective_price')
             order = account_models.Order.objects.create(
-                product_id=account_models.Order.VIP_PRODUCT_ID,
-                action=account_models.Order.VIP_CREATE,
+                product_id=product_id,
+                action=product_create_id,
                 action_data=plus_data,
                 amount=payable_amount,
                 cashback_amount=0,
@@ -243,8 +275,19 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 payment_status=account_models.Order.PAYMENT_PENDING,
                 # visitor_info=visitor_info
             )
-            resp["status"] = 1
-            resp['data'], resp["payment_required"] = payment_details(request, order)
+            if payable_amount > 0:
+                resp["status"] = 1
+                resp['data'], resp["payment_required"] = payment_details(request, order)
+            else:
+                plus_object, wallet_amount, cashback_amount = order.process_order()
+                resp["status"] = 1
+                resp["payment_required"] = False
+                resp["data"] = {'id': plus_object.id}
+                resp["data"] = {
+                    "orderId": order.id,
+                    "type": "plus_membership",
+                    "id": plus_object.id if plus_object else None
+                }
             # else:
             #     wallet_amount = amount
             #
@@ -273,6 +316,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
 
+    # After policy purchase add members to the policy.
     @transaction.atomic
     def add_members(self, request):
         user = request.user
@@ -299,7 +343,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         counter = 0
         self_counter = -1
         for member in members_to_be_added:
-            if member.get('relation') == PlusMembers.Relations.SELF:
+            if member.get('is_primary_user'):
                 self_counter = counter
                 if member.get('document_ids'):
                     proposer_profile = inactive_plus_subscription.get_primary_member_profile()
@@ -311,7 +355,8 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             counter += 1
 
-        members_to_be_added.pop(self_counter)
+        if self_counter > -1:
+            members_to_be_added.pop(self_counter)
 
         PlusMembers.create_plus_members(inactive_plus_subscription, members_list=members_to_be_added)
         inactive_plus_subscription.status = PlusUser.ACTIVE
@@ -323,6 +368,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, )
 
+    # After policy purchase below function gives the stats of the policy.
     def dashboard(self, request):
         resp = {}
         if request.query_params.get('is_dashboard'):
@@ -345,10 +391,16 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         #     resp['is_member_allowed'] = False
         # else:
         #     resp['is_member_allowed'] = True
-        if len(plus_members) == int(total_member_allowed):
+        if len(plus_members) >= int(total_member_allowed):
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
+
+        plus_via_sbi = False
+        if plus_user.order and plus_user.order.action_data and plus_user.order.action_data.get('utm_sbi_tags', None):
+            plus_via_sbi = True
+        resp['plus_via_sbi'] = plus_via_sbi
+
         plus_plan_queryset = PlusPlans.objects.filter(id=plus_user.plan.id)
         plan_body_serializer = serializers.PlusPlansSerializer(plus_plan_queryset, context={'request': request}, many=True)
         resp['plan'] = plan_body_serializer.data
@@ -359,7 +411,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             self_index = 0
             count = 0
             for member in members_data:
-                if member['relation'] == PlusMembers.Relations.SELF:
+                if member['is_primary_user']:
                     self_index = count
                 count = count + 1
 
@@ -389,22 +441,39 @@ class PlusDataViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    # In journey of gold purchase, interim data is pushed by below api.
     def push_dummy_data(self, request):
-        try:
-            user = request.user
-            data = request.data
-            PlusDummyData.objects.create(user=user, data=data)
-            return Response(data="save successfully!!", status=status.HTTP_200_OK )
-        except Exception as e:
-            logger.error(str(e))
-            return Response(data="could not save data", status=status.HTTP_400_BAD_REQUEST)
+        from ondoc.api.v1.doctor.views import DoctorAppointmentsViewSet
+        from ondoc.api.v1.diagnostic.views import LabAppointmentView
 
+        user = request.user
+        data = request.data
+        query_params = request.query_params
+        data_type = query_params.get('dummy_data_type', 'PLAN_PURCHASE')
+        resp = {}
+        if data_type == PlusDummyData.DataType.SINGLE_PURCHASE:
+            if query_params.get('is_single_flow_opd'):
+                DoctorAppointmentsViewSet().create(request, is_dummy=True)
+
+            elif query_params.get('is_single_flow_lab'):
+                LabAppointmentView().create(request, is_dummy=True)
+
+        plus_dummy_obj = PlusDummyData(user=user, data=data, data_type=data_type)
+        plus_dummy_obj.save()
+        resp = {'dummy_id': plus_dummy_obj.id}
+
+        return Response(data=resp, status=status.HTTP_200_OK)
+
+    # Get the interim data in the journey of policy purchase.
     def show_dummy_data(self, request):
         user = request.user
+        data_type = request.query_params.get('dummy_data_type')
+        dummy_id = request.query_params.get('dummy_id')
+        data_type = data_type if data_type and data_type in PlusDummyData.DataType.availabilities() else PlusDummyData.DataType.PLAN_PURCHASE
         res = {}
         if not user:
             return Response(data=res, status=status.HTTP_200_OK)
-        dummy_data = PlusDummyData.objects.filter(user=user).order_by('-id').first()
+        dummy_data = PlusDummyData.objects.filter(user=user, data_type=data_type).order_by('-id').first() if not dummy_id else PlusDummyData.objects.filter(id=dummy_id).first()
         if not dummy_data:
             return Response(data=res, status=status.HTTP_200_OK)
         member_data = dummy_data.data
@@ -416,6 +485,7 @@ class PlusDataViewSet(viewsets.GenericViewSet):
 
 class PlusIntegrationViewSet(viewsets.GenericViewSet):
 
+    # Push vip integration lead.
     def push_vip_integration_leads(self, request):
         resp = {}
         request_data = request.data
@@ -423,34 +493,6 @@ class PlusIntegrationViewSet(viewsets.GenericViewSet):
         if utm_source:
             resp = PlusIntegration.get_response(request_data)
             return Response(data=resp, status=status.HTTP_200_OK)
-            # utm_param_dict = PlusIntegration.get_response(request_data)
-            # try:
-            #     if utm_param_dict:
-            #         url = utm_param_dict.get('url', "")
-            #         request_data = utm_param_dict.get('request_data', {})
-            #         auth_token = utm_param_dict.get('auth_token', "")
-            #
-            #         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
-            #                                                                               'Content-Type': 'application/json'})
-            #
-            #         if response.status_code != status.HTTP_200_OK:
-            #             logger.error(json.dumps(request_data))
-            #             logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
-            #             resp['error'] = "Error while saving data!!"
-            #             return Response(data=resp, status=status.HTTP_200_OK)
-            #         elif response.status_code == status.HTTP_200_OK and response.get('data', None) and \
-            #                 response.get('data, None').get('error', False):
-            #             resp['data'] = response.get('data', None).get('errorDetails', [])
-            #             return Response(data=resp, status=status.HTTP_200_OK)
-            #         else:
-            #             resp['data'] = "successfully save!!"
-            #             return Response(data=resp, status=status.HTTP_200_OK)
-            #     else:
-            #         resp['error'] = "Not able to find Utm params"
-            #         return Response(data=resp, status=status.HTTP_200_OK)
-            # except Exception as e:
-            #     logger.error(json.dumps(request_data))
-            #     logger.info("[ERROR] {}".format(e))
         else:
             resp['error'] = "UTM source required!!"
             return Response(data=resp, status=status.HTTP_200_OK)

@@ -1,7 +1,7 @@
 from django.contrib.admin import TabularInline
 
 from ondoc.crm.admin.doctor import ReadOnlyInline, forms
-from ondoc.location.models import CompareLabPackagesSeoUrls, EntityUrls
+from ondoc.location.models import CompareLabPackagesSeoUrls, EntityUrls, ClusterMap
 from django.contrib import admin
 
 
@@ -49,3 +49,8 @@ class ComparePackagesSEOUrlsAdmin(admin.ModelAdmin):
     inlines = [CompareLabPackagesSeoUrlsInLine]
     search_fields = ['url']
     list_display = ('url', 'title')
+
+
+class ClusterMapAdmin(admin.ModelAdmin):
+    model = ClusterMap
+    list_display = ('id', 'is_active', 'polygon_data')

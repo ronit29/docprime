@@ -11,6 +11,7 @@ constants = {
     'TEST_USER_GROUP': 'test_user_group',
     'OPD_APPOINTMENT_MANAGEMENT_TEAM': 'opd_appointment_management_team',
     'LAB_APPOINTMENT_MANAGEMENT_TEAM': 'lab_appointment_management_team',
+    'SALES_CALLING_TEAM': 'sales_calling_team',
     'CONDITIONS_MANAGEMENT_TEAM': 'condition_managment_team',
     'REPORT_TEAM': 'report_team',
     'SUPER_QC_GROUP': 'super_qc_group',

@@ -287,6 +287,16 @@ class DoctorSearchHelper:
             )
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
+        if self.query_params.get('is_gold'):
+            filtering_params.append(
+                "h.enabled_for_gold"
+            )
+
+        if self.query_params.get('is_vip'):
+            filtering_params.append(
+                "h.enabled_for_plus_plans"
+            )
+
         result = {}
         if not filtering_params and not spec_filter_str:
             result['string'] = "1=1"
@@ -693,7 +703,8 @@ class DoctorSearchHelper:
                     else:
                         price = price_engine.get_price(price_data)
                     # vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
-                    vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=request.user.active_plus_user.plan)
+                    plus_membership_plan = request.user.active_plus_user.plan if request.user.active_plus_user else None
+                    vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_membership_plan)
                     engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
                     is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
                     if engine:

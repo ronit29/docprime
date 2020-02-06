@@ -7,6 +7,8 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 
 
 class BannerForm(forms.ModelForm):
+    body = forms.CharField(widget=forms.Textarea, required=False)
+
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -62,6 +64,12 @@ class BannerForm(forms.ModelForm):
                         if key1 == key2 and value1 == value2:
                             resp.append(str(key1) + ':' + str(value1))
                 raise forms.ValidationError('Cannot input duplicate values in field url_params -> {}'.format(resp))
+
+    class Media:
+        extend = False
+        # js = ('ckedit/js/ckeditor.js', 'articles/js/init.js')   # ckeditor-5 replaced with ckeditor-4.11.4
+        js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'articles/js/init.js')
+        css = {'all': ('articles/css/style.css',)}
 
 
 class BannerLocationInline(admin.TabularInline):

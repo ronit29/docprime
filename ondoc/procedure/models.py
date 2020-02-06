@@ -2,7 +2,7 @@ import datetime
 
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.fields import JSONField
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.db import models, transaction
 from django.db.models import Q
 
@@ -29,6 +29,7 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
     show_about = models.BooleanField(default=False)
     icon = models.ImageField(upload_to='ipd_procedure/images', null=True, blank=False)
+    svg_icon = models.ImageField(upload_to='ipd_procedure/images', null=True, blank=False, validators=[FileExtensionValidator(allowed_extensions=['svg'])])
 
     def __str__(self):
         return '{}'.format(self.name)

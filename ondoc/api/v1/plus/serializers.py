@@ -8,6 +8,7 @@ from ondoc.api.v1.doctor.serializers import CommonConditionsSerializer
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.models import User
 from ondoc.common.models import DocumentsProofs
+from ondoc.coupon.models import RandomGeneratedCoupon, CouponRecommender
 from ondoc.doctor.models import Hospital
 from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusUserUtilization,
                                PlusPlanParameters, PlusPlanParametersMapping)
@@ -116,8 +117,8 @@ class PlusPlansSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlusPlans
         fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected',
-                  'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks', 'utilize', 'is_gold',
-                  'show_consultation_text')
+                  'tenure', 'total_allowed_members', 'default_single_booking', 'content', 'enabled_hospital_networks',
+                  'utilize', 'is_gold', 'show_consultation_text', 'is_corporate')
 
 
 class PlusProposerSerializer(serializers.ModelSerializer):
@@ -194,37 +195,37 @@ class PlusMembersDocumentSerializer(serializers.Serializer):
 
 class PlusMemberListSerializer(serializers.Serializer):
     id = serializers.IntegerField(allow_null=True, required=False)
-    title = serializers.ChoiceField(choices=PlusMembers.TITLE_TYPE_CHOICES)
+    title = serializers.ChoiceField(choices=PlusMembers.TITLE_TYPE_CHOICES, required=False, allow_blank=True, allow_null=True)
     first_name = serializers.CharField(max_length=50)
     last_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
     dob = serializers.DateField()
-    email = serializers.EmailField(allow_blank=True, allow_null=True)
-    address = serializers.CharField(max_length=250)
-    pincode = serializers.IntegerField()
+    email = serializers.EmailField(allow_blank=True, allow_null=True, required=False)
+    address = serializers.CharField(max_length=250, required=False, allow_null=True)
+    pincode = serializers.IntegerField(required=False, allow_null=True)
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=True)
-    city = serializers.CharField(required=True)
-    city_code = serializers.CharField(required=True)
-    relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices())
+    city = serializers.CharField(required=False, allow_null=True)
+    city_code = serializers.CharField(required=False, allow_null=True)
+    relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices(), required=False, allow_null=True, allow_blank=True)
     document_ids = serializers.ListField(required=False, allow_null=True, child=PlusMembersDocumentSerializer())
-    # is_primary_user = serializers.BooleanField()
-    # plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.all_active_plans(), allow_null=False, allow_empty=False)
-
+    is_primary_user = serializers.BooleanField(required=False, default=False)
+    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False, allow_null=True, allow_blank=True)
+    phone_number = serializers.CharField(max_length=10, required=False, allow_blank=True, allow_null=True)
 
 class PlusMembersSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=PlusMemberListSerializer())
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
     def validate(self, attrs):
+        from ondoc.account.models import Order
+
         request = self.context.get('request')
         user = request.user
         plus_user_obj = PlusUser.get_by_user(user)
         if plus_user_obj:
             plus_members = plus_user_obj.plus_members.all()
-            # if len(plus_members) > 1:
-            #     raise serializers.ValidationError({'members': 'Members can be added only once.'})
 
             total_allowed_members = plus_user_obj.plan.total_allowed_members
 
-            # if len(plus_members) + len(attrs.get('members'))-1 > total_allowed_members:
             if len(attrs.get('members')) > total_allowed_members:
                 raise serializers.ValidationError({'members': 'Cannot add members more than total allowed memebers.'})
 
@@ -232,33 +233,47 @@ class PlusMembersSerializer(serializers.Serializer):
 
             # check if there is name duplicacy or not.
             member_list = attrs.get('members', [])
-            # to_be_added_member_list = attrs.get('members', [])
             to_be_added_member_list = []
             proposer_name = None
             for each_member in member_list:
-                if not each_member.get('id') or each_member['relation'] == PlusMembers.Relations.SELF:
+                if not each_member.get('id') or each_member['is_primary_user']:
                     to_be_added_member_list.append(each_member)
-                if each_member['relation'] == PlusMembers.Relations.SELF:
+                if each_member['is_primary_user']:
                     proposer_name = "%s %s" % (each_member['first_name'], each_member['last_name'])
 
             to_be_added_member_set = set(
                     map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
-            to_be_added_member_set.remove(proposer_name)
 
-            # to_be_added_member_set = set(map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
-            # to_be_added_member_relation_set = set(map(lambda member: "%s" % (member['relation']), to_be_added_member_list))
-            # if PlusMembers.Relations.SELF in to_be_added_member_relation_set:
-            #     raise serializers.ValidationError({'name': 'Proposer has already be added. Cannot be added and changed.'})
-            # if len(to_be_added_member_set) != len(to_be_added_member_list):
-            #     raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
-
-            # if len(to_be_added_member_set) != len(member_list):
-            #     raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
+            if proposer_name in to_be_added_member_set:
+                to_be_added_member_set.remove(proposer_name)
 
             if to_be_added_member_set & existing_members_name_set:
                 raise serializers.ValidationError({'name': 'Member already exist. Members name need to be unique.'})
 
             attrs['members'] = to_be_added_member_list
+
+        else:
+            if attrs.get("coupon_code"):
+                coupon_codes = attrs.get("coupon_code", [])
+                coupon_obj = RandomGeneratedCoupon.get_coupons(coupon_codes)
+                plus_plan_id = request.data.get('plan_id')
+                if not plus_plan_id:
+                    raise serializers.ValidationError({"Plans": "Plus Plan is not Valid"})
+
+                if coupon_codes and not coupon_obj:
+                    raise serializers.ValidationError({"Coupon": "Applied coupon not found"})
+
+                if coupon_obj:
+                    for coupon in coupon_obj:
+                        profile = attrs.get("profile")
+                        obj = PlusUser()
+                        if obj.validate_user_coupon(user=user, coupon_obj=coupon, profile=profile).get("is_valid"):
+                            if not obj.validate_product_coupon(coupon_obj=coupon, gold_vip_plan_id=plus_plan_id,
+                                                               product_id=Order.VIP_PRODUCT_ID):
+                                raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                        else:
+                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                    attrs["coupon_obj"] = list(coupon_obj)
 
         return attrs
 
@@ -268,10 +283,13 @@ class PlusUserSerializer(serializers.Serializer):
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     amount = serializers.IntegerField()
+    effective_price = serializers.IntegerField()
     plus_members = serializers.ListSerializer(child=PlusMemberListSerializer())
     purchase_date = serializers.DateTimeField()
     expire_date = serializers.DateTimeField()
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    random_coupon_list = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
 
 class PlusUserModelSerializer(serializers.ModelSerializer):

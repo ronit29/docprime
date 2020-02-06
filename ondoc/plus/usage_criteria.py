@@ -3,10 +3,16 @@ from math import floor
 
 
 class AbstractCriteria(object):
-    def __init__(self, plus_obj):
-        self.plus_obj = plus_obj
-        self.plus_plan = plus_obj.plan
-        self.utilization = plus_obj.get_utilization
+    def __init__(self, plus_obj, plan=None):
+        if plus_obj.__class__.__name__ == 'PlusUser':
+            self.plus_obj = plus_obj
+        elif plus_obj.__class__.__name__ == 'TempPlusUser':
+            self.plus_obj = plus_obj
+        else:
+            self.plus_obj = None
+        # self.plus_obj = plus_obj if plus_obj.__class__.__name__ == 'PlusUser' else None
+        self.plus_plan = plus_obj.plan if plus_obj.__class__.__name__ in ['PlusUser', 'TempPlusUser'] else plan
+        self.utilization = plus_obj.get_utilization if plus_obj.__class__.__name__ in ['PlusUser', 'TempPlusUser'] else {}
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         raise NotImplementedError()
@@ -17,10 +23,12 @@ class AbstractCriteria(object):
         mrp = kwargs.get('mrp')
         deal_price = kwargs.get('deal_price')
         utilization = kwargs.get('utilization')
+        price_engine_price = kwargs.get('price_engine_price')
+        calculated_convenience_amount = kwargs.get('calculated_convenience_amount')
         if cost is None or cost < 0:
             return {}
 
-        return self._validate_booking_entity(cost, id, utilization=utilization, mrp=mrp, deal_price=deal_price)
+        return self._validate_booking_entity(cost, id, utilization=utilization, mrp=mrp, deal_price=deal_price, price_engine_price=price_engine_price, calculated_convenience_amount=calculated_convenience_amount)
 
     def _update_utilization(self, utilization, deduction_amount):
         raise NotImplementedError()
@@ -54,6 +62,17 @@ class ConvenienceAbstractCriteria(object):
         return self._get_price(price_data)
 
 
+class CorporateAbstractCriteria(object):
+    def __init__(self, plus_obj):
+        self.plus_obj = plus_obj
+
+    def _get_price(self, price_data):
+        raise NotImplementedError()
+
+    def get_price(self, price_data):
+        return self._get_price(price_data)
+
+
 class DoctorAmountCount(AbstractCriteria):
 
     def __init__(self, plus_obj):
@@ -67,7 +86,7 @@ class DoctorAmountCount(AbstractCriteria):
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         from ondoc.plus.models import PlusPlans
 
-        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
+        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost, 'convenience_charge': 0}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
@@ -84,7 +103,7 @@ class DoctorAmountCount(AbstractCriteria):
         # min_price = min_price_engine.get_price(price_data)
         # max_price_engine = get_max_convenience_reference(self.plus_obj, "DOCTOR")
         # max_price = max_price_engine.get_price(price_data)
-        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
+        convenience_charge = kwargs.get('calculated_convenience_amount', 0) if kwargs.get('calculated_convenience_amount') else 0
         total_cost = cost + convenience_charge
         if plan.is_gold and total_cost >= deal_price:
             return resp
@@ -94,7 +113,14 @@ class DoctorAmountCount(AbstractCriteria):
 
         if (total_doctor_count <= 0 and available_amount > 0) or (total_doctor_count > 0 and available_count > 0
                                                                   and available_amount > 0):
-            if not plan.is_gold:
+            if plan.is_corporate:
+                corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "DOCTOR")
+                if not corporate_cost_engine:
+                    return resp
+                cost = corporate_cost_engine.get_price(price_data)
+                upper_limit = int(plan.corporate_doctor_upper_limit)
+                if upper_limit < cost:
+                    return resp
                 if available_amount >= cost:
                     vip_amount_deducted = cost
                     amount_to_be_paid = 0
@@ -104,18 +130,29 @@ class DoctorAmountCount(AbstractCriteria):
                     amount_to_be_paid = int(cost - available_amount)
                     is_covered = True
             else:
-                difference_amount = int(mrp - cost)
-                if available_amount >= difference_amount:
-                    vip_amount_deducted = difference_amount
-                    amount_to_be_paid = cost
-                    is_covered = True
+                if not plan.is_gold:
+                    if available_amount >= cost:
+                        vip_amount_deducted = cost
+                        amount_to_be_paid = 0
+                        is_covered = True
+                    else:
+                        vip_amount_deducted = int(available_amount)
+                        amount_to_be_paid = int(cost - available_amount)
+                        is_covered = True
                 else:
-                    vip_amount_deducted = int(available_amount)
-                    amount_to_be_paid = cost + (int(difference_amount) - int(available_amount))
-                    is_covered = True
+                    difference_amount = int(mrp - cost)
+                    if available_amount >= difference_amount:
+                        vip_amount_deducted = difference_amount
+                        amount_to_be_paid = cost
+                        is_covered = True
+                    else:
+                        vip_amount_deducted = int(available_amount)
+                        amount_to_be_paid = cost + (int(difference_amount) - int(available_amount))
+                        is_covered = True
         resp['vip_amount_deducted'] = vip_amount_deducted
         resp['amount_to_be_paid'] = amount_to_be_paid
         resp['is_covered'] = is_covered
+        resp['convenience_charge'] = convenience_charge
 
         return resp
 
@@ -217,6 +254,7 @@ class LabtestAmountCount(AbstractCriteria):
         is_covered = False
         plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
+        price_engine_price = int(kwargs.get('price_engine_price', 0))
         price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
         # min_price_engine = get_min_convenience_reference(self.plus_obj, "LABTEST")
         # min_price = min_price_engine.get_price(price_data)
@@ -224,10 +262,9 @@ class LabtestAmountCount(AbstractCriteria):
         # max_price = max_price_engine.get_price(price_data)
         # convenience_charge = plan.get_convenience_charge(max_price, min_price, "LABTEST")
         # convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
-        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
-                                                                      default_plan_query=plan)
+        convenience_charge = kwargs.get('calculated_convenience_amount', 0) if kwargs.get('calculated_convenience_amount') else 0
         total_cost = cost + convenience_charge
-        if plan.is_gold and total_cost >= deal_price:
+        if plan.is_gold and (price_engine_price + convenience_charge) >= deal_price:
             return resp
 
         if not total_count_left and not total_amount_left:
@@ -235,21 +272,38 @@ class LabtestAmountCount(AbstractCriteria):
 
         if (total_count <= 0 and total_amount_left > 0) or (total_count > 0 and total_count_left > 0 and total_amount_left > 0):
             is_covered = True
-            if not plan.is_gold:
-                if cost <= total_amount_left:
+            if plan.is_corporate:
+                corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "LABTEST")
+                if not corporate_cost_engine:
+                    return resp
+                cost = corporate_cost_engine.get_price(price_data)
+                upper_limit = int(plan.corporate_lab_upper_limit)
+                if upper_limit < cost:
+                    return resp
+                if total_amount_left >= cost:
                     vip_amount_deducted = cost
                     amount_to_be_paid = 0
-                elif 0 < total_amount_left < cost:
-                    vip_amount_deducted = total_amount_left
-                    amount_to_be_paid = cost - total_amount_left
+                    is_covered = True
+                else:
+                    vip_amount_deducted = int(total_amount_left)
+                    amount_to_be_paid = int(cost - total_amount_left)
+                    is_covered = True
             else:
-                difference_amount = mrp - cost
-                if difference_amount <= total_amount_left:
-                    vip_amount_deducted = difference_amount
-                    amount_to_be_paid = cost
-                elif 0 < total_amount_left < difference_amount:
-                    vip_amount_deducted = total_amount_left
-                    amount_to_be_paid = cost + (difference_amount - total_amount_left)
+                if not plan.is_gold:
+                    if cost <= total_amount_left:
+                        vip_amount_deducted = cost
+                        amount_to_be_paid = 0
+                    elif 0 < total_amount_left < cost:
+                        vip_amount_deducted = total_amount_left
+                        amount_to_be_paid = cost - total_amount_left
+                else:
+                    difference_amount = mrp - cost
+                    if difference_amount <= total_amount_left:
+                        vip_amount_deducted = difference_amount
+                        amount_to_be_paid = cost
+                    elif 0 < total_amount_left < difference_amount:
+                        vip_amount_deducted = total_amount_left
+                        amount_to_be_paid = cost + (difference_amount - total_amount_left)
 
         resp['vip_amount_deducted'] = int(vip_amount_deducted)
         resp['amount_to_be_paid'] = int(amount_to_be_paid)
@@ -343,15 +397,12 @@ class PackageAmountCount(AbstractCriteria):
         plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
         price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
-        # min_price_engine = get_min_convenience_reference(self.plus_obj, "LABTEST")
-        # min_price = min_price_engine.get_price(price_data)
-        # max_price_engine = get_max_convenience_reference(self.plus_obj, "LABTEST")
-        # max_price = max_price_engine.get_price(price_data)
-        # convenience_charge = plan.get_convenience_charge(max_price, min_price, "LABTEST")
-        # convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
-        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
+        price_engine_price = int(kwargs.get('price_engine_price', 0))
+        convenience_charge = kwargs.get('calculated_convenience_amount', 0) if kwargs.get('calculated_convenience_amount') else 0
         total_cost = cost + convenience_charge
-        if plan.is_gold and total_cost >= deal_price:
+        if plan.is_gold and (price_engine_price + convenience_charge) >= deal_price:
+            return resp
+        if plan.is_corporate:
             return resp
 
         vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
@@ -795,6 +846,86 @@ class ConvenienceLabtestCodDealPrice(ConvenienceAbstractCriteria):
         return price_data.get('deal_price', 0)
 
 
+class CorporateDoctorMrp(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class CorporateDoctorDealPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+class CorporateDoctorAgreedPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('fees', 0)
+
+
+class CorporateDoctorCodDealPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('cod_deal_price', 0)
+
+
+class CorporateLabtestMrp(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class CorporateLabtestDealPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+class CorporateLabtestAgreedPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('fees', 0)
+
+
+class CorporateLabtestCodDealPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
 price_criteria_class_mapping = {
     'DOCTOR': {
         'MRP': DoctorMrp,
@@ -825,6 +956,21 @@ convenience_price_criteria_class_mapping = {
     }
 }
 
+corporate_price_criteria_class_mapping = {
+    'DOCTOR': {
+        'MRP': CorporateDoctorMrp,
+        'DEAL_PRICE': CorporateDoctorDealPrice,
+        'AGREED_PRICE': CorporateDoctorAgreedPrice,
+        'COD_DEAL_PRICE': CorporateDoctorCodDealPrice
+    },
+    'LABTEST': {
+        'MRP': CorporateLabtestMrp,
+        'DEAL_PRICE': CorporateLabtestDealPrice,
+        'AGREED_PRICE': CorporateLabtestAgreedPrice,
+        'COD_DEAL_PRICE': CorporateLabtestCodDealPrice
+    }
+}
+
 
 def get_class_reference(plus_membership_obj, entity):
     if not plus_membership_obj:
@@ -838,16 +984,33 @@ def get_class_reference(plus_membership_obj, entity):
     return class_reference(plus_membership_obj)
 
 
-def get_price_reference(plus_membership_obj, entity):
-    if not plus_membership_obj:
+def get_price_reference(obj, entity):
+    if not obj:
         return None
 
-    price_criteria = plus_membership_obj.plan.price_criteria
+    if obj.__class__.__name__ not in ['PlusUser', 'PlusPlans', 'TempPlusUser']:
+        return None
+
+    price_criteria = obj.plan.price_criteria if obj.__class__.__name__ in ['PlusUser', 'TempPlusUser'] else obj.price_criteria
     if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
         return None
 
     class_reference = price_criteria_class_mapping[entity][price_criteria]
-    return class_reference(plus_membership_obj)
+    return class_reference(obj)
+
+
+def get_corporate_price_reference(obj, entity):
+    if not obj:
+        return None
+
+    if obj.__class__.__name__ not in ['PlusUser']:
+        return None
+
+    price_criteria = obj.plan.corporate_upper_limit_criteria if obj.__class__.__name__ in ['PlusUser'] else obj.corporate_upper_limit_criteria
+    if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
+        return None
+    class_reference = corporate_price_criteria_class_mapping[entity][price_criteria]
+    return class_reference(obj)
 
 
 def get_max_convenience_reference(plan, entity):
