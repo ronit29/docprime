@@ -2687,7 +2687,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if deal_price:
             result = deal_price
         if discount:
-            result =- discount
+            result -= discount
         # if self.doctor:
         #     aware_dt = timezone.localtime(self.time_slot_start)
         #     hour_min = aware_dt.hour + aware_dt.minute / 60
