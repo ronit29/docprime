@@ -2687,7 +2687,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if deal_price:
             result = deal_price
         if discount:
-            result =- discount
+            result -= discount
         # if self.doctor:
         #     aware_dt = timezone.localtime(self.time_slot_start)
         #     hour_min = aware_dt.hour + aware_dt.minute / 60
@@ -5432,10 +5432,10 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
 
 class GoogleMapRecords(auth_model.TimeStampedModel):
-    PHLEBO_NA = 1
-    PHLEBO_YES = 2
-    PHLEBO_NO = 3
-    PHLEBO_CHOICES = [(PHLEBO_NA, "NA"), (PHLEBO_YES, "Yes"), (PHLEBO_NO, "No")]
+    NA = 1
+    YES = 2
+    NO = 3
+    DEFAULT_CHOICES = [(NA, "NA"), (YES, "Yes"), (NO, "No")]
 
     ONBOARDED_NA = 1
     ONBOARDED_YES = 2
@@ -5464,9 +5464,18 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     is_bookable = models.SmallIntegerField(null=True, blank=True)
     phone_number = models.CharField(max_length=500, null=True, blank=True)
     hospital_id = models.IntegerField(null=True, blank=True)
-    has_phlebo = models.SmallIntegerField(choices=PHLEBO_CHOICES, default=PHLEBO_NA)
+    has_phlebo = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
+    phlebo_type = models.CharField(max_length=100, null=True, blank=True)
     serial_number = models.IntegerField(blank=True, null=True)
     onboarded = models.SmallIntegerField(choices=ONBOARDED_CHOICES, default=ONBOARDED_NA)
+    interested_in_diagnostics = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
+    interested_in_pharmacy = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
+    samples_per_month = models.IntegerField(blank=True, null=True)
+    latitude_sales = models.DecimalField(max_digits=9, decimal_places=6, default=None, null=True, blank=True)
+    longitude_sales = models.DecimalField(max_digits=9, decimal_places=6, default=None, null=True, blank=True)
+    cluster = models.CharField(max_length=100, null=True, blank=True)
+    ready_to_use_wallet = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
+    digital_only_report = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
 
     class Meta:
         db_table = "google_map_records"
