@@ -472,6 +472,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
     payment_type = models.PositiveSmallIntegerField(choices=const.PAY_CHOICES, default=const.PREPAID)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="plus_coupon")
 
+    def add_user_profile_to_members(self, user_profile):
+        members = [{
+            'profile': user_profile.id,
+            'dob': user_profile.dob,
+            'email': user_profile.email,
+            'gender': user_profile.gender,
+            'is_primary_user': False,
+            'first_name': user_profile.name
+        }]
+        PlusMembers.create_plus_members(self, members=members)
+
     # Purchased gold plan have few states , some are valid and some are not valid, check if plan is still valid or not.
     def is_valid(self):
         if self.expire_date >= timezone.now() and (self.status == self.ACTIVE):
