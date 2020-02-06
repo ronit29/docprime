@@ -2439,7 +2439,7 @@ class SendBookingUrlViewSet(GenericViewSet):
         utm_tags = request.data.get('utm_spo_tags', {})
         if not utm_tags:
             utm_tags = {}
-        utm_source = utm_tags.get('utm_source', '')
+        utm_source = utm_tags.get('utm_source', {})
         landing_url = request.data.get('landing_url')
         message_medium = request.data.get('message_medium', None)
 
@@ -2475,7 +2475,7 @@ class SendBookingUrlViewSet(GenericViewSet):
 
         if message_medium == 'WHATSAPP':
             whatsapp_template = 'gold_payment_template'
-            utm_source = utm_source.get('utm_source', '')
+            utm_source = utm_source.get('utm_source', {})
             landing_url = utm_source.get('landing_url', '')
             booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
             if utm_source:
