@@ -204,6 +204,9 @@ class WhatsappNotificationViewSet(viewsets.GenericViewSet):
 
         callback = request.data.get('callback')
         template = request.data.get('template')
+        if not callback or not template:
+            return Response({'error': 'Callback and template not provided.'}, status= status.HTTP_400_BAD_REQUEST)
+
         user_token = JWTAuthentication.generate_token(request.user, request)
         token = user_token['token'].decode("utf-8") if 'token' in user_token else None
         if '?' not in callback:
