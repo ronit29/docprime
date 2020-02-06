@@ -54,3 +54,4 @@ django-reversion-compare
 pandas
 newrelic
 geopy
+xlrd
