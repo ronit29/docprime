@@ -1493,8 +1493,7 @@ def create_prescription_lead_to_matrix(self, data):
             phone_number = appointment.profile.phone_number
         else:
             phone_number = appointment.user.phone_number
-        feedback_url = "%s/api/v1/diagnostic/feedback_to_matrix?" \
-                         "&appointment_id=%s" \
+        feedback_url = "%s/chat-ratings?&appointment_id=%s" \
                          % (settings.BASE_URL, appointment.id)
         tiny_feedback_url = generate_short_url(feedback_url)
 
