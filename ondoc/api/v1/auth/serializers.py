@@ -224,6 +224,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if not plus_membership:
             return resp
         resp['expiry_date'] = plus_membership.expire_date.date()
+        resp['total_members_allowed'] = plus_membership.plan.total_allowed_members
         resp['purchase_date'] = plus_membership.purchase_date.date()
         primary_member = plus_membership.get_primary_member_profile()
         if primary_member:

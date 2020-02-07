@@ -370,8 +370,8 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
         serializer = [serializers.UserProfileSerializer(q, context= {'request':request}).data for q in qs]
         result = list()
-        result.extend(list(filter(lambda x: x['is_default_user'], serializer)))
-        result.extend(list(filter(lambda x: x['is_vip_gold_member'], serializer)))
+        result.extend(list(filter(lambda x: (x['is_default_user'] and x['is_vip_gold_member']) or x['is_default_user'], serializer)))
+        result.extend(list(filter(lambda x: x['is_vip_gold_member'] and not x['is_default_user'], serializer)))
         result.extend(list(filter(lambda x: not x['is_default_user'] and not x['is_vip_gold_member'], serializer)))
 
         return Response(data=result)
