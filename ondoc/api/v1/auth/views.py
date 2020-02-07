@@ -2455,6 +2455,8 @@ class SendBookingUrlViewSet(GenericViewSet):
             if not landing_url:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'No Landing url found.'})
             SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url, user_id=request.user.id)
+            if message_medium == 'WHATSAPP':
+                self.send_whatsapp(request, token, utm_source)
             return Response({"status": 1})
 
         if purchase_type == 'vip_purchase':
@@ -2474,22 +2476,25 @@ class SendBookingUrlViewSet(GenericViewSet):
             EmailNotification.send_booking_url(token=token, email=user_profile.email, user=user_profile.user)
 
         if message_medium == 'WHATSAPP':
-            whatsapp_template = 'gold_payment_template'
-            utm_source = utm_source.get('utm_source', {})
-            landing_url = utm_source.get('landing_url', '')
-            booking_url = "{}/agent/booking?user_id={}&token={}".format(settings.CONSUMER_APP_DOMAIN, request.user.id, token)
-            if utm_source:
-                booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
-                    landing_url=landing_url, utm_source=utm_source)
-            else:
-                booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false".format(
-                    landing_url=landing_url)
-
-            short_url = generate_short_url(booking_url)
-            whatsapp_payload = [short_url]
-            WhtsappNotification.send_whatsapp(request.user.phone_number, whatsapp_template, whatsapp_payload, None)
+            self.send_whatsapp(request, token, utm_source)
 
         return Response({"status": 1})
+
+    def send_whatsapp(self, request, token, utm_source):
+        whatsapp_template = 'gold_payment_template'
+        utm_source = utm_source.get('utm_source', {})
+        landing_url = utm_source.get('landing_url', '')
+        booking_url = "{}/agent/booking?user_id={}&token={}".format(settings.CONSUMER_APP_DOMAIN, request.user.id,
+                                                                    token)
+        if utm_source:
+            booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
+                landing_url=landing_url, utm_source=utm_source)
+        else:
+            booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false".format(
+                landing_url=landing_url)
+        short_url = generate_short_url(booking_url)
+        whatsapp_payload = [short_url]
+        WhtsappNotification.send_whatsapp(request.user.phone_number, whatsapp_template, whatsapp_payload, None)
 
 
 class SendCartUrlViewSet(GenericViewSet):
