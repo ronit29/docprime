@@ -210,9 +210,9 @@ class WhatsappNotificationViewSet(viewsets.GenericViewSet):
         user_token = JWTAuthentication.generate_token(request.user, request)
         token = user_token['token'].decode("utf-8") if 'token' in user_token else None
         if '?' not in callback:
-            short_url = "{}/{}?token={}".format(settings.CONSUMER_APP_DOMAIN, callback, token)
+            short_url = "{}{}?token={}".format(settings.CONSUMER_APP_DOMAIN, callback, token)
         else:
-            short_url = "{}/{}&token={}".format(settings.CONSUMER_APP_DOMAIN, callback, token)
+            short_url = "{}{}&token={}".format(settings.CONSUMER_APP_DOMAIN, callback, token)
 
         short_url = generate_short_url(short_url)
         whatsapp_payload = [short_url]
