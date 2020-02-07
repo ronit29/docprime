@@ -2477,7 +2477,7 @@ class SendBookingUrlViewSet(GenericViewSet):
             whatsapp_template = 'gold_payment_template'
             utm_source = utm_source.get('utm_source', {})
             landing_url = utm_source.get('landing_url', '')
-            booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+            booking_url = "{}/agent/booking?user_id={}&token={}".format(settings.CONSUMER_APP_DOMAIN, request.user.id, token)
             if utm_source:
                 booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
                     landing_url=landing_url, utm_source=utm_source)
