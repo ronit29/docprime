@@ -417,9 +417,10 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
 
-        default_profile = request.user.get_default_profile()
-        if default_profile.email and not data.get('email'):
-            data['email'] = default_profile.email
+        if add_to_gold_members:
+            default_profile = request.user.get_default_profile()
+            if default_profile.email and not data.get('email'):
+                data['email'] = default_profile.email
 
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
@@ -458,6 +459,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
+
+        add_to_gold_members = data.get('add_to_gold')
+        if add_to_gold_members:
+            default_profile = request.user.get_default_profile()
+            if default_profile.email and not data.get('email'):
+                data['email'] = default_profile.email
 
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
             return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
@@ -521,6 +528,11 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                        }
                 }, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
+
+        if add_to_gold_members:
+            saved_profile = request.user.profiles.filter().order_by('-created_at').first()
+            request.user.active_plus_user.add_user_profile_to_members(saved_profile)
+
         return Response(serializer.data)
 
     def upload(self, request, *args, **kwargs):
