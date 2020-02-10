@@ -2461,6 +2461,8 @@ class SendBookingUrlViewSet(GenericViewSet):
 
         if purchase_type == 'vip_purchase':
             SmsNotification.send_vip_booking_url(token, str(request.user.phone_number), utm_source=utm_source, user_id=request.user.id)
+            if message_medium == 'WHATSAPP':
+                self.send_whatsapp(request, token, utm_source, landing_url)
             return Response({"status": 1})
 
         if not user_profile:
