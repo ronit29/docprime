@@ -1229,6 +1229,134 @@ class EntityUrls(TimeStampedModel):
         return True
 
     @classmethod
+    def create_lab_search_urls_new(cls):
+        query = '''select nextval('entity_url_version_seq') as inc;'''
+        seq = RawSql(query, []).fetch_all()
+        if seq:
+            sequence = seq[0]['inc'] if seq[0]['inc'] else 0
+        else:
+            sequence = 0
+
+        RawSql('truncate table temp_url', []).execute()
+
+        ea_limit = RawSql('select min(id) min, max(id) max from entity_address', []).fetch_all()
+
+        min_ea = ea_limit[0]['min']
+        max_ea = ea_limit[0]['max']
+        step = 2000
+
+        lab_search_query = ''' select lab_id, sublocality_value,
+                                locality_value, count,  entity_type, url_type, is_valid from (
+                                select  ROW_NUMBER() OVER (PARTITION BY lab_id) AS row_num, lab_id, sublocality_value,
+                                locality_value, count,  entity_type, url_type, is_valid
+                                from (
+                                select max(l.id) as lab_id, max(l.locality) as sublocality_value, max(l.city) as locality_value, count(*) count,
+                                'Lab' as entity_type, 'SEARCHURL' url_type, True as is_valid
+                                from entity_address ea inner join lab l on l.is_live=true and ((ea.type = 'LOCALITY' and l.city=ea.value and 
+                                ST_DWithin(ea.centroid::geography,l.location::geography,l.search_url_locality_radius)) OR 
+                                (ea.type = 'SUBLOCALITY' and l.locality=ea.value and 
+                                ST_DWithin(ea.centroid::geography,l.location::geography,l.search_url_sublocality_radius))) 
+                                and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true
+                                where ea.id>=%d and ea.id<%d
+                                group by ea.id
+                                )a where count>=%d)b  where row_num=1'''
+
+        start = min_ea
+        while start < max_ea:
+            query = lab_search_query % (start, start + step, int(settings.LAB_COUNT))
+            lab_data = RawSql(query, []).fetch_all()
+            if lab_data:
+                lab_ids = [data.get('lab_id', None) for data in lab_data]
+                from ondoc.diagnostic.models import Lab
+                lab_loc_map = Lab.objects.filter(id__in=lab_ids).values('id', 'location')
+
+                to_create = []
+                lab_loc_dict = dict()
+                for data in lab_loc_map:
+                    if not lab_loc_dict.get(data.get('id', None)):
+                        lab_loc_dict[data.get('id')] = data.get('location', None)
+
+                for data in lab_data:
+                    location = lab_loc_dict[data.get('lab_id', None)]
+                    if location:
+                        url_data = {}
+                        url_data['is_valid'] = data.get('is_valid')
+                        url_data['url_type'] = data.get('url_type')
+                        url_data['entity_type'] = data.get('entity_type')
+                        url_data['count'] = data.get('count')
+                        url_data['sitemap_identifier'] = 'LAB_CITY'
+                        url_data['locality_latitude'] = location.y
+                        url_data['locality_longitude'] = location.x
+                        url_data['location'] = location
+                        url_data['locality_location'] = location
+                        url_data['locality_value'] = data.get('locality_value')
+                        url_data['url'] = slugify('labs-in-' + data.get('locality_value') + '-lbcit')
+                        to_create.append(TempURL(**url_data))
+                        url_data['sitemap_identifier'] = 'LAB_LOCALITY_CITY'
+                        url_data['sublocality_value'] = data.get('sublocality_value')
+                        url_data['sublocality_latitude'] = location.y
+                        url_data['sublocality_longitude'] = location.x
+                        url_data['sublocality_location'] = location
+                        url_data['url'] = slugify(
+                            'labs-in-' + data.get('sublocality_value') + '-' + data.get('locality_value') + '-lblitcit')
+                        to_create.append(TempURL(**url_data))
+
+            TempURL.objects.bulk_create(to_create)
+
+            start = start + step
+
+        update_extras_query = '''update  temp_url 
+                                              set extras = case when sitemap_identifier='LAB_CITY' then
+                                              json_build_object('location_json',json_build_object('locality_id',locality_id,'locality_value',locality_value, 
+                                              'locality_latitude',locality_latitude,'locality_longitude',locality_longitude))
+
+                                              else json_build_object('location_json',
+                                              json_build_object('sublocality_id', sublocality_id,'sublocality_value', sublocality_value,
+                                              'locality_id', locality_id, 'locality_value', locality_value,'breadcrum_url',slugify_url('labs-in-' || locality_value ||'-lbcit'),
+                                              'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 'locality_latitude',locality_latitude,
+                                              'locality_longitude',locality_longitude))  end
+                                               '''
+        update_extras = RawSql(update_extras_query, []).execute()
+
+        # clean up duplicate urls
+
+        RawSql('''delete from temp_url where id in (select id from 
+                        (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from temp_url eu  
+                        )x where rownum>1
+                        ) ''', []).execute()
+
+        # insert into entity_urls
+        query = '''insert into entity_urls(sequence,extras, sitemap_identifier, url, count, entity_type, 
+                 url_type,  created_at, 
+                 updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
+                 locality_longitude, locality_id, sublocality_id,
+                 locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location, entity_id, 
+                 specialization_id, specialization, breadcrumb, bookable_doctors_count)
+
+                 select %d as sequence ,a.extras, a.sitemap_identifier,getslug(a.url) as url, a.count, a.entity_type,
+                  a.url_type, now() as created_at, now() as updated_at,
+                  a.sublocality_latitude, a.sublocality_longitude, a.locality_latitude, a.locality_longitude,
+                  a.locality_id, a.sublocality_id, a.locality_value, a.sublocality_value, a.is_valid, 
+                  a.locality_location, a.sublocality_location, a.location, entity_id, 
+                  specialization_id, specialization, breadcrumb, bookable_doctors_count from temp_url a
+                   ''' %sequence
+
+        update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
+                           in ('LAB_LOCALITY_CITY', 'LAB_CITY') and sequence< %d''' % sequence
+
+        cleanup = '''delete from entity_urls where id in (select id from 
+                (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
+                )x where rownum>1
+                ) '''
+
+        RawSql(query, []).execute()
+        RawSql(update_query, []).execute()
+        RawSql(cleanup, []).execute()
+
+        return True
+
+
+    @classmethod
     def create_lab_search_urls(cls):
         from ondoc.diagnostic.models import Lab
 
@@ -1714,11 +1842,13 @@ class LabPageUrl(object):
         self.lab = lab
         self.locality = None
         self.sequence = sequence
-
         self.sublocality = None
         self.sublocality_id = None
         self.sublocality_longitude = None
         self.sublocality_latitude = None
+        self.locality_longitude = None
+        self.locality_latitude = None
+        self.locality_id = None
 
     def initialize(self):
         if self.lab:
@@ -1735,6 +1865,85 @@ class LabPageUrl(object):
                 self.locality_id = locality.location.id
                 self.locality_longitude = locality.location.centroid.x
                 self.locality_latitude = locality.location.centroid.y
+
+    def create_page_urls(lab, sequence, cache):
+        sequence = sequence
+        locality_value = None
+        locality_id = None
+        locality_latitude = None
+        locality_longitude = None
+        sublocality_value = None
+        sublocality_id = None
+        sublocality_longitude = None
+        sublocality_latitude = None
+
+        if lab:
+            if lab.is_live:
+                sublocality_value = lab.locality
+                if lab.location:
+                        sublocality_longitude = lab.location.x
+                        sublocality_latitude = lab.location.y
+                        locality_longitude = lab.location.x
+                        locality_latitude = lab.location.y
+                locality_value = lab.city
+
+        if lab:
+            url = "%s" % lab.name
+            if locality_value and sublocality_value:
+                url = url + "-in-%s-%s-lpp" % (sublocality_value, locality_value)
+            elif locality_value:
+                url = url + "-in-%s-lpp" % locality_value
+
+            url = slugify(url)
+
+            data = {}
+            data['url'] = url
+            data['is_valid'] = True
+            data['url_type'] = EntityUrls.UrlType.PAGEURL
+            data['entity_type'] = 'Lab'
+            data['entity_id'] = lab.id
+            data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.LAB_PAGE
+            data['locality_id'] = locality_id
+            data['locality_value'] = locality_value
+            data['locality_latitude'] = locality_latitude
+            data['locality_longitude'] = locality_longitude
+
+            if locality_latitude and locality_longitude:
+                data['locality_location'] = Point(locality_longitude, locality_latitude)
+
+            if sublocality_latitude and sublocality_longitude:
+                data['sublocality_location'] = Point(sublocality_longitude, sublocality_latitude)
+
+            data['sublocality_id'] = sublocality_id
+            data['sublocality_value'] = sublocality_value
+            data['sublocality_latitude'] = sublocality_latitude
+            data['sublocality_longitude'] = sublocality_longitude
+            data['location'] = lab.location
+
+            extras = {}
+            extras['related_entity_id'] = lab.id
+            extras['location_id'] = None
+            extras['locality_value'] = locality_value if locality_value else ''
+            extras['sublocality_value'] = sublocality_value if sublocality_value else ''
+            extras['breadcrums'] = []
+            data['extras'] = extras
+            data['sequence'] = sequence
+
+            new_url = url
+
+            is_duplicate = cache.is_duplicate(new_url + '-lpp', lab.id)
+
+            if is_duplicate:
+                new_url = new_url + '-' + str(lab.id)
+
+            new_url = new_url + '-lpp'
+
+            data['url'] = new_url
+            new_entity = EntityUrls(**data)
+
+            cache.add(new_entity)
+
+            return new_entity
 
     def create(self):
         self.initialize()
@@ -2215,3 +2424,12 @@ class CityLatLong(TimeStampedModel):
 
     class Meta:
         db_table = 'city_lat_long'
+
+
+class ClusterMap(TimeStampedModel):
+    is_active = models.BooleanField(default=True)
+    polygon_data = models.TextField(blank=True, null=True)
+    center_point_data = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'cluster_map'

@@ -7,12 +7,16 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
+from django.db.models import F, Window, DateTimeField, TimeField
+from django.db.models.expressions import RawSQL, ExpressionWrapper
+from django.db.models.functions import Rank
 from django.forms.models import model_to_dict
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.authentication.models import NotificationEndpoint
 from ondoc.authentication.models import UserProfile
 from ondoc.account import models as account_model
 from ondoc.api.v1.utils import readable_status_choices, generate_short_url
+# from ondoc.doctor.models import Hospital, Doctor
 from ondoc.notification.rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
@@ -36,7 +40,6 @@ from ondoc.common.helper import Choices
 from django.utils.safestring import mark_safe
 from collections import OrderedDict
 from django.template import Context, Template
-
 import copy
 import random, string
 
@@ -157,6 +160,16 @@ class NotificationAction:
     PARTNER_LAB_REPORT_UPLOADED = 209
     PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY = 210
 
+    IPDIntimateEmailNotification = 301
+
+    # Not for Medanta and Artimis Hospitals
+    PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT = 321
+    PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC = 322
+    PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT = 323
+    PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC = 324
+    REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS = 341
+    PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT = 331
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -232,6 +245,8 @@ class NotificationAction:
         (PARTNER_LAB_NEED_HELP, 'Partner Lab Need Help'),
         (PARTNER_LAB_REPORT_UPLOADED, 'Partner Lab Report Uploaded'),
         (PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY, 'Partner Lab Order Placed Successfully'),
+
+        (IPDIntimateEmailNotification, 'IPD Intimate Email Notification Send Successfully'),
     )
     OPD_APPOINTMENT = "opd_appointment"
     LAB_APPOINTMENT = "lab_appoingment"
@@ -857,8 +872,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, email):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_booking_url(cls, token, email, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         short_url = generate_short_url(booking_url)
         html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         email_subject = "Booking Url"
@@ -877,8 +893,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
-    def send_insurance_booking_url(cls, token, email):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_insurance_booking_url(cls, token, email, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
@@ -919,8 +936,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
-    def send_endorsement_request_url(cls, token, email):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_endorsement_request_url(cls, token, email, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id )
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
         short_url = generate_short_url(booking_url)
         html_body = "Your Endorsement Request url is - {} . Please confirm to process".format(short_url)
@@ -1023,19 +1041,30 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     @classmethod
     def send_dynamic_template_notification(cls, recipient_obj, html_body, email_subject, notification_type, *args, **kwargs):
         if recipient_obj and recipient_obj.to:
+            obj = None
+            content_type = None
+            # if kwargs.get('ipd_email_obj'):
+            #     obj = kwargs.get('ipd_email_obj')
+            if kwargs.get('email_obj'):
+                obj = kwargs.get('email_obj')
+                content_type = ContentType.objects.get_for_model(obj)
 
             if kwargs.get('is_preview', False):
                 email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
-                                               content=html_body, email_subject=email_subject, cc=[], bcc=[])
+                                               content=html_body, email_subject=email_subject, cc=[], bcc=[], object_id=obj.id, content_type= content_type)
 
             else:
                 email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
-                                               content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc)
+                                               content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc, object_id=obj.id, content_type= content_type)
+                # object_id = models.BigIntegerField(null=True)
+                # content_object = GenericForeignKey()
 
             email_obj.save()
 
             email_noti = {
                 "email": recipient_obj.to,
+                "cc": recipient_obj.cc,
+                "bcc": recipient_obj.bcc,
                 "content": html_body,
                 "email_subject": email_subject
             }
@@ -1174,8 +1203,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, phone_number, name):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_booking_url(cls, token, phone_number, name, user):
+        user_id = user.id if user  else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         short_url = generate_short_url(booking_url)
         html_body = "Dear {}, \n" \
                     "Please click on the link to review your appointment details and make an online payment.\n" \
@@ -1196,8 +1226,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_insurance_booking_url(cls, token, phone_number):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_insurance_booking_url(cls, token, phone_number, user):
+        user_id = user.id if user  else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
@@ -1217,11 +1248,11 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     @classmethod
     def send_vip_booking_url(cls, token, phone_number, *args, **kwargs):
         utm_source = kwargs.get('utm_source', '')
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, kwargs.get('user_id'))
         if utm_source:
-            booking_url = booking_url + "&callbackurl=vip-club-member-details?utm_source={utm_source}&is_agent=false".format(utm_source=utm_source)
+            booking_url = booking_url + "&callbackurl=vip-club-member-details&utm_source={utm_source}&is_agent=false".format(utm_source=utm_source)
         else:
-            booking_url = booking_url + "&callbackurl=vip-club-member-details?is_agent=false"
+            booking_url = booking_url + "&callbackurl=vip-club-member-details&is_agent=false"
 
         short_url = generate_short_url(booking_url)
         print(short_url)
@@ -1241,8 +1272,38 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_endorsement_request_url(cls, token, phone_number):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_single_purchase_booking_url(cls, token, phone_number, *args, **kwargs):
+        utm_source = kwargs.get('utm_source', '')
+        landing_url = kwargs.get('landing_url', '')
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, kwargs.get('user_id'))
+        if utm_source:
+            booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
+                landing_url=landing_url, utm_source=utm_source)
+        else:
+            booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false".format(landing_url=landing_url)
+
+        short_url = generate_short_url(booking_url)
+        print(short_url)
+
+        sms_body = "Hi,\nPlease click on the link to review your appointment details and make an online payment.\n{link} \nThanks\nTeam Docprime".format(
+            link=short_url)
+        if phone_number:
+            sms_notification = {
+                "phone_number": phone_number,
+                "content": sms_body,
+            }
+            message = {
+                "data": sms_notification,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
+    def send_endorsement_request_url(cls, token, phone_number, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user-id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance Endorsement request url is - {} . Please confirm to process".format(short_url)
@@ -1260,10 +1321,11 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_cart_url(cls, token, phone_number, utm):
+    def send_cart_url(cls, token, phone_number, utm, user):
+        user_id = user.id if user else None
         callback_url = "cart"
-        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}&{}".format(settings.CONSUMER_APP_DOMAIN,
-                                                                                         token, callback_url, utm)
+        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}&{}&user_id={}".format(settings.CONSUMER_APP_DOMAIN,
+                                                                                         token, callback_url, utm, user_id)
         short_url = generate_short_url(payment_page_url)
         html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         if phone_number:
@@ -1498,6 +1560,7 @@ class DynamicTemplates(TimeStampedModel):
 
     def send_notification(self, context, recipient_obj, notification_type, *args, **kwargs):
         rendered_content = self.render_template(context)
+
         if rendered_content is None:
             logger.error("Could not generate content. Dynamic temlplate id %s" % str(self.id))
             return None
@@ -1508,8 +1571,9 @@ class DynamicTemplates(TimeStampedModel):
 
             recipient_obj.add_cc(self.get_cc())
             recipient_obj.add_bcc(self.get_bcc())
+            rendered_subject = self.render_template_subject(context)
 
-            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type, *args, **kwargs)
+            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, rendered_subject, notification_type, *args, **kwargs)
         elif self.template_type == self.TemplateType.SMS:
             SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type, *args, **kwargs)
 
@@ -1520,6 +1584,19 @@ class DynamicTemplates(TimeStampedModel):
 
         try:
             file_content = self.content
+            t = Template(file_content)
+            c = Context(context)
+            rendered_data = t.render(c)
+        except Exception as e:
+            logger.error(str(e))
+
+        return rendered_data
+
+    def render_template_subject(self, context):
+        rendered_data = None
+
+        try:
+            file_content = self.subject
             t = Template(file_content)
             c = Context(context)
             rendered_data = t.render(c)
@@ -1641,3 +1718,52 @@ class DynamicTemplates(TimeStampedModel):
     #
     #     return parameter_dict
 
+
+class IPDIntimateEmailNotification(TimeStampedModel):
+
+    MALE = 'm'
+    FEMALE = 'f'
+    GENDER_TYPE_CHOICES = (
+        (MALE, 'male'),
+        (FEMALE, 'female')
+    )
+
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=False)
+    doctor = models.ForeignKey('doctor.Doctor', on_delete=models.DO_NOTHING, null=False)
+    hospital = models.ForeignKey('doctor.Hospital', on_delete=models.DO_NOTHING, null=False)
+    phone_number = models.BigIntegerField(null=False)
+    preferred_date = models.DateField(null=True, blank=True)
+    time_slot = models.TimeField(blank=True, null=True)
+    gender = models.CharField(max_length=100,choices=GENDER_TYPE_CHOICES, blank=True, null=True)
+    dob = models.DateField(blank=True, null=True)
+    email_notifications = JSONField(null=True, blank=True)
+    profile = models.ForeignKey(UserProfile, related_name="ipd_profile", on_delete=models.DO_NOTHING, null=True, blank=True)
+    is_sent = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "ipd_intimate_email_notification"
+
+
+    @classmethod
+    def send_email(cls, *args, **kwargs):
+        current_date = datetime.datetime.now()
+        ipd_obj = IPDIntimateEmailNotification.objects.annotate(rank=Window(expression=Rank(),
+                                            order_by=F('id').desc(), partition_by=[F('user_id')]),
+                                                time_diff=ExpressionWrapper(current_date - F('created_at'), output_field=TimeField())).filter(is_sent=False, time_diff__gt='0:2:0')
+
+        ipd_obj = [obj for obj in ipd_obj if obj.rank == 1]
+
+        for data in ipd_obj:
+            if data.is_sent == False:
+                spoc_details = data.hospital.spoc_details.all()
+                receivers = [{'user': data.user_id, 'email': spoc.email} for spoc in spoc_details]
+                from ondoc.communications.models import EMAILNotification
+                email_notification = EMAILNotification(notification_type=NotificationAction.IPDIntimateEmailNotification,
+                                                       context={'doctor_name': data.doctor.name, 'dob': data.dob,
+                                                                'Mobile': data.phone_number, 'date_time': str(data.preferred_date) + " " + str(data.time_slot),                                                                         'Hospital_Name': data.hospital.name , 'Patient_name': data.profile.name})
+
+                kwargs['email_obj'] = data
+                kwargs['ipd_email_obj'] = data
+                # email_notification.send(receivers, *args, **kwargs)
+                IPDIntimateEmailNotification.objects.filter(user=data.user).update(is_sent=True)
+                print("ipd_obj: " + str(data.id))

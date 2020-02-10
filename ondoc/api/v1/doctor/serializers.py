@@ -9,7 +9,7 @@ from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
-from ondoc.common.models import Feature, MatrixMappedCity
+from ondoc.common.models import Feature, MatrixMappedCity, SearchCriteria, UserConfig
 from ondoc.diagnostic.models import LabTest
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
@@ -20,7 +20,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
                                  AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup,
-                                 PracticeSpecialization)
+                                 PracticeSpecialization, CommonHospital, GoogleMapRecords)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -49,8 +49,9 @@ from django.conf import settings
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold, InsuranceDoctorSpecializations
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
-from ondoc.plus.models import PlusUser, PlusAppointmentMapping
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.models import PlusUser, PlusAppointmentMapping, PlusPlans
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
+    get_max_convenience_reference
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail, Offer
@@ -133,7 +134,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     payment_type = serializers.SerializerMethodField()
     effective_price = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
-
+    payment_mode = serializers.SerializerMethodField()
 
     def get_payment_type(self, obj):
         return obj.payment_type
@@ -146,6 +147,12 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     def get_vip(self, obj):
 
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        is_gold_member = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         plus_appointment_mapping = None
         vip_amount = 0
         if obj:
@@ -155,10 +162,19 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
                 vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
 
+        if plus_appointment_mapping and plus_appointment_mapping.plus_user and plus_appointment_mapping.plus_user.plan and plus_appointment_mapping.plus_user.plan.is_gold:
+            is_gold_member = True
+        else:
+            is_gold_member = False
+
         return {
-            'is_vip_member': True if obj and obj.plus_plan else False,
+            'is_vip_member': True if obj and obj.plus_plan and obj.plus_plan.plan and not obj.plus_plan.plan.is_gold else False,
             'vip_amount': vip_amount,
-            'covered_under_vip': True if obj and obj.plus_plan else False
+            'is_gold_member': is_gold_member,
+            'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'covered_under_vip': True if obj and obj.plus_plan else False,
+            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
+            'hosp_is_gold': hosp_is_gold
         }
 
     def get_prescription(self, obj):
@@ -169,12 +185,23 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return obj.allowed_action(request.user.user_type, request)
 
+    def get_payment_mode(self, obj):
+        payment_modes = dict(OpdAppointment.PAY_CHOICES)
+        if payment_modes:
+            effective_price = obj.effective_price
+            payment_type = obj.payment_type
+            if effective_price > 0 and payment_type == 5:
+                return 'Online'
+            else:
+                return payment_modes.get(obj.payment_type, '')
+        return ''
+
     class Meta:
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start',
                   'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports',
-                  'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip')
+                  'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip', 'payment_mode')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -238,6 +265,7 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
     plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    vip_convenience_amount = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
 
 
 
@@ -265,6 +293,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
     spo_data = serializers.JSONField(required=False, default={})
     appointment_id = serializers.IntegerField(required=False)
     cod_to_prepaid = serializers.BooleanField(required=False)
+    utm_sbi_tags = serializers.JSONField(required=False, default={})
+    plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.filter(is_live=True, is_gold=True), required=False)
 
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
@@ -334,23 +364,24 @@ class CreateAppointmentSerializer(serializers.Serializer):
             raise serializers.ValidationError("Doctor is on leave")
 
         data["part_of_integration"] = False
-        if settings.MEDANTA_INTEGRATION_ENABLED and not bool(data.get('from_app')) and doctor_clinic.is_part_of_integration():
-            data["part_of_integration"] = True
-            available_slots = doctor_clinic.get_available_slots(time_slot_start)
-            if not available_slots[date]:
-                logger.error(
-                    "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("Integration - Invalid Time slot")
-        else:
-            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
-                                                     doctor_clinic__hospital=data.get('hospital'),
-                                                     day=time_slot_start.weekday(), start__lte=data.get("start_time"),
-                                                     end__gte=data.get("start_time")).exists():
-                logger.error(
-                    "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("Invalid Time slot")
+
+        # if settings.MEDANTA_INTEGRATION_ENABLED and not bool(data.get('from_app')) and doctor_clinic.is_part_of_integration():
+        #     data["part_of_integration"] = True
+        #     available_slots = doctor_clinic.get_available_slots(time_slot_start)
+        #     if not available_slots[date]:
+        #         logger.error(
+        #             "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
+        #                 request.data))
+        #         raise serializers.ValidationError("Integration - Invalid Time slot")
+        # else:
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
+                                                 doctor_clinic__hospital=data.get('hospital'),
+                                                 day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+                                                 end__gte=data.get("start_time")).exists():
+            logger.error(
+                "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
+                    request.data))
+            raise serializers.ValidationError("Invalid Time slot")
 
         # if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
         #     raise serializers.ValidationError('A previous appointment with this doctor already exists. Cancel it before booking new Appointment.')
@@ -561,7 +592,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         if obj.doctor_clinic:
             doctor_clinic = obj.doctor_clinic
             if obj.doctor_clinic.hospital and obj.doctor_clinic.doctor:
-                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking and (doctor_clinic.hospital.enabled_for_cod or doctor_clinic.hospital.enabled_for_prepaid):
                    enable_for_online_booking = True
         return enable_for_online_booking
 
@@ -593,7 +624,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     def get_insurance(self, obj):
         request = self.context.get("request")
         user = request.user
-        resp = Doctor.get_insurance_details(user)
+        ins_threshold_amount = self.context.get('ins_threshold_amount', None)
+        resp = Doctor.get_insurance_details(user, ins_threshold_amount)
 
         # enabled for online booking check
         resp['error_message'] = ""
@@ -631,30 +663,76 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
-        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False}
         request = self.context.get("request")
         user = request.user
+        price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees,
+                      "cod_deal_price": obj.cod_deal_price}
+
+        search_query = self.context.get('search_query', None)
+        if not search_query:
+            search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        else:
+            search_criteria = search_query
+
+        default_plan_query = self.context.get('default_plan', None)
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+        plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
+        plan = plus_user.plan if plus_user else None
+        calculated_convenience_charge = obj.calculate_convenience_charge(plan)
+        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
+                "vip_convenience_amount": calculated_convenience_charge,
+                "vip_gold_price": 0, 'hosp_is_gold': False, "is_gold_member": False}
+
+        resp['hosp_is_gold'] = hosp_is_gold
         doctor_clinic = obj.doctor_clinic
         doctor = doctor_clinic.doctor
         hospital = doctor_clinic.hospital
         enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
                                         hospital.enabled_for_online_booking and hospital.enabled_for_prepaid \
-                                        and hospital.enabled_for_plus_plans and doctor.enabled_for_plus_plans
+                                        and hospital.is_enabled_for_plus_plans() and doctor.enabled_for_plus_plans
 
         if enabled_for_online_booking and obj.mrp is not None:
             resp['is_enable_for_vip'] = True
-            plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
+            resp['vip_gold_price'] = obj.fees
             if not plus_user:
+                vip_gold_price = resp['vip_gold_price'] if (
+                            resp.get('vip_gold_price') and resp['vip_gold_price']) else 0
+                calculated_convenience_charge = calculated_convenience_charge if calculated_convenience_charge else 0
+                calc_deal_price = obj.deal_price if obj.deal_price else 0
+                if vip_gold_price + calculated_convenience_charge >= calc_deal_price:
+                    resp['is_enable_for_vip'] = False
                 return resp
             utilization = plus_user.get_utilization
             available_amount = int(utilization.get('doctor_amount_available', 0))
             mrp = int(obj.mrp)
+            deal_price = obj.deal_price
+            price_engine = get_price_reference(plus_user, "DOCTOR")
+            if not price_engine:
+                price = mrp
+            else:
+                price = price_engine.get_price(price_data)
             resp['is_vip_member'] = True
+            resp['is_gold_member'] = True if plus_user and plus_user.plan and plus_user.plan.is_gold else False
             engine = get_class_reference(plus_user, "DOCTOR")
             if engine:
-                vip_res = engine.validate_booking_entity(cost=mrp)
+                # vip_res = engine.validate_booking_entity(cost=mrp)
+                vip_res = engine.validate_booking_entity(cost=price, mrp=mrp, deal_price=deal_price)
+                # min_price_engine = get_min_convenience_reference(self.plus_obj, "DOCTOR")
+                # min_price = min_price_engine.get_price(price_data)
+                # max_price_engine = get_max_convenience_reference(self.plus_obj, "DOCTOR")
+                # max_price = max_price_engine.get_price(price_data)
+                # convenience_charge = plus_user.plan.get_convenience_charge(max_price, min_price, "DOCTOR")
+                # resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
+                convenience_charge = obj.calculate_convenience_charge(plus_user.plan)
+                resp['vip_convenience_amount'] = convenience_charge
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
+                convenience_charge = convenience_charge if convenience_charge is not None else 0
+                vip_amount = resp['vip_amount'] if ('vip_amount' in resp and resp['vip_amount'] is not None) else 0
+                if vip_amount + convenience_charge >= obj.deal_price:
+                    resp['is_enable_for_vip'] = False
             # amount = plus_user.get_vip_amount(utilization, mrp)
             # resp['cover_under_vip'] = True if (amount < mrp) else False
             # resp['vip_amount'] = amount
@@ -797,6 +875,8 @@ class HospitalModelSerializer(serializers.ModelSerializer):
     hospital_thumbnail = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     matrix_city = serializers.SerializerMethodField()
+    logo = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
 
     def get_address(self, obj):
         return obj.get_hos_address() if obj.get_hos_address() else None
@@ -822,10 +902,26 @@ class HospitalModelSerializer(serializers.ModelSerializer):
             return obj.get_thumbnail()
         return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail() else None
 
+    def get_logo(self, obj):
+        request = self.context.get('request')
+        if request:
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
+            if obj.network:
+                for document in obj.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
+        return None
+
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        return entity_url.get(obj.id)
+
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'operational_since', 'lat', 'long', 'address', 'registration_number',
-                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', )
+                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', 'logo', 'url')
 
 
 class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
@@ -976,6 +1072,9 @@ class DoctorListSerializer(serializers.Serializer):
     avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     group_ids = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     specialization_filter_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
+    is_gold = serializers.BooleanField(required=False)
+    is_vip = serializers.BooleanField(required=False)
+
 
     def validate_specialization_filter_ids(self, attrs):
         try:
@@ -1090,7 +1189,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     doctor_specializations_ids = serializers.SerializerMethodField()
     show_popup = serializers.SerializerMethodField()
     force_popup = serializers.SerializerMethodField()
-    lensfit_offer = serializers.SerializerMethodField()
+    # lensfit_offer = s erializers.SerializerMethodField()
 
     def get_enabled_for_cod(self, obj):
         return obj.enabled_for_cod()
@@ -1409,6 +1508,18 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(all_hospital_ids, EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
         self.context['hosp_entity_dict']=hosp_entity_dict
         self.context['hosp_locality_entity_dict']=hosp_locality_entity_dict
+
+        # Part of Optimisation. Query reason Unknown
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        self.context['ins_threshold_amount'] = insurance_threshold_amount
+        search_criteria_query = SearchCriteria.objects.filter(search_key='is_gold').first()
+        self.context['search_query'] = search_criteria_query
+        default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+        self.context['default_plan'] = default_plan
+
         if obj:
             doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(obj)
             if doctor_specialization:
@@ -1519,7 +1630,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                   'general_specialization', 'doctor_specializations_ids', 'thumbnail', 'license', 'is_live', 'seo',
                   'breadcrumb', 'rating', 'rating_graph',
                   'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold',
-                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup', 'lensfit_offer')
+                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
@@ -1576,14 +1687,32 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     invoices = serializers.SerializerMethodField()
     cancellation_reason = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
+    appointment_via_sbi = serializers.SerializerMethodField()
+    gold = serializers.SerializerMethodField()
+
+    def get_gold(self, obj):
+        from ondoc.api.v1.plus.serializers import PlusUserModelSerializer
+        request = self.context.get('request')
+        data = {'is_gold': False, 'members': [], 'is_single_flow': False}
+
+        plus_plan = obj.plus_plan
+        if plus_plan:
+            data['is_gold'] = plus_plan.plan.is_gold
+            data['members'] = PlusUserModelSerializer(plus_plan, context={'request': request}).data
+
+            appointment_order = Order.objects.filter(reference_id=obj.id).first()
+            if appointment_order and appointment_order.single_booking:
+                data['is_single_flow'] = True
+
+        return data
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
-                  'report_files', 'vip')
+                  'report_files', 'vip', 'appointment_via_sbi', 'gold')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1611,6 +1740,11 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         return resp
 
     def get_vip(self, obj):
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         vip_amount = 0
         plus_appointment_mapping = None
         if obj:
@@ -1623,7 +1757,11 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         return {
             'is_vip_member': True if obj and obj.plus_plan else False,
             'vip_amount': vip_amount,
-            'covered_under_vip': True if obj and obj.plus_plan else False
+            'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_user and plus_appointment_mapping.plus_user.plan and plus_appointment_mapping.plus_user.plan.is_gold else False,
+            'covered_under_vip': True if obj and obj.plus_plan else False,
+            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
+            'hosp_is_gold': hosp_is_gold
         }
 
     def get_procedures(self, obj):
@@ -1637,9 +1775,21 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     def get_cancellation_reason(self, obj):
         return obj.get_serialized_cancellation_reason()
 
+    def get_appointment_via_sbi(self, obj):
+        sbi_appointment = False
+        order = Order.objects.filter(reference_id=obj.id, product_id=1).first()
+        if order and order.action_data.get('utm_sbi_tags', None):
+            sbi_appointment = True
+
+        return sbi_appointment
+
 
 class NewAppointmentRetrieveSerializer(AppointmentRetrieveSerializer):
     doctor = QrcodeRetrieveDoctorSerializer()
+    user_referral_amt = serializers.SerializerMethodField()
+
+    def get_user_referral_amt(self, obj):
+        return UserConfig.get_referral_amount()
 
     class Meta(AppointmentRetrieveSerializer.Meta):
         model = OpdAppointment
@@ -1647,7 +1797,7 @@ class NewAppointmentRetrieveSerializer(AppointmentRetrieveSerializer):
         #           'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
         #           'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
         #           'invoices', 'cancellation_reason', 'payment_type')
-        fields = AppointmentRetrieveSerializer.Meta.fields
+        fields = AppointmentRetrieveSerializer.Meta.fields + ('user_referral_amt', )
 
 
 
@@ -1710,10 +1860,18 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
     name = serializers.ReadOnlyField(source='specialization.name')
     icon = serializers.SerializerMethodField
     url = serializers.SerializerMethodField()
+    svg_icon = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
+
+    def get_svg_icon(self, obj):
+        request = self.context.get('request')
+        if request and obj and obj.svg_icon:
+            return request.build_absolute_uri(obj.svg_icon.url)
+
+        return None
 
     def get_url(self, obj):
         url = None
@@ -1723,7 +1881,7 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonSpecialization
-        fields = ('id', 'name', 'icon', 'url')
+        fields = ('id', 'name', 'icon', 'url', 'svg_icon')
 
 
 class ConfigGetSerializer(serializers.Serializer):
@@ -1769,7 +1927,7 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
     is_cloud_lab_email = serializers.BooleanField(default=False)
     rating = serializers.IntegerField(max_value=10, required=False)
     subject_string = serializers.CharField(max_length=128, required=False)
-    feedback = serializers.CharField(max_length=512, required=False)
+    feedback = serializers.CharField(required=False)
     feedback_tags = serializers.ListField(required=False)
     email = serializers.EmailField(required=False)
     app_version = serializers.CharField(required=False, allow_blank=True)
@@ -2161,13 +2319,23 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     hospital_services = serializers.SerializerMethodField()
     service_count = serializers.SerializerMethodField()
     hospital_image = serializers.SerializerMethodField()
+    bookable_doctors_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image',
+                  'bookable_doctors_count')
+
+    def get_bookable_doctors_count(self, obj):
+        try:
+            if obj and obj.bookable_doctors_count:
+                return obj.bookable_doctors_count
+        except:
+            return None
+
 
     def get_name_city(self, obj):
         result = obj.name
@@ -2213,9 +2381,11 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
 
     def get_certifications(self, obj):
-        certification_objs = obj.hospitalcertification_set.all()
-        names = [x.name for x in certification_objs]
-        return names
+        # certification_objs = obj.hospitalcertification_set.all()
+        # names = [x.name for x in certification_objs]
+        # return names
+        return [{"certification_id": data.certification.id, "certification_name": data.certification.name}
+                for data in obj.hospitalcertification_set.all() if data.certification]
 
     def get_insurance_provider(self, obj):
         return [x.name for x in obj.health_insurance_providers.all()]
@@ -2435,11 +2605,19 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return result
 
     def get_images(self, obj):
+        hospital_name = obj.name.lower().replace(' ', '-')
         request = self.context.get('request')
         result = [{'original': request.build_absolute_uri(img.name.url),
                    "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
                    "cover_image": img.cover_image} for img in
                   obj.imagehospital.all() if img.name]
+
+        # result = [{'original': request.build_absolute_uri(img.name.url)
+        #                         if img.name.url.find(hospital_name) != -1
+        #               else request.build_absolute_uri(hospital_name + img.name.url),
+        #            "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
+        #            "cover_image": img.cover_image} for img in
+        #           obj.imagehospital.all() if img.name]
         if not result:
             if obj.network:
                 result = [{'original': request.build_absolute_uri(img.name.url),
@@ -2747,3 +2925,215 @@ class OfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = Offer
         fields = '__all__'
+
+
+class HospitalNearYouSerializer(serializers.Serializer):
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
+    from_vip = serializers.BooleanField(default=False)
+
+
+class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
+    id = serializers.ReadOnlyField(source='hospital.id')
+    name = serializers.ReadOnlyField(source='hospital.name')
+    bed_count = serializers.ReadOnlyField(source='hospital.bed_count')
+    avg_rating = serializers.ReadOnlyField(source='hospital.avg_rating')
+    operational_since = serializers.ReadOnlyField(source='hospital.operational_since')
+    is_ipd_hospital = serializers.ReadOnlyField(source='hospital.is_ipd_hospital')
+    seo_title = serializers.ReadOnlyField(source='hospital.seo_title')
+    network_id = serializers.ReadOnlyField(source='hospital.network_id')
+    count_of_insurance_provider = serializers.SerializerMethodField()
+    distance = serializers.SerializerMethodField()
+    certifications = serializers.SerializerMethodField()
+    multi_speciality = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
+    short_address = serializers.SerializerMethodField()
+    logo = serializers.SerializerMethodField()
+    open_today = serializers.SerializerMethodField()
+    insurance_provider = serializers.SerializerMethodField()
+    established_in = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    long = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
+    locality_url = serializers.SerializerMethodField()
+    name_city = serializers.SerializerMethodField()
+    h1_title = serializers.SerializerMethodField()
+    hospital_services = serializers.SerializerMethodField()
+    service_count = serializers.SerializerMethodField()
+    hospital_image = serializers.SerializerMethodField()
+    vip_percentage = serializers.SerializerMethodField()
+
+
+    class Meta:
+        model = CommonHospital
+        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
+                  'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority',
+                  'vip_percentage')
+
+    def get_vip_percentage(self, obj):
+        if self.context.get('plan'):
+            return obj.percentage
+        return 0
+
+    def get_name_city(self, obj):
+        result = None
+        if obj and obj.hospital and obj.hospital.name:
+            result = obj.hospital.name
+            if obj.hospital.city:
+                result += " {}".format(obj.hospital.city)
+        return result
+
+    def get_locality_url(self, obj):
+        entity_url = self.context.get('hosp_locality_entity_dict', {})
+        return entity_url.get(obj.hospital.id)
+
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        return entity_url.get(obj.hospital.id)
+
+    def get_h1_title(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        new_dynamic_dict = self.context.get('new_dynamic_dict', {})
+        url = entity_url.get(obj.hospital.id)
+        if url:
+            new_dynamic_obj = new_dynamic_dict.get(url)
+            if new_dynamic_obj and new_dynamic_obj.h1_title:
+                return new_dynamic_obj.h1_title
+        return None
+
+    def get_lat(self, obj):
+        if obj and obj.hospital and obj.hospital.location:
+            return obj.hospital.location.y
+        return None
+
+    def get_long(self, obj):
+        if obj and obj.hospital and obj.hospital.location:
+            return obj.hospital.location.x
+        return None
+
+    def get_established_in(self, obj):
+        if obj and obj.hospital and obj.hospital.operational_since:
+            return obj.hospital.operational_since
+        return None
+
+    def get_count_of_insurance_provider(self, obj):
+        if obj and obj.hospital and obj.hospital.health_insurance_providers.all():
+            return len(list(obj.hospital.health_insurance_providers.all()))
+        return None
+
+    def get_distance(self, obj):
+        return int(obj.hospital.distance.m) if hasattr(obj.hospital, 'distance') and obj.hospital.distance else None
+
+    def get_certifications(self, obj):
+        if obj.hospital and obj.hospital.hospitalcertification_set.all():
+            certification_objs = obj.hospital.hospitalcertification_set.all()
+            names = [x.name for x in certification_objs]
+            return names
+        return None
+
+    def get_insurance_provider(self, obj):
+        if obj.hospital and obj.hospital.health_insurance_providers:
+            return [x.name for x in obj.hospital.health_insurance_providers.all()]
+
+        return []
+
+    def get_multi_speciality(self, obj):
+        result1 = len(obj.hospital.hospitalspeciality_set.all()) > 1 if obj.hospital else False
+        result2 = len(obj.hospital.network.hospitalnetworkspeciality_set.all()) > 1 if obj.hospital and obj.hospital.network else False
+        return result1 or result2
+
+    def get_address(self, obj):
+        return obj.hospital.get_hos_address() if obj.hospital else None
+
+    def get_short_address(self, obj):
+        return obj.hospital.get_short_address() if obj.hospital else None
+
+    def get_logo(self, obj):
+        request = self.context.get('request')
+        if request and obj.hospital:
+            for document in obj.hospital.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
+            if obj.hospital and obj.hospital.network:
+                for document in obj.hospital.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
+        return None
+
+    def get_open_today(self, obj):
+        now = timezone.now()
+        now = aware_time_zone(now)
+        if obj.hospital and obj.hospital.always_open:
+            return True
+        if obj.hospital:
+            for timing in obj.hospital.hosp_availability.all():
+                if timing.day == now.weekday() and timing.start < now.hour < timing.end:
+                    return True
+        return False
+
+    def get_hospital_services(self, obj):
+        sp_list = []
+        if obj and obj.hospital:
+            if obj.hospital.hospital_services.all():
+                for sp_service in obj.hospital.hospital_services.all():
+                    id = sp_service.sponsored_service.id
+                    name = sp_service.sponsored_service.name
+                    sp_list.append({'id': id, 'name': name})
+            else:
+                sp_list = None
+        return sp_list
+
+    def get_service_count(self, obj):
+        sp_list = []
+        count = None
+        if obj:
+            if obj.hospital and obj.hospital.hospital_services.all():
+                for sp_service in obj.hospital.hospital_services.all():
+                    id = sp_service.sponsored_service.id
+                    name = sp_service.sponsored_service.name
+                    sp_list.append({'id': id, 'name': name})
+                count = len(sp_list)
+            else:
+                sp_list = None
+        return count
+
+    def get_hospital_image(self, obj):
+        if obj and obj.hospital:
+            request = self.context.get('request')
+            if obj.hospital.imagehospital.all():
+                for image in obj.hospital.imagehospital.all():
+                    image = image.name
+                    return request.build_absolute_uri(image.url) if image else None
+        return None
+
+
+class RecordSerializer(serializers.ModelSerializer):
+    crm_link = serializers.SerializerMethodField()
+    link = serializers.SerializerMethodField()
+
+    def get_link(self, obj):
+        link = None
+        # request = self.context.get('request')
+        # params = request.query_params
+        lat = obj.latitude
+        long = obj.longitude
+
+        if lat and long:
+            link = 'https://www.google.com/maps/search/?api=1&query=' + str(lat) + ',' + str(long)
+
+        return link
+
+    def get_crm_link(self, obj):
+        crm_link = "https://admin.docprime.com/admin/doctor/googlemaprecords/" + str(obj.id) + "/change/"
+
+        return crm_link
+
+    class Meta:
+       model = GoogleMapRecords
+       fields = (["id", "location", "text", "created_at", "latitude", "longitude", "updated_at", "image", "label", "reason", "hospital_name", "place_id",
+                  "multi_speciality", "has_phone", "lead_rank", "combined_rating", "combined_rating_count", "is_potential", "has_booking", "monday_timing",
+                  "address", "is_bookable", "link", "hospital_id", "phone_number", "has_phlebo", "serial_number", "onboarded", "crm_link", "phlebo_type",
+                  "interested_in_diagnostics", "interested_in_pharmacy", "samples_per_month", "latitude_sales", "longitude_sales", "cluster",
+                  "ready_to_use_wallet", "digital_only_report"])

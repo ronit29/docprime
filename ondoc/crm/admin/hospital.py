@@ -8,6 +8,7 @@ import datetime
 
 from reversion_compare.admin import CompareVersionAdmin
 
+from ondoc.common.models import Certifications
 from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
@@ -84,6 +85,8 @@ class HospitalCertificationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+    fields = ['certification']
+    search_fields = ['certification']
 
 
 class HospitalSpecialityInline(admin.TabularInline):
@@ -380,6 +383,7 @@ class HospitalForm(FormCleanMixin):
         super().clean()
         if any(self.errors):
             return
+        old_instance_enable = self.instance.enabled
         data = self.cleaned_data
         if self.data.get('search_distance') and float(self.data.get('search_distance')) > float(50000):
             raise forms.ValidationError("Search Distance should be less than 50 KM.")
@@ -403,8 +407,8 @@ class HospitalForm(FormCleanMixin):
                         'disable_comments', None):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
 
-            if is_enabled == False and (not self.request.user.is_superuser == True):
-                raise forms.ValidationError('User is not Super User')
+            if old_instance_enable and (not is_enabled) and (not self.request.user.is_superuser):
+                raise forms.ValidationError('Only Super User can disable the hospital.')
         # if '_mark_in_progress' in self.data and data.get('enabled'):
         #     raise forms.ValidationError("Must be disabled before rejecting.")
 
@@ -479,13 +483,21 @@ class CloudLabAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if not self.request.user.is_authenticated:
             return Lab.objects.none()
-        queryset = Lab.objects.filter(is_b2b=True)
+        queryset = Lab.objects.filter(is_b2b=True, is_live=True, lab_pricing_group__isnull=False)
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)
         return queryset.distinct()
 
 
 class PartnerLabsInlineForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        lab = self.cleaned_data['lab']
+        if not (lab.is_live and lab.is_b2b and lab.lab_pricing_group):
+            raise forms.ValidationError('Error! Please remove the lab "{}" OR check if (lab is b2b || lab is live || has lab pricing group)'.format(lab.name))
+        return cleaned_data
 
     class Meta:
         model = PartnerHospitalLabMapping
@@ -639,6 +651,8 @@ class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPem
             obj.data_status = QCModel.REOPENED
         if not obj.source_type:
             obj.source_type = Hospital.AGENT
+        if not obj.enabled_for_cod and not obj.enabled_for_prepaid:
+            obj.enabled_for_online_booking = False
 
         obj.status_changed_by = request.user
         obj.city = obj.matrix_city.name

@@ -1,21 +1,10 @@
 from config.settings.base import *
 import logging, warnings
-from ddtrace import tracer
-
-if (env('DJANGO_SETTINGS_MODULE')=='config.settings.production'):
-    try:
-        tracer.configure(
-            hostname='datadog-agent',
-            port=8126,
-        )
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error("Error Configuring DDtracer " + str(e))
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
 # ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com'])
-ALLOWED_HOSTS = ['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com', 'backendprod']
+ALLOWED_HOSTS = ['docprime.com','admin.docprime.com', 'sbig.docprime.com']
 ALLOWED_HOSTS += ['10.20.{}.{}'.format(i,j) for i in range(256) for j in range(256)]
 
 DATABASES['default']['ATOMIC_REQUESTS'] = True  # noqa F405
@@ -41,11 +30,11 @@ EMAIL_BACKEND = 'ondoc.sendemail.backends.backend.MailgunEmailBackend'
 # https://docs.djangoproject.com/en/dev/topics/security/#ssl-https
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-seconds
 # TODO: set this to 60 seconds first and then to 518400 once you prove the former works
-#SECURE_HSTS_SECONDS = 60
+SECURE_HSTS_SECONDS = 360000
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-include-subdomains
-#SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-preload
-#SECURE_HSTS_PRELOAD = env.bool('DJANGO_SECURE_HSTS_PRELOAD', default=True)
+SECURE_HSTS_PRELOAD = True
 # https://docs.djangoproject.com/en/dev/ref/middleware/#x-content-type-options-nosniff
 SECURE_CONTENT_TYPE_NOSNIFF = env.bool('DJANGO_SECURE_CONTENT_TYPE_NOSNIFF', default=True)
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-browser-xss-filter
@@ -54,7 +43,18 @@ SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 
 if env.bool('ENABLE_DATADOG', default=False):
-    INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS 
+    INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS
+    if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
+        from ddtrace import tracer
+
+        try:
+            tracer.configure(
+                hostname='datadog-agent',
+                port=8126,
+            )
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error("Error Configuring DDtracer " + str(e))
 
 INSTALLED_APPS += ('gunicorn',)
 
@@ -84,7 +84,7 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console',],
+            'handlers': ['console', ],
             'level': 'ERROR',
             'propagate': False,
         },
@@ -102,7 +102,7 @@ LOGGING = {
 }
 SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
-if env('ENABLE_SENTRY', default=False):
+if env.bool('ENABLE_SENTRY', default=False):
     LOGGING['disable_existing_loggers'] = True
     LOGGING['handlers']['sentry'] = {
         'level': 'ERROR',
@@ -119,7 +119,7 @@ if env('ENABLE_SENTRY', default=False):
         'handlers': ['console', ],
         'propagate': False,
     }
-    INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
+    INSTALLED_APPS += ('raven.contrib.django.raven_compat', )
     RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
     MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
     # Sentry Configuration

@@ -8,6 +8,9 @@ import datetime
 from django.utils import timezone
 from django.contrib.gis import forms
 from django.core.exceptions import ObjectDoesNotExist
+from import_export.tmp_storages import MediaStorage
+from reversion_compare.admin import CompareVersionAdmin
+
 from ondoc.crm.constants import constants
 from dateutil import tz
 from django.conf import settings
@@ -15,7 +18,7 @@ from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, PayoutMapping
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
-    GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates, Fraud
+    GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates, Fraud, SearchCriteria, GoogleLatLong
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -534,14 +537,22 @@ class MerchantPayoutResource(resources.ModelResource):
 
         return 0
 
+    def dehydrate_api_response(self, merchant_payout):
+        if merchant_payout.api_response and merchant_payout.api_response.get('result', []):
+            result = merchant_payout.api_response.get('result')[0]
+            if result.get('responseError', ''):
+                return result.get('responseError').get('errorMsg')
+
+        return ''
+
     class Meta:
         model = MerchantPayout
         fields = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
                   'status', 'payout_time', 'paid_to', 'utr_no', 'type', 'amount_paid',
-                  'content_type', 'object_id', 'appointment_id', 'booking_type', 'merchant', 'verified_by_finance')
+                  'content_type', 'object_id', 'appointment_id', 'booking_type', 'merchant', 'verified_by_finance', 'api_response')
 
         export_order = ('appointment_id', 'booking_type', 'id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
-                  'status', 'payout_time', 'merchant', 'paid_to', 'verified_by_finance', 'utr_no', 'type', 'amount_paid', 'content_type', 'object_id')
+                  'status', 'payout_time', 'merchant', 'paid_to', 'verified_by_finance', 'utr_no', 'type', 'amount_paid', 'content_type', 'object_id', 'api_response')
 
 
 class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
@@ -597,6 +608,7 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
 
         if form.cleaned_data.get('recreate_payout', False):
             obj.recreate_failed_payouts()
+            obj.status = obj.ARCHIVE
 
         super().save_model(request, obj, form, change)
 
@@ -964,3 +976,24 @@ class AdvanceMerchantAmountAdmin(admin.ModelAdmin):
     fields = ['id', 'total_amount', 'amount', 'merchant_id']
     list_display = ('id', 'total_amount', 'amount', 'merchant_id')
     readonly_fields = ['id', 'total_amount', 'amount', 'merchant_id']
+
+
+class SearchCriteriaAdmin(CompareVersionAdmin):
+    model = SearchCriteria
+    list_display = ('id', 'search_key', 'search_value')
+    fields = ('search_key', 'search_value')
+
+
+class GoogleLatLongAdminResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
+
+    class Meta:
+        model = GoogleLatLong
+        fields = ('id', 'latitude', 'longitude', 'coordinates')
+        export_order = ('id', 'latitude', 'longitude', 'coordinates')
+
+
+class GoogleLatLongAdmin(ImportExportMixin, CompareVersionAdmin):
+    list_display = ['latitude', 'longitude', 'coordinates']
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    resource_class = GoogleLatLongAdminResource

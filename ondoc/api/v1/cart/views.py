@@ -11,6 +11,8 @@ from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from django.db import transaction
 from django.conf import settings
 import copy
+
+from ondoc.common.models import SearchCriteria
 from ondoc.diagnostic.models import LabAppointment
 
 from ondoc.coupon.models import Coupon
@@ -19,8 +21,10 @@ from ondoc.insurance.models import InsuranceDoctorSpecializations, UserInsurance
 from ondoc.subscription_plan.models import UserPlanMapping
 from ondoc.doctor.models import OpdAppointment
 
+# Cart view.
 class CartViewSet(viewsets.GenericViewSet):
 
+    # Api for add items to cart.
     def add(self, request, *args, **kwargs):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.insurance.models import UserInsurance
@@ -68,7 +72,9 @@ class CartViewSet(viewsets.GenericViewSet):
             "is_vip_member": False,
             "cover_under_vip": False,
             "plus_user_id": None,
-            "vip_amount": 0
+            "vip_amount": 0,
+            "is_gold_member": False,
+            "vip_convenience_amount": 0
         }
         if plus_user:
             vip_data_dict = plus_user.validate_cart_items(serialized_data, request)
@@ -77,6 +83,8 @@ class CartViewSet(viewsets.GenericViewSet):
         valid_data['data']['is_vip_member'] = vip_data_dict.get('is_vip_member', False)
         valid_data['data']['vip_amount'] = vip_data_dict.get('vip_amount')
         valid_data['data']['amount_to_be_paid'] = vip_data_dict.get('vip_amount')
+        valid_data['data']['is_gold_member'] = vip_data_dict.get('is_gold_member')
+        valid_data['data']['vip_convenience_amount'] = vip_data_dict.get('vip_convenience_amount')
 
         if valid_data['data']['is_appointment_insured']:
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
@@ -148,6 +156,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
         return Response({"status": 1, "message": "Saved in cart"}, status.HTTP_200_OK)
 
+    # update plan for Care product.
     @staticmethod
     def update_plan_details(request, serialized_data, valid_data):
         from ondoc.doctor.models import OpdAppointment
@@ -175,9 +184,15 @@ class CartViewSet(viewsets.GenericViewSet):
             if payment_type == OpdAppointment.PLAN and valid_data.get('data')['included_in_user_plan'] == False:
                 valid_data.get('data')['payment_type'] = OpdAppointment.PREPAID
 
+    # Api for list of items in the cart.
     @transaction.non_atomic_requests()
     def list(self, request, *args, **kwargs):
         from ondoc.insurance.models import UserInsurance
+
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
 
         user = request.user
         if not user.is_authenticated:
@@ -217,8 +232,16 @@ class CartViewSet(viewsets.GenericViewSet):
                     vip_dict = plus_user.validate_plus_appointment(validated_data, utilization=deep_utilization)
                     if not vip_dict.get('cover_under_vip'):
                         raise Exception('Appointment no more cover under VIP')
+
+                    if vip_dict.get('cover_under_vip'):
+                        if plus_user and plus_user.plan.is_gold:
+                            validated_data['payment_type'] = 6
+                        elif plus_user and not plus_user.plan.is_gold:
+                            validated_data['payment_type'] = 5
+
                     item.data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
                     item.data['vip_amount'] = vip_dict['amount_to_be_paid']
+                    item.data['vip_convenience_amount'] = vip_dict['vip_convenience_amount']
                     # cart_data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
                     # cart_data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
                     # validated_data.save()
@@ -311,7 +334,7 @@ class CartViewSet(viewsets.GenericViewSet):
                                 #     item.data['payment_type'] = OpdAppointment.PREPAID
                                 # item.data['payment_type'] = OpdAppointment.PREPAID
 
-                price_data = item.get_price_details(validated_data)
+                price_data = item.get_price_details(validated_data, plus_user_obj)
                 items.append({
                     "id" : item.id,
                     "valid": True,
@@ -327,7 +350,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     "consultation" : price_data.get("consultation", None),
                     "cod_deal_price": price_data.get("consultation", {}).get('cod_deal_price'),
                     "is_enabled_for_cod" : price_data.get("consultation", {}).get('is_enabled_for_cod'),
-                    "is_price_zero": True if price_data['fees'] is not None and price_data['fees']==0 else False
+                    "is_price_zero": True if price_data['fees'] is not None and price_data['fees']==0 else False,
+                    'is_gold': hosp_is_gold
                 })
             except Exception as e:
                 # error = custom_exception_handler(e, None)
@@ -345,6 +369,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
         return Response({"cart_items" : items, "status": 1})
 
+    # process cart for purchase.
     def process(self, request, *args, **kwargs):
 
         user = request.user
@@ -406,7 +431,7 @@ class CartViewSet(viewsets.GenericViewSet):
             error = {"code": "invalid", "message": error}
             return Response(status=400, data={"request_errors": error})
 
-
+    # remove item from the cart.
     def remove(self, request, *args, **kwargs):
         user = request.user
         if not user.is_authenticated:

@@ -346,13 +346,19 @@ class User(AbstractBaseUser, PermissionsMixin):
         return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
 
     @cached_property
+    def get_temp_plus_user(self):
+        from ondoc.plus.models import TempPlusUser
+        temp_plus_user = TempPlusUser.objects.filter(user_id=self.id, deleted=0).order_by('-id').first()
+        return temp_plus_user if temp_plus_user else None
+
+    @cached_property
     def inactive_plus_user(self):
         from ondoc.plus.models import PlusUser
         inactive_plus_user = PlusUser.objects.filter(status=PlusUser.INACTIVE, user_id=self.id).order_by('-id').first()
         return inactive_plus_user if inactive_plus_user else None
 
     @classmethod
-    def get_external_login_data(cls, data):
+    def get_external_login_data(cls, data, request=None):
         from ondoc.authentication.backends import JWTAuthentication
         profile_data = {}
         source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
@@ -412,7 +418,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             profile_data.pop('hospital', None)
             UserProfile.objects.create(**profile_data)
 
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
         result = dict()
         result['token'] = token_object
         result['user_id'] = user.id
@@ -660,6 +666,17 @@ class UserProfile(TimeStampedModel):
 
         return None
 
+    def verify_profile(self):
+        if self.dob and self.email and self.name:
+            return True
+        else:
+            return False
+
+    @cached_property
+    def get_temp_plus_membership(self):
+        from ondoc.plus.models import TempPlusUser
+        plus_user = TempPlusUser.objects.filter(profile_id=self.id, deleted=0).first()
+        return plus_user
 
     def has_image_changed(self):
         if not self.pk:
@@ -673,6 +690,12 @@ class UserProfile(TimeStampedModel):
             today = date.today()
             user_age = today.year - self.dob.year - ((today.month, today.day) < (self.dob.month, self.dob.day))
         return user_age
+
+    @cached_property
+    def is_gold_profile(self):
+        plus_member_profile = self.plus_member.filter().order_by('-id').first()
+        response = True if plus_member_profile and plus_member_profile.plus_user.is_valid() else False
+        return response
 
     def save(self, *args, **kwargs):
         if not self.has_image_changed():
@@ -1437,8 +1460,12 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
         ).distinct('user')
         admin_users = []
         for admin in admins:
-            if admin.user:
-                admin_users.append(admin.user)
+            try:
+                if admin.user:
+                    admin_users.append(admin.user)
+            except Exception as e:
+                continue
+                # pass
         return admin_users
 
     @staticmethod
@@ -2147,22 +2174,28 @@ class RefundMixin(object):
         from ondoc.common.models import RefundDetails
         from ondoc.account.models import ConsumerTransaction
         from ondoc.account.models import ConsumerRefund
+        from ondoc.plus.models import PlusUser
+        from ondoc.account.models import Order
         # Taking Lock first
         consumer_account = None
-        product_id = self.PRODUCT_ID
-        if self.payment_type == OpdAppointment.PREPAID:
+        if isinstance(self, PlusUser) and self.plan and self.plan.is_gold:
+            product_id = Order.GOLD_PRODUCT_ID
+        else:
+            product_id = self.PRODUCT_ID
+        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP, OpdAppointment.GOLD]:
             temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-        if self.payment_type == OpdAppointment.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
+        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP, OpdAppointment.GOLD] and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
             RefundDetails.log_refund(self)
             wallet_refund, cashback_refund = self.get_cancellation_breakup()
             if hasattr(self, 'promotional_amount'):
                 consumer_account.debit_promotional(self)
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
-                ctx_obj = consumer_account.debit_refund()
-                if initiate_refund:
-                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
+                ctx_objs = consumer_account.debit_refund(self, initiate_refund)
+                if ctx_objs:
+                    for ctx_obj in ctx_objs:
+                        ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -2358,9 +2391,21 @@ class PaymentMixin(object):
             parent_order = child_order.parent
 
         if parent_order:
-            pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).first()
+            pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).order_by('-created_at').first()
 
         return pg_transaction
+
+
+class TransactionMixin(object):
+
+    def get_order(self):
+        from ondoc.account.models import Order
+        order = Order.objects.filter(reference_id=self.id).first()
+
+        if not order.is_parent():
+            order = order.parent
+
+        return order
 
 
 class GenericQuestionAnswer(TimeStampedModel):
@@ -2372,3 +2417,12 @@ class GenericQuestionAnswer(TimeStampedModel):
 
     class Meta:
         db_table = "generic_question_answer"
+
+
+class WhiteListedLoginTokens(TimeStampedModel):
+
+    token = models.CharField(max_length=180)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'whitelisted_login_tokens'

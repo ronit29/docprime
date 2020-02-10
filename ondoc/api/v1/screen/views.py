@@ -1,8 +1,10 @@
-from django.db.models import F
-from rest_framework import viewsets
+from django.contrib.gis.db.models.functions import Distance
+from django.db.models import F, Count, Q
+from rest_framework import viewsets, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from ondoc.api.v1.doctor import serializers
 from ondoc.api.v1.auth.views import AppointmentViewSet
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
@@ -15,12 +17,12 @@ from ondoc.doctor.models import CommonSpecialization, Hospital
 from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
 from ondoc.banner.models import Banner
-from ondoc.common.models import PaymentOptions, UserConfig
+from ondoc.common.models import PaymentOptions, UserConfig, SearchCriteria
 from ondoc.insurance.models import InsuranceEligibleCities
 from ondoc.location.models import EntityUrls
 from ondoc.procedure.models import CommonIpdProcedure, CommonProcedureCategory
 from ondoc.tracking.models import TrackingEvent
-from ondoc.common.models import UserConfig
+from ondoc.plus.models import PlusPlans
 from ondoc.ratings_review.models import AppRatings
 from ondoc.api.v1.doctor.serializers import CommonSpecializationsSerializer
 from ondoc.api.v1.diagnostic.serializers import CommonTestSerializer
@@ -34,10 +36,11 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
 
     def home_page(self, request, *args, **kwargs):
+        from django.contrib.gis.geos import GEOSGeometry
 
         show_search_header = True
         show_footer = True
-        grid_size = 6
+        grid_size = 9
         force_update_version = ""
         update_version = ""
         app_custom_data = None
@@ -71,14 +74,12 @@ class ScreenViewSet(viewsets.GenericViewSet):
             # if city_name:
             #     insurance_availability = True
 
-        if UserConfig.objects.filter(key="app_update").exists():
-            app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
-            if app_update:
-                force_update_version = app_update.get("force_update_version", "")
-                update_version = app_update.get("update_version", "")
+        app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
+        if app_update:
+            force_update_version = app_update.get("force_update_version", "")
+            update_version = app_update.get("update_version", "")
 
-        if UserConfig.objects.filter(key="app_custom_data").exists():
-            app_custom_data = UserConfig.objects.filter(key="app_custom_data").values_list('data', flat=True).first()
+        app_custom_data = UserConfig.objects.filter(key="app_custom_data").values_list('data', flat=True).first()
 
         common_specializations = CommonSpecialization.get_specializations(grid_size-1)
         specializations_serializer = CommonSpecializationsSerializer(common_specializations, many=True,
@@ -89,7 +90,13 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         package_queryset = CommonPackage.get_packages(grid_size-1)
         coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
-        package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender': coupon_recommender})
+        is_gold_search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        plan = PlusPlans.get_gold_plan()
+        package_serializer = CommonPackageSerializer(package_queryset, many=True, context={'request': request,
+                                                                                           'coupon_recommender': coupon_recommender,
+                                                                                           'is_gold_search_criteria': is_gold_search_criteria,
+                                                                                           'plan': plan
+                                                                                           })
 
         # upcoming_appointment_viewset = AppointmentViewSet()
         # upcoming_appointment_result = upcoming_appointment_viewset.upcoming_appointments(request).data
@@ -98,7 +105,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             upcoming_appointment_result = get_all_upcoming_appointments(request.user.id)
 
         common_package_data = package_serializer.data
-        top_hospitals_data = Hospital.get_top_hospitals_data(request, lat, long)
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, lat, long, plan=plan)
 
         common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
             ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
@@ -115,10 +122,39 @@ class ScreenViewSet(viewsets.GenericViewSet):
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
                                                                         context={'entity_dict': ipd_entity_dict,
                                                                                  'request': request})
+        request_data = request.query_params
+        serializer = serializers.HospitalNearYouSerializer(data=request_data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        result_count = 0
+        if validated_data and validated_data.get('long') and validated_data.get('lat'):
+            point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+
+            hospital_queryset = Hospital.objects.select_related('matrix_city',
+                                                                'network')\
+                                                .prefetch_related('hospital_doctors',
+                                                                  'hospital_documents',
+                                                                  'network__hospital_network_documents')\
+                                                .filter(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True).annotate(
+                                               bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True)),
+                distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
+            result_count = hospital_queryset.count()
+            temp_hospital_ids = hospital_queryset.values_list('id', flat=True)
+            hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                              EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True, context={'request': request,
+                                                                                         'hosp_entity_dict': hosp_entity_dict})
 
         grid_list = [
             {
-                'priority': 2,
+                'priority': 3,
                 'title': "Book Doctor Appointment",
                 'type': "Specialization",
                 'items': specializations_serializer.data,
@@ -127,7 +163,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Doctor"
             },
             {
-                'priority': 1,
+                'priority': 2,
                 'title': "Health Packages",
                 'type': "CommonPackage",
                 'items': common_package_data,
@@ -136,7 +172,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Package"
             },
             {
-                'priority': 5,
+                'priority': 6,
                 'title': "Book a Test",
                 'type': "CommonTest",
                 'items': test_serializer.data,
@@ -148,7 +184,14 @@ class ScreenViewSet(viewsets.GenericViewSet):
         carousel_list = [
 
             {
-                'priority': 4,
+                'priority': 1,
+                'title': "Hospitals Near You",
+                'type': "Hospitals",
+                'items': hospital_serializer.data,
+                'show_view_all': True,
+            },
+            {
+                'priority': 5,
                 'title': "Health Package Categories",
                 'type': "PackageCategories",
                 'items': common_package_category(self, request),
@@ -160,7 +203,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'items': top_hospitals_data,
             },
             {
-                'priority': 6,
+                'priority': 7,
                 'title': "Top Procedures",
                 'type': "IPD",
                 'items': common_ipd_procedures_serializer.data,
@@ -179,7 +222,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             if banner.get('slider_location') == 'home_page':
                 banner_list_homepage.append(banner)
         banner = [{
-            'priority': 3,
+            'priority': 4,
             'type': "Banners",
             'title': "Banners",
             'items': banner_list_homepage

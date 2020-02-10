@@ -53,7 +53,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
                                  SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
                                  DoctorSponsoredServices, SponsoredServicePracticeSpecialization, SponsoredServices,
-                                 HospitalSponsoredServices)
+                                 HospitalSponsoredServices, GoogleMapRecords)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -132,6 +132,7 @@ class DoctorQualificationInline(ReadOnlyInline):
 
 
 class DoctorClinicTimingForm(forms.ModelForm):
+
 
     def __init__(self, data=None, files=None, auto_id='id_%s', prefix=None, initial=None, error_class=ErrorList,
                  label_suffix=None, empty_permitted=False, instance=None, use_required_attribute=None):
@@ -1496,6 +1497,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
             raise forms.ValidationError("Please select Appointment type for Follow up Appointment!!")
 
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
+            if self.request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+                raise forms.ValidationError("You cannot change appointment date time.")
+            else:
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
                 time_slot_start = make_aware(dt_field)
@@ -1726,6 +1730,10 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
             return "False"
     get_is_fraud.short_description = 'Is Fraud'
 
+    def integrator_order_no(self, obj):
+        return obj.integrator_booking_no()
+    integrator_order_no.short_description = 'Integrator Order ID'
+
     def response_change(self, request, obj):
         if "_capture-payment" in request.POST:
             if request.user.is_superuser:
@@ -1833,7 +1841,7 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
         #             'cancellation_reason', 'cancellation_comments', 'ratings',
         #             'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
         # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        all_fields = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
+        all_fields = ('booking_id', 'integrator_order_no', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                 'kyc', 'contact_details', 'used_profile_name',
                 'used_profile_number', 'default_profile_name',
                 'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
@@ -1862,7 +1870,7 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
         #     return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
         #             'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
         # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        read_only = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+        read_only = ('booking_id', 'doctor_name', 'integrator_order_no', 'doctor_id', 'doctor_details', 'hospital_name',
                      'hospital_details', 'kyc', 'contact_details',
                      'used_profile_name', 'used_profile_number', 'default_profile_name',
                      'default_profile_number', 'user_id', 'user_number', 'booked_by',
@@ -1876,6 +1884,9 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
 
         if obj and obj.status is not OpdAppointment.CREATED:
             read_only = read_only + ('status_change_comments',)
+
+        if request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+            read_only = read_only + ['status', 'status_change_comments']
 
         return read_only
         # else:
@@ -2518,7 +2529,7 @@ class SponsoredListingServiceInline(admin.TabularInline):
 class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     model = PurchaseOrderCreation
     form = PurchaseOrderCreationForm
-    list_display = ['provider_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'total_appointment_count',
+    list_display = ['id', 'provider_type', 'product_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'provider_name_hospital_id', 'total_appointment_count',
                     'appointment_booked_count', 'current_appointment_count']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
@@ -2526,6 +2537,10 @@ class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsoredListingServiceInline]
 
     # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
+
+    def provider_name_hospital_id(self, obj):
+        return obj.provider_name_hospital.id
+    provider_name_hospital_id.self_description = 'Provider Hospital ID'
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
@@ -2619,3 +2634,31 @@ class DoctorSponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     resource_class = DoctorSponsoredServicesResource
 
+
+class GoogleMapRecordForm(forms.ModelForm):
+   location = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}), required =True)
+   text = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control'}), required = True)
+
+   class Meta:
+       model = GoogleMapRecords
+       fields = [
+         "location", "text",
+       ]
+
+class GoogleMapRecordsResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
+
+    class Meta:
+        model = GoogleMapRecords
+        fields = ('id', 'text', 'label', 'reason', 'hospital_name', 'place_id',
+                  'multi_speciality', 'has_phone', 'lead_rank', 'combined_rating', 'combined_rating_count',
+                  'is_potential', 'has_booking', 'monday_timing', 'address', 'is_bookable', 'hospital_id',
+                  'phone_number', 'has_phlebo', 'serial_number', 'onboarded', 'phlebo_type', 'interested_in_diagnostics',
+                  'interested_in_pharmacy', 'samples_per_month', 'cluster',
+                  'ready_to_use_wallet', 'digital_only_report',)
+
+class GoogleMapRecordsAdmin(ImportExportMixin, VersionAdmin, ActionAdmin):
+    search_fields = ('hospital_name', 'lead_rank',)
+    list_display = ('id', 'hospital_name', 'lead_rank', )
+    formats = (base_formats.XLS,)
+    resource_class = GoogleMapRecordsResource

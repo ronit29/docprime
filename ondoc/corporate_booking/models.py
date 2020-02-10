@@ -7,6 +7,22 @@ from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import TimeStampedModel, Document
 from ondoc.bookinganalytics.models import DP_CorporateDeals
 from ondoc.common.models import MatrixMappedCity, MatrixMappedState, SyncBookingAnalytics
+from ondoc.common.helper import Choices
+
+
+# class CorporateGroup(auth_model.TimeStampedModel):
+#     class CorporateType(Choices):
+#         VIP = 'VIP'
+#         GOLD = 'GOLD'
+#
+#     name = models.CharField(max_length=300, null=False, blank=False)
+#     type = models.CharField(max_length=100, null=True, choices=CorporateType.as_choices())
+#
+#     def __str__(self):
+#         return str(self.name)
+#
+#     class Meta:
+#         db_table = 'corporate_groups'
 
 
 class Corporates(auth_model.TimeStampedModel):
@@ -19,6 +35,7 @@ class Corporates(auth_model.TimeStampedModel):
     PIN = models.BigIntegerField(null=True, blank=True, verbose_name='PIN Code')
     pan_no = models.CharField(max_length=10000, default='', verbose_name='PAN no.')
     gst_no = models.CharField(max_length=10000, default='', verbose_name='GST no.')
+    # corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_group', null=True, blank=True, on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return "{}".format(self.corporate_name)
@@ -68,24 +85,6 @@ class CorporateDeal(auth_model.TimeStampedModel):
 
 
     def sync_with_booking_analytics(self):
-        obj = DP_CorporateDeals.objects.filter(CorporateDealId=self.id).first()
-        if not obj:
-            obj = DP_CorporateDeals()
-            obj.CorporateDealId = self.id
-
-        obj.CorporateName = self.corporate.corporate_name
-        obj.DealStartDate = self.deal_start_date
-        obj.ReceiptNumber = self.receipt_no
-        obj.CreatedDate = self.created_at
-        obj.ExpectedProviderFee = self.expected_provider_fee
-        obj.GrossAmount = self.gross_amount
-        obj.NumberOfEmployees = self.employee_count
-        obj.TDSDeducted = self.tds_deducted
-        obj.PaymentDate = self.payment_date
-        obj.IsActive = self.is_active
-        obj.DealEndDate = self.deal_end_date
-        obj.UpdatedDate = self.updated_at
-        obj.save()
 
 
         try:
@@ -93,9 +92,37 @@ class CorporateDeal(auth_model.TimeStampedModel):
                                                           content_type=ContentType.objects.get_for_model(CorporateDeal),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
-        return obj
+        # obj = DP_CorporateDeals.objects.filter(CorporateDealId=self.id).first()
+        # if not obj:
+        #     obj = DP_CorporateDeals()
+        #     obj.CorporateDealId = self.id
+        #
+        # obj.CorporateName = self.corporate.corporate_name
+        # obj.DealStartDate = self.deal_start_date
+        # obj.ReceiptNumber = self.receipt_no
+        # obj.CreatedDate = self.created_at
+        # obj.ExpectedProviderFee = self.expected_provider_fee
+        # obj.GrossAmount = self.gross_amount
+        # obj.NumberOfEmployees = self.employee_count
+        # obj.TDSDeducted = self.tds_deducted
+        # obj.PaymentDate = self.payment_date
+        # obj.IsActive = self.is_active
+        # obj.DealEndDate = self.deal_end_date
+        # obj.UpdatedDate = self.updated_at
+        # obj.save()
+        #
+        #
+        # try:
+        #     SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+        #                                                   content_type=ContentType.objects.get_for_model(CorporateDeal),
+        #                                                   defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        # except Exception as e:
+        #     pass
+        #
+        # return obj
 
     class Meta:
         db_table = "corporate_deal"

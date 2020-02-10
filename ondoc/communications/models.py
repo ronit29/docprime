@@ -59,14 +59,17 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
                 admins_with_user = admins.filter(user__isnull=False)
                 if admins_with_user:
                     for admin in admins_with_user:
-                        if int(admin.user.phone_number) == int(spoc.number):
-                            user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
-                            if spoc.email:
-                                user_and_email.append({'user': admin.user, 'email': spoc.email})
-                        else:
-                            user_and_number.append({'user': None, 'phone_number': spoc.number})
-                            if spoc.email:
-                                user_and_email.append({'user': None, 'email': spoc.email})
+                        try:
+                            if int(admin.user.phone_number) == int(spoc.number):
+                                user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
+                                if spoc.email:
+                                    user_and_email.append({'user': admin.user, 'email': spoc.email})
+                            else:
+                                user_and_number.append({'user': None, 'phone_number': spoc.number})
+                                if spoc.email:
+                                    user_and_email.append({'user': None, 'email': spoc.email})
+                        except Exception as e:
+                            continue
                 else:
                     user_and_number.append({'user': None, 'phone_number': spoc.number})
                     if spoc.email:
@@ -419,7 +422,7 @@ class SMSNotification:
         obj = None
         if notification_type == NotificationAction.COD_TO_PREPAID_REQUEST:
             obj = DynamicTemplates.objects.filter(template_name="COD_to_Prepaid_SMS_to_customer", approved=True).first()
-        elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+        elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED and self.context.get('instance') and self.context.get('instance').hospital and self.context.get('instance').hospital.network and self.context.get('instance').hospital.network.id == 1883:
             obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 2):
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
@@ -457,6 +460,16 @@ class SMSNotification:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_provider", approved=True).first()
         elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_patient", approved=True).first()
+        elif user and user.user_type == User.CONSUMER and notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED and self.context.get('visit_type') == 'home':
+            obj = DynamicTemplates.objects.filter(template_name="booking_confirmed_lab_prepaid_home_collection_with_google_link", approved=True).first()
+        elif user and user.user_type == User.CONSUMER and notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED and self.context.get('visit_type') == 'lab':
+            obj = DynamicTemplates.objects.filter(template_name="booking_confirmed_lab_prepaid_lab_visit_with_google_link", approved=True).first()
+        elif user and user.user_type == User.CONSUMER and notification_type == NotificationAction.APPOINTMENT_ACCEPTED and self.context.get('is_payment_type_cod'):
+            obj = DynamicTemplates.objects.filter(template_name="booking_confirmed_doctor_cod_with_google_link", approved=True).first()
+        elif user and user.user_type == User.CONSUMER and notification_type == NotificationAction.APPOINTMENT_ACCEPTED and not self.context.get('is_payment_type_cod'):
+            obj = DynamicTemplates.objects.filter(template_name="booking_confirmed_doctor_prepaid_with_google_link", approved=True).first()
+        elif notification_type == NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS:
+            obj = DynamicTemplates.objects.filter(template_name="Reminder_message_Medanta_Artemis", approved=True).first()
         return obj
 
     def trigger(self, receiver, template, context):
@@ -532,6 +545,7 @@ class SMSNotification:
         appointment = context.get("instance")
         user_key = UserSecretKey.objects.get_or_create(user=user)
         payload = JWTAuthentication.provider_sms_payload_handler(user, appointment)
+        payload.pop('expiration_time')
         token = jwt.encode(payload, user_key[0].key)
         token = str(token, 'utf-8')
         appointment_type = 'opd' if appointment.__class__ == OpdAppointment else 'lab'
@@ -569,6 +583,36 @@ class SMSNotification:
                 self.trigger(receiver, template, context)
         ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
+    def update_context(self, template_obj):
+        if template_obj and template_obj.template_name == 'booking_confirmed_lab_prepaid_home_collection_with_google_link':
+            self.context['code'] = self.context.get('instance').otp
+
+        if template_obj and template_obj.template_name == 'booking_confirmed_lab_prepaid_lab_visit_with_google_link':
+            instance = self.context.get('instance')
+            self.context['code'] = instance.otp
+            self.context['address'] = instance.lab.get_lab_address()
+            self.context['spoc_number'] = None
+            if instance.lab and instance.lab.network and instance.lab.network.spoc_details.all():
+                spoc = instance.lab.network.spoc_details.all()[0]
+                self.context['spoc_number'] = str(spoc.std_code) if spoc.std_code else "" + str(spoc.number) if spoc.number else ""
+
+            self.context['Google_link'] = generate_short_url('https://www.google.com/maps/search/?api=1&query=%f,%f' % (instance.lab.location.y, instance.lab.location.x))
+
+        if template_obj and template_obj.template_name == 'booking_confirmed_doctor_prepaid_with_google_link':
+            instance = self.context.get('instance')
+            self.context['code'] = instance.otp
+            self.context['spoc_number'] = None
+            if instance.hospital and instance.hospital.spoc_details.all():
+                spoc = instance.hospital.spoc_details.all()[0]
+                self.context['spoc_number'] = str(spoc.std_code) if spoc.std_code else "" + str(spoc.number) if spoc.number else ""
+            self.context['Google_link'] = generate_short_url('https://www.google.com/maps/search/?api=1&query=%f,%f' % (instance.hospital.location.y, instance.hospital.location.x))
+
+        if template_obj and template_obj.template_name == 'booking_confirmed_doctor_cod_with_google_link':
+            self.context['Google_link'] = generate_short_url('https://www.google.com/maps/search/?api=1&query=%f,%f' % (self.context.get('instance').hospital.location.y, self.context.get('instance').hospital.location.x))
+            self.context['code'] = self.context.get('instance').otp
+
+        return self.context
+
     def dispatch(self, receivers):
         context = self.context
         instance = context.get("instance")
@@ -590,6 +634,8 @@ class SMSNotification:
             if not obj:
                 receivers_left.append(receiver)
             else:
+                # update context
+                context = self.update_context(obj)
                 # click_login_token_objects = list()
                 user = receiver.get('user')
                 phone_number = receiver.get('phone_number')
@@ -625,6 +671,21 @@ class WHTSAPPNotification:
         context.pop('time_slot_start', None)
         self.context = context
 
+    @staticmethod
+    def get_pipe_separated_string_from_list(list):
+        pipe_separared_string = list[0] if len(list) == 1 else ''
+        if not pipe_separared_string:
+            pipe_separared_string = ' | '.join(list)
+        return pipe_separared_string
+
+    @staticmethod
+    def get_pipe_separated_indexed_string_from_list(list):
+        pipe_separated_indexed_string = list[0] if len(list) == 1 else ''
+        if not pipe_separated_indexed_string:
+            pipe_separated_indexed_string = ' | '.join(
+                [(str(index) + '. ' + list_element) for index, list_element in enumerate(list, 1)])
+        return pipe_separated_indexed_string
+
     def get_template_and_data(self, user):
         notification_type = self.notification_type
         body_template = ''
@@ -632,7 +693,74 @@ class WHTSAPPNotification:
         # if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
         #         notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
 
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+        if notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT and user:
+            body_template = "appointment_completion_prepaid"
+
+            data.append(self.context.get('doctor_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+            data.append(self.context.get('hospital_address'))
+            data.append(self.context.get('patient_name'))
+            sms_obj = SMSNotification(NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT, self.context)
+            context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
+            data.append(context['provider_login_url'])
+            click_login_token_obj.save()
+
+        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC and user:
+            body_template = "appointment_completion_cod"
+
+            data.append(self.context.get('doctor_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+            data.append(self.context.get('hospital_address'))
+            data.append(self.context.get('patient_name'))
+            if self.context.get('instance').payment_type == 2:
+                data.append(str(self.context.get('cod_amount')))
+            else:
+                data.append(str(self.context.get('instance').effective_price))
+            sms_obj = SMSNotification(NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC, self.context)
+            context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
+            data.append(context['provider_login_url'])
+            click_login_token_obj.save()
+
+        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT and user:
+            body_template = "appointment_confirmation_online_payment"
+
+            data.append(self.context.get('doctor_name'))
+            data.append(self.context.get('patient_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%I:%M%p'))
+
+            sms_obj = SMSNotification(NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT, self.context)
+            context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
+            data.append(context['provider_login_url'])
+            click_login_token_obj.save()
+
+        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC and user:
+            body_template = "appointment_confirmation_pay_at_clinic"
+
+            data.append(self.context.get('doctor_name'))
+            data.append(self.context.get('patient_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%I:%M%p'))
+
+            sms_obj = SMSNotification(NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                      self.context)
+            context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
+            data.append(context['provider_login_url'])
+            click_login_token_obj.save()
+
+        elif notification_type == NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT and user:
+            body_template = "appointment_completion_prepaid"
+
+            data.append(self.context.get('lab_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+            data.append(self.context.get('pickup_address'))
+            data.append(self.context.get('patient_name'))
+            sms_obj = SMSNotification(NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT, self.context)
+            context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
+            data.append(context['provider_login_url'])
+            click_login_token_obj.save()
+
+        elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             body_template = "appointment_accepted_opd_patient"
 
             data.append(self.context.get('patient_name'))
@@ -981,6 +1109,34 @@ class WHTSAPPNotification:
         #         temp_short_url = generate_short_url(report)
         #         lab_reports.append(temp_short_url)
         #     self.context['lab_reports'] = lab_reports
+
+        # elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED and user and user.user_type == User.DOCTOR:
+        #
+        #     instance = self.context.get('instance')
+        #     body_template = "cloudlabs_report_generated_partner"
+        #     data.append(self.context.get('order_id'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('patient_age'))
+        #     lab_tests_ordered_string = self.get_pipe_separated_string_from_list(self.context.get('lab_tests_ordered'))
+        #     data.append(lab_tests_ordered_string)
+        #     report_list_string = self.get_pipe_separated_indexed_string_from_list(self.context.get('report_list'))
+        #     data.append(report_list_string)
+        #
+        # elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
+        #
+        #     instance = self.context.get('instance')
+        #     body_template = "cloudlabs_report_generated_v2"
+        #     data.append(self.context.get('hospital_name'))
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('patient_age'))
+        #     data.append(self.context.get('order_id'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
+        #     lab_tests_ordered_string = self.get_pipe_separated_string_from_list(self.context.get('lab_tests_ordered'))
+        #     data.append(lab_tests_ordered_string)
+        #     report_list_string = self.get_pipe_separated_indexed_string_from_list(self.context.get('report_list'))
+        #     data.append(report_list_string)
+
         return body_template, data
 
     def trigger(self, receiver, template, context, **kwargs):
@@ -1090,7 +1246,11 @@ class EMAILNotification:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="").first()
         if notification_type == NotificationAction.SEND_LENSFIT_COUPON:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Lensfit_email", approved=True).first()
-
+        if notification_type == NotificationAction.IPDIntimateEmailNotification:
+            obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="EMail_to_provider_for_ipd_hospitals_for_request_query", approved=True).first()
+        if notification_type in (NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT, NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB, NotificationAction.LAB_APPOINTMENT_BOOKED) and (not user or user.user_type == User.DOCTOR):
+            obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Email_to_lab_on_appointment_booked",
+                                                  approved=True).first()
         return obj
 
     def get_template(self, user):
@@ -1102,7 +1262,7 @@ class EMAILNotification:
 
             if context.get("instance").is_credit_letter_required_for_appointment() and not context.get("instance").is_payment_type_cod():
                 credit_letter = context.get("instance").get_valid_credit_letter()
-                if not credit_letter:
+                if not credit_letter or not credit_letter.file or not credit_letter.file.url:
                     logger.error("Got error while getting pdf for opd credit letter")
                     return '', ''
                 context.update({"credit_letter": credit_letter})
@@ -1392,9 +1552,8 @@ class EMAILNotification:
             message = json.dumps(message)
             publish_message(message)
 
-    def send(self, receivers):
-
-        dispatch_response, receivers = self.dispatch(receivers)
+    def send(self, receivers, *args, **kwargs):
+        dispatch_response, receivers = self.dispatch(receivers, *args, **kwargs)
         if dispatch_response:
             return
 
@@ -1406,7 +1565,7 @@ class EMAILNotification:
             if template:
                 self.trigger(receiver, template, context)
 
-    def dispatch(self, receivers):
+    def dispatch(self, receivers, *args, **kwargs):
         context = self.context
         if not context:
             return None, receivers
@@ -1438,7 +1597,7 @@ class EMAILNotification:
 
                 if email or send_without_email:
                     recipient_obj = RecipientEmail(email)
-                    obj.send_notification(context, recipient_obj, self.notification_type, user=receiver_user)
+                    obj.send_notification(context, recipient_obj, self.notification_type, user=receiver_user, *args, **kwargs)
 
         if not receivers_left:
             return True, receivers_left
@@ -1562,9 +1721,9 @@ class OpdNotification(Notification):
         if self.appointment.hospital.assoc_doctors.filter(enabled=True).count() > 10:
             clinic_or_hospital = "Hospital"
         token_object = JWTAuthentication.generate_token(self.appointment.user)
-        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        booking_url = settings.BASE_URL + '/sms/booking?token={}&user_id={}'.format(token_object['token'].decode("utf-8"), self.appointment.user_id)
         opd_appointment_cod_to_prepaid_url, cod_to_prepaid_discount = self.appointment.get_cod_to_prepaid_url_and_discount(
-            token_object['token'].decode("utf-8"))
+            token_object['token'].decode("utf-8"), self.appointment.user_id)
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(
             self.appointment.id)
         appointment_type = 'opd'
@@ -1642,7 +1801,7 @@ class OpdNotification(Notification):
 
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
-        elif notification_type == NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS:
+        elif notification_type == NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS or notification_type == NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
         elif notification_type == NotificationAction.COD_TO_PREPAID or \
@@ -1653,6 +1812,13 @@ class OpdNotification(Notification):
             email_notification.send(all_receivers.get('email_receivers', []))
             sms_notification.send(all_receivers.get('sms_receivers', []))
             # whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+
+        elif notification_type in (NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC):
+            whtsapp_notification = WHTSAPPNotification(notification_type, context)
+            whtsapp_notification.send(all_receivers.get('sms_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -1679,6 +1845,12 @@ class OpdNotification(Notification):
         if notification_type in [NotificationAction.DOCTOR_INVOICE]:
             if instance.payment_type not in [2, 3]:
                 receivers.append(instance.user)
+        if notification_type in [NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT]:
+            spocs_to_be_communicated = doctor_spocs
+            if not is_valid_for_provider:
+                spocs_to_be_communicated = []
+            doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
         elif notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
                                  NotificationAction.PRESCRIPTION_UPLOADED,
@@ -1694,7 +1866,11 @@ class OpdNotification(Notification):
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.APPOINTMENT_BOOKED,
                                    NotificationAction.APPOINTMENT_CANCELLED,
-                                   NotificationAction.COD_TO_PREPAID]:
+                                   NotificationAction.COD_TO_PREPAID,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC,
+                                   NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS
+                                   ]:
             spocs_to_be_communicated = doctor_spocs
             if not is_valid_for_provider:
                 spocs_to_be_communicated = []
@@ -1739,6 +1915,10 @@ class OpdNotification(Notification):
             if email:
                 user_and_email.append({'user': user, 'email': email})
         spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated, instance)
+        if notification_type in (NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT):
+            user_and_phone_number.clear()
+
         user_and_phone_number.extend(spoc_numbers)
         user_and_email.extend(spoc_emails)
         user_and_email = unique_emails(user_and_email)
@@ -1771,7 +1951,7 @@ class LabNotification(Notification):
         tests = self.appointment.get_tests_and_prices()
         report_file_links = instance.get_report_urls()
         token_object = JWTAuthentication.generate_token(self.appointment.user)
-        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        booking_url = settings.BASE_URL + '/sms/booking?token={}&user_id={}'.format(token_object['token'].decode("utf-8"), instance.user_id)
         lab_appointment_complete_url = booking_url + "&callbackurl=lab/appointment/{}?complete=true".format(self.appointment.id)
         lab_appointment_feedback_url = booking_url + "&callbackurl=lab/appointment/{}".format(self.appointment.id)
         reschedule_appointment_bypass_url = booking_url + "&callbackurl=lab/{}/timeslots?reschedule=true".format(self.appointment.lab.id)
@@ -1833,8 +2013,10 @@ class LabNotification(Notification):
         }
         return context
 
-    def send(self, is_valid_for_provider=True):
+    def send(self, is_valid_for_provider=True, *args, **kwargs):
         context = self.get_context()
+        if kwargs.get('overrided_context'):
+            context.update(kwargs.get('overrided_context'))
         notification_type = self.notification_type
         all_receivers = self.get_receivers(is_valid_for_provider)
 
@@ -1864,6 +2046,9 @@ class LabNotification(Notification):
             sms_notification = SMSNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
             sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT:
+            whtsapp_notification = WHTSAPPNotification(notification_type, context)
+            whtsapp_notification.send(all_receivers.get('sms_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -1871,7 +2056,7 @@ class LabNotification(Notification):
             push_notification = PUSHNotification(notification_type, context)
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
-            email_notification.send(all_receivers.get('email_receivers', []))
+            email_notification.send(all_receivers.get('email_receivers', []), *args, **kwargs)
             sms_notification.send(all_receivers.get('sms_receivers', []))
             app_notification.send(all_receivers.get('app_receivers', []))
             push_notification.send(all_receivers.get('push_receivers', []))
@@ -1898,7 +2083,8 @@ class LabNotification(Notification):
                                  NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_REPORT_SEND_VIA_CRM,
-                                 NotificationAction.SEND_LENSFIT_COUPON
+                                 NotificationAction.SEND_LENSFIT_COUPON,
+                                 NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT
                                  ]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
@@ -2404,7 +2590,7 @@ class VipNotification(Notification):
         instance = self.plus_user_obj
 
         context = {
-            'expiry_date': str(aware_time_zone(instance.expiry_date).date().strftime('%d %b %Y')),
+            'expiry_date': str(aware_time_zone(instance.expire_date).date().strftime('%d %b %Y')),
         }
 
         return context
@@ -2519,6 +2705,8 @@ class PartnerLabNotification(Notification):
             sms_notification.send(all_receivers.get('sms_receivers', []))
             push_notification = PUSHNotification(notification_type, context)
             push_notification.send(all_receivers.get('push_receivers', []))
+            whatsapp_notification = WHTSAPPNotification(notification_type, context)
+            whatsapp_notification.send(all_receivers.get('sms_receivers', []))
         if notification_type in [NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY]:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))

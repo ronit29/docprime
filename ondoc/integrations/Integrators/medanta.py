@@ -13,6 +13,7 @@ from ondoc.api.v1.utils import aware_time_zone
 
 class Medanta(BaseIntegrator):
 
+    # This method is use to get all the doctor data from hospital.
     @classmethod
     def get_doctor_data(cls):
         url = '%s' % settings.MEDANTA_DOCTOR_LIST_URL
@@ -37,6 +38,7 @@ class Medanta(BaseIntegrator):
             defaults = {'integrator_doctor_data': doc_data, 'integrator_class_name': Medanta.__name__, 'first_name': doc_data['DoctorName']}
             IntegratorDoctorMappings.objects.update_or_create(integrator_doctor_id=doc_data['ID'], defaults=defaults)
 
+    # This method provides available time slots of doctors.
     def _get_appointment_slots(self, pincode, date, **kwargs):
         from ondoc.doctor.models import Hospital
         dc_obj = kwargs.get('dc_obj', None)
@@ -94,6 +96,7 @@ class Medanta(BaseIntegrator):
             res_data = {"timeslots": resp_list, "upcoming_slots": [], "is_integrated": True}
             return res_data
 
+    # This method is use for formatting the slots data.
     def time_slot_extraction(self, slots, date, dc_obj):
         from ondoc.doctor.models import DoctorClinicTiming
         deal_price = None
@@ -137,6 +140,7 @@ class Medanta(BaseIntegrator):
         time_dict[date].append(pm_dict)
         return time_dict
 
+    # check if slots available for clinic or not.
     def slots_available_for_selected_clinic(self, avlbl_slot, facility_id, clinic_code):
         if avlbl_slot['facilityId'] == 'GH':
             if avlbl_slot['facilityId'] == facility_id and avlbl_slot['clinicCode'][:2] == clinic_code:
@@ -147,6 +151,7 @@ class Medanta(BaseIntegrator):
 
         return False
 
+    # This method provides authentication token.
     def get_auth_token(self):
         url = '%s/login' % settings.MEDANTA_API_BASE_URL
         body = {'username': 'Docprime_Technologies', 'password': '1234'}
@@ -157,6 +162,7 @@ class Medanta(BaseIntegrator):
         response = response.json()
         return response['token']
 
+    # This method is use to push an appointment.
     def _post_order_details(self, appointment, **kwargs):
         auth_token = self.get_auth_token()
         retry_count = kwargs.get('retry_count', 0)
@@ -171,19 +177,20 @@ class Medanta(BaseIntegrator):
             status_code = response.status_code
             if response.status_code != status.HTTP_200_OK or not response.ok:
                 h_status = IntegratorHistory.NOT_PUSHED
-                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Sims', status_code,
+                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Medanta', status_code,
                                                  retry_count, h_status, '')
                 logger.error("[ERROR-MEDANTA] Failed to push appointment - %s", response.json())
                 return None
             else:
                 response = response.json()
                 h_status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
-                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Sims', status_code,
+                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Medanta', status_code,
                                                  retry_count, h_status, '')
                 return response
 
         return None
 
+    # Creating payload for post order.
     def prepare_payload(self, integrator_mapping, appointment):
         doctor_id = integrator_mapping.integrator_doctor_id
         preferred_date = aware_time_zone(appointment.time_slot_start).strftime("%d/%m/%Y %H:%M:%S")

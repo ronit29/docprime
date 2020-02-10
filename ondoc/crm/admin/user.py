@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Permission
 from django.contrib.gis import admin
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.admin import UserAdmin
@@ -54,6 +55,7 @@ class CustomUserChangeForm(UserChangeForm):
             raise forms.ValidationError("Employee Code must be filled in staff profile.")
         return super().clean()
 
+
 class CustomUserAdmin(UserAdmin,VersionAdmin):
     list_display = ('email',)
     list_filter = ('is_staff', 'is_superuser')
@@ -66,6 +68,7 @@ class CustomUserAdmin(UserAdmin,VersionAdmin):
     list_display = ('email','phone_number', 'is_active')
     list_select_related = ('staffprofile',)
     form = CustomUserChangeForm
+
     def save_model(self, request, obj, form, change):
         if not obj.email:
             obj.email = None
@@ -91,6 +94,7 @@ class CustomUserAdmin(UserAdmin,VersionAdmin):
         if ordering:
             qs = qs.order_by(*ordering)
         return qs
+
     def get_changeform_initial_data(self, request):
         return {'user_type': 1}
 
@@ -150,7 +154,21 @@ class UserNumberUpdateAdmin(admin.ModelAdmin):
 
 
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email',)
 
+    list_display = ('name', 'email',)
     search_fields = ['email', 'name']
     autocomplete_fields = ['user']
+
+    def save_model(self, request, obj, form, change):
+        is_superuser = request.user.is_superuser
+        if obj.is_gold_profile and not is_superuser:
+            return
+        elif obj.is_insured_profile and not is_superuser:
+            return
+        super().save_model(request, obj, form, change)
+
+
+class PermissionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'codename')
+    search_fields = ['name', 'codename']
+    model = Permission

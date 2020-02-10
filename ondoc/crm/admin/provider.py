@@ -5,8 +5,10 @@ from import_export import fields, resources
 from import_export.admin import ImportExportModelAdmin
 from import_export.tmp_storages import MediaStorage
 from import_export import widgets
+from ondoc.account import models as account_models
 from ondoc.provider import models as prov_models
 from ondoc.diagnostic import models as diag_models
+from ondoc.doctor import models as doc_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.models import NotificationAction
 from django.db.models import Q
@@ -110,8 +112,12 @@ class ReportsInlineFormset(forms.BaseInlineFormSet):
         if any(self.errors):
             return
         if self.instance.status in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
-                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED] and not self.cleaned_data:
-            raise forms.ValidationError("No report files found.")
+                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED,
+                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_VIEWED] and \
+                (not self.cleaned_data or len(self.cleaned_data) == len(self.deleted_forms)):
+            raise forms.ValidationError("Report file required.")
+        if self.instance.status < self.instance.PARTIAL_REPORT_GENERATED and self.cleaned_data:
+            raise forms.ValidationError("Reports can't be uploaded for present status")
 
 
 class ReportsInline(admin.TabularInline):
@@ -126,15 +132,64 @@ class ReportsInline(admin.TabularInline):
     formset = ReportsInlineFormset
 
 
+class PartnerLabSamplesCollectOrderForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        if 'status' in self.changed_data:
+            status_update_check = self.instance.status_update_checks(cleaned_data['status'])
+            if not status_update_check["is_correct"]:
+                raise forms.ValidationError(status_update_check["message"])
+        if not cleaned_data.get('status') in [prov_models.PartnerLabSamplesCollectOrder.CANCELLED_BY_LAB,
+                                              prov_models.PartnerLabSamplesCollectOrder.CANCELLED_BY_DOCTOR] and (cleaned_data.get('cancellation_comments')):
+            raise forms.ValidationError(
+                "Reason/Comment for cancellation can only be entered on cancelled appointment")
+        if cleaned_data.get('status') in [prov_models.PartnerLabSamplesCollectOrder.CANCELLED_BY_LAB,
+                                          prov_models.PartnerLabSamplesCollectOrder.CANCELLED_BY_DOCTOR] and not cleaned_data.get('cancellation_comments'):
+            raise forms.ValidationError("Comment for Cancelled appointment needs to be entered.")
+
+
+class HospitalFilter(admin.SimpleListFilter):
+    title = 'Hospital'
+    parameter_name = 'hospital'
+
+    def lookups(self, request, model_admin):
+        hospitals = prov_models.PartnerLabSamplesCollectOrder.objects.distinct('hospital').values_list('hospital_id', 'hospital__name')
+        return hospitals
+
+    def queryset(self, request, queryset):
+        if self.value():
+            queryset = queryset.filter(hospital_id=self.value())
+        return queryset
+
+
+class LabFilter(admin.SimpleListFilter):
+    title = 'Lab'
+    parameter_name = 'lab'
+
+    def lookups(self, request, model_admin):
+        labs = prov_models.PartnerLabSamplesCollectOrder.objects.distinct('lab').values_list('lab_id', 'lab__name')
+        return labs
+
+    def queryset(self, request, queryset):
+        if self.value():
+            queryset = queryset.filter(lab_id=self.value())
+        return queryset
+
+
 class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
 
-    list_display = ('id', 'offline_patient', 'hospital', 'doctor', 'lab')
+    list_display = ('id', 'created_at', 'status', 'offline_patient', 'hospital', 'doctor', 'lab')
     readonly_fields = ['offline_patient', 'patient_details', 'hospital', 'doctor', 'lab', 'available_lab_tests',
-                       'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts']
-    search_fields = ['offline_patient']
+                       'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts', 'extras']
+    search_fields = ('id', 'doctor__name', 'offline_patient__name',)
+    date_hierarchy = 'created_at'
+    list_filter = ('created_at', 'status', HospitalFilter, LabFilter)
     inlines = [
         ReportsInline,
     ]
+    form = PartnerLabSamplesCollectOrderForm
 
     def get_queryset(self, request):
         return super(PartnerLabSamplesCollectOrderAdmin, self).get_queryset(request)\
@@ -143,9 +198,6 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
                                                                                 'available_lab_tests__test')
 
     def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
         return False
 
     def save_related(self, request, form, formsets, change):

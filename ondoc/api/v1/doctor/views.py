@@ -5,17 +5,19 @@ from uuid import UUID
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
 
+from config.settings.db_router import DatabaseInfo
 from ondoc.account.models import Order, ConsumerAccount, PgTransaction
-from ondoc.api.v1.auth.serializers import UserProfileSerializer
+# from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
-    OfflinePatientSerializer, CommonConditionsSerializer
+    OfflinePatientSerializer, CommonConditionsSerializer, RecordSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
     CommonHospitalSerializer, CommonCategoriesSerializer
 from ondoc.authentication.models import UserProfile
 from ondoc.cart.models import Cart
+from ondoc.common.middleware import use_slave
 from ondoc.crm.constants import constants
 from ondoc.diagnostic.models import LabTestCategory
 from ondoc.doctor import models
@@ -26,13 +28,14 @@ from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
     HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, \
-    SpecializationDepartmentMapping, DoctorPracticeSpecialization, DoctorClinicTiming
+    SpecializationDepartmentMapping, DoctorPracticeSpecialization, DoctorClinicTiming, GoogleMapRecords
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
+from ondoc.plus.models import PlusPlans, TempPlusUser
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer, \
@@ -49,7 +52,7 @@ from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min, Prefetch
 from django.contrib.gis.geos import Point, GEOSGeometry
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets
+from rest_framework import viewsets, generics
 from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -65,7 +68,7 @@ from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_param
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F, Count
-from django.db.models.functions import StrIndex
+from django.db.models.functions import StrIndex, Length
 import datetime, logging, copy, re
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
@@ -83,7 +86,7 @@ from ondoc.insurance.models import InsuranceThreshold
 import logging
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
-from ondoc.common.models import GlobalNonBookable, AppointmentHistory
+from ondoc.common.models import GlobalNonBookable, AppointmentHistory, UserConfig
 from ondoc.api.v1.common import serializers as common_serializers
 from django.utils.text import slugify
 from django.urls import reverse
@@ -95,7 +98,12 @@ from ondoc.prescription import models as pres_models
 from ondoc.api.v1.prescription import serializers as pres_serializers
 from django.template.defaultfilters import slugify
 from packaging.version import parse
+from django.http import HttpResponse, HttpResponseRedirect
+from geopy.geocoders import Nominatim
+from django.shortcuts import render
+import newrelic.agent
 
+geolocator = Nominatim()
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -388,12 +396,20 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
 
     @transaction.atomic
-    def create(self, request):
+    def create(self, request, *args, **kwargs):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         data = request.data
+        profile = validated_data.get('profile')
+        plus_plan = validated_data.get('plus_plan', None)
         plus_user = request.user.active_plus_user
+        if plus_plan and plus_user is None:
+            is_verified = profile.verify_profile()
+            if not is_verified:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "Profile is not completed, Please update profile first to process further"})
+        if plus_plan and plus_user is None:
+            plus_user = TempPlusUser.objects.create(user=request.user, plan=plus_plan, profile=profile)
         user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 
         hospital = validated_data.get('hospital')
@@ -401,7 +417,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
         profile = validated_data.get('profile')
-        payment_type = validated_data.get('payment_type')
+        if not plus_user:
+            payment_type = validated_data.get('payment_type')
+        else:
+            payment_type = OpdAppointment.GOLD if plus_user.plan.is_gold else OpdAppointment.VIP
+            validated_data['payment_type'] = payment_type
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '
@@ -447,11 +467,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
-            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
+            data['vip_amount'] = int(plus_user_dict.get('vip_amount_deducted'))
+            data['amount_to_be_paid'] = int(plus_user_dict.get('amount_to_be_paid'))
             if data['cover_under_vip']:
-                data['payment_type'] = OpdAppointment.VIP
-
+                if plus_user.plan.is_gold:
+                    data['payment_type'] = OpdAppointment.GOLD
+                    data['is_gold_member'] = True
+                else:
+                    data['payment_type'] = OpdAppointment.VIP
+                    data['is_gold_member'] = False
+                validated_data['payment_type'] = data['payment_type']
+            else:
+                validated_data['payment_type'] = validated_data.get('payment_type')
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'], data['is_vip_member'], data['cover_under_vip'], \
@@ -475,20 +502,21 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if responsible_user:
             data['_responsible_user'] = responsible_user
 
-        if validated_data.get("existing_cart_item"):
-            cart_item = validated_data.get("existing_cart_item")
-            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
-            payment_type = old_cart_obj.data.get('payment_type')
-            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            # cart_item.data = request.data
-            cart_item.data = data
-            cart_item.save()
-        else:
-            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                  user=request.user, defaults={"data": data})
+        if not plus_plan:
+            if validated_data.get("existing_cart_item"):
+                cart_item = validated_data.get("existing_cart_item")
+                old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
+                payment_type = old_cart_obj.data.get('payment_type')
+                if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                    data['payment_type'] = OpdAppointment.PREPAID
+                if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
+                    data['payment_type'] = OpdAppointment.PREPAID
+                # cart_item.data = request.data
+                cart_item.data = data
+                cart_item.save()
+            else:
+                cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
+                                                      user=request.user, defaults={"data": data})
 
         resp = None
         is_agent = False
@@ -499,8 +527,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     is_agent = True
                 else:
                     resp = {'is_agent': True, "status": 1}
-        if not resp:
+        if not resp and not plus_plan:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
+
+        if not resp and plus_plan:
+            if kwargs.get('is_dummy'):
+                return validated_data
+
+            resp = account_models.Order.create_new_order(request, validated_data, False)
 
         if is_agent:
             resp['is_agent'] = True
@@ -804,7 +838,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
             resp_data['is_provider_signup_lead'] = True
         else:
             resp_data['is_provider_signup_lead'] = False
-
+        resp_data['user_id'] = request.user.id
         return Response(resp_data)
 
     def licence_update(self, request):
@@ -833,7 +867,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def prepare_response(self, response_data, selected_hospital, profile=None, product_id=None, coupon_code=None):
-        import operator 
+        # import operator
         # hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
         # [d['value'] for d in l if 'value' in d]
         hospital_ids = set(data['hospital_id'] for data in response_data.get('hospitals') if 'hospital_id' in data)
@@ -1012,6 +1046,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return about_doctor
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
@@ -1037,7 +1072,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve(self, request, pk, entity=None, *args, **kwargs):
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -1087,7 +1124,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         spec_ids = list()
         spec_url_dict = dict()
 
-        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
         all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
         is_congot = False
 
@@ -1174,7 +1210,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 lat = hospital.get('lat')
                 long = hospital.get('long')
             else:
-                hospital = doctor.hospitals.all().first()
+                hospital = doctor.hospitals.first()
                 if hospital and hospital.location:
                     lat = hospital.location.coords[1]
                     long = hospital.location.coords[0]
@@ -1218,25 +1254,34 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     hosp_reviews_dict[hospital.pk]['google_rating'] = list()
                     ratings_graph = None
                     hosp_reviews = hospital.hospital_place_details.all()
+                    # if hosp_reviews:
+                    reviews_data = dict()
+                    reviews_data['user_reviews'] = None
                     if hosp_reviews:
-                        reviews_data = hosp_reviews[0].reviews
+                        reviews_data['user_reviews'] = hosp_reviews[0].reviews.get('user_reviews')
+                    reviews_data['user_avg_rating'] = hospital.google_avg_rating
+                    reviews_data['user_ratings_total'] = hospital.google_ratings_count
+                    ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                                                                 context={"request": request})
 
-                        if reviews_data and reviews_data.get('user_reviews'):
-                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
-                                                                         context={"request": request})
+                    if reviews_data and reviews_data.get('user_reviews'):
+                        for data in reviews_data.get('user_reviews'):
+                            if data.get('time'):
+                                date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
 
-                            for data in reviews_data.get('user_reviews'):
-                                if data.get('time'):
-                                    date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
-
-                                hosp_reviews_dict[hospital.pk]['google_rating'].append(
-                                    {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
-                                     'ratings': data.get('rating'),
-                                     'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
-                                     })
-
-                        else:
-                            hosp_reviews_dict[hospital.pk]['google_rating'] = None
+                            hosp_reviews_dict[hospital.pk]['google_rating'].append(
+                                {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
+                                 'ratings': data.get('rating'),
+                                 'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
+                                 })
+                    if reviews_data.get('user_avg_rating') and reviews_data.get('user_ratings_total'):
+                        if not hosp_reviews_dict[hospital.pk].get('google_rating'):
+                            hosp_reviews_dict[hospital.pk]['google_rating'].append(
+                                {'compliment': None, 'date': None, 'id': None,
+                                 'is_live': hospital.is_live,
+                                 'ratings':None,
+                                 'review': None, 'user': None, 'user_name': None
+                                 })
                         hosp_reviews_dict[hospital.pk]['google_rating_graph'] = ratings_graph.data if ratings_graph else None
                     else:
                         hosp_reviews_dict[hospital.pk]['google_rating'] = None
@@ -1564,6 +1609,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
 
     @transaction.non_atomic_requests
+    @use_slave
+    @newrelic.agent.function_trace()
     def common_conditions(self, request):
         city = None
         serializer = CommonConditionsSerializer(data=request.query_params)
@@ -1575,10 +1622,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
-            "-priority")[:count]
-        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
-                                                                       context={'request': request})
+        # medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
+        #     "-priority")[:count]
+        # conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
+        #                                                                context={'request': request})
 
         common_specializations = models.CommonSpecialization.get_specializations(count)
         common_spec_urls = list()
@@ -1599,16 +1646,14 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                                           'city': city,
                                                                                           'spec_urls': spec_urls})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
-            procedure_category__is_live=True).all().order_by("-priority")[:10]
-        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
-                                                                                   many=True)
-
-
-
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(
-            procedure__is_enabled=True).all().order_by("-priority")[:10]
-        common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
+        # common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
+        #     procedure_category__is_live=True).all().order_by("-priority")[:10]
+        # common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
+        #                                                                            many=True)
+        #
+        # common_procedures = CommonProcedure.objects.select_related('procedure').filter(
+        #     procedure__is_enabled=True).all().order_by("-priority")[:10]
+        # common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
 
         common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
             ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
@@ -1619,7 +1664,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
                                                       sitemap_identifier='IPD_PROCEDURE_CITY',
                                                       is_valid=True,
-                                                      locality_value__iexact=city).annotate(
+                                                      locality_value__iexact=city.lower()).annotate(
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
             ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
@@ -1643,12 +1688,31 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         #
         #     categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
 
-        return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
-                         "procedure_categories": common_procedure_categories_serializer.data,
-                         "procedures": common_procedures_serializer.data,
+        return Response({"conditions": [],
+                         "specializations": specializations_serializer.data,
+                         "procedure_categories": [],
+                         "procedures": [],
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,
                          'package_categories': common_package_category(self, request)})
+
+    @transaction.non_atomic_requests
+    def top_hospitals(self, request):
+        logged_in_user = request.user
+        serializer = CommonConditionsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+#        vip_user = None
+ #       from_vip_page = True
+
+#        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+#            vip_user = logged_in_user.active_plus_user
+#        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'), vip_user, from_vip_page)
+
+
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
+
+        return Response({"top_hospitals": top_hospitals_data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
@@ -1715,6 +1779,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request, *args, **kwargs):
         if (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) \
                 and request.query_params.get('is_insurance'):
@@ -1753,7 +1818,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         if kwargs.get('reviews'):
             validated_data['reviews'] = kwargs['reviews']
 
-
         specialization_dynamic_content = ''
         top_content = None
         bottom_content = None
@@ -1761,7 +1825,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         ratings = None
         reviews = None
         result_count = 0
-
 
         # Insurance check for logged in user
         logged_in_user = request.user
@@ -1806,8 +1869,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
             query_string['query'] = paginate_raw_query(request, query_string['query'])
-            doctor_search_result = RawSql(query_string.get('query'),
-                                         query_string.get('params')).fetch_all()
+            db = DatabaseInfo.DEFAULT
+            if settings.USE_SLAVE_DB:
+                db = DatabaseInfo.SLAVE
+
+            doctor_search_result = RawSql(query_string.get('query'), query_string.get('params'), db).fetch_all()
 
             if doctor_search_result:
                 result_count = doctor_search_result[0]['result_count']
@@ -1831,7 +1897,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping",
                                                 "qualifications__qualification","qualifications__college",
                                                 "qualifications__specialization",
-                                                "doctor_clinics__hospital__hospital_place_details"
+                                                "doctor_clinics__hospital__hospital_place_details", "rating"
                                                 ).order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request,
@@ -1889,7 +1955,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 sublocality = validated_data.get('sublocality_value')
                 if sublocality:
                     locality = sublocality + ' ' + locality
-
 
             # if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
             #     if validated_data.get('extras').get('location_json').get('locality_value'):
@@ -1968,7 +2033,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     description += 'in '+ city
                 description += '.'
 
-
             breadcrumb = validated_data.get('breadcrumb')
 
             if breadcrumb:
@@ -1978,10 +2042,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
             if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
                 breadcrumb.append({'title': validated_data.get('specialization') + ' in ' + validated_data.get('locality_value'), 'url': None})
-            elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
+            elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY' and validated_data.get('sublocality_value'):
                 breadcrumb.append({'title': validated_data.get('specialization') + ' in ' +
                                  validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
-            elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY':
+            elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY' and validated_data.get('sublocality_value'):
                 breadcrumb.append({'title': 'Doctors in ' + validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
             elif validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
                 breadcrumb.append({'title': 'Procedures', 'url': 'ipd-procedures'})
@@ -2370,8 +2434,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                               order_by_field, rank_by, page)
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+
         doctor_search_result = RawSql(query_string.get('query'),
-                                      query_string.get('params')).fetch_all()
+                                      query_string.get('params'), db).fetch_all()
 
         result_count = 0
         if len(doctor_search_result)>0:
@@ -2752,6 +2820,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         return Response({"timeslots": timeslots["time_slots"], "upcoming_slots": timeslots["upcoming_slots"], "doctor_data": doctor_serializer.data})
 
     @transaction.non_atomic_requests
+    @use_slave
     def list_v2(self, request, *args, **kwargs):
         doctor_id = request.query_params.get('doctor_id')
         hospital_id = request.query_params.get('hospital_id')
@@ -2789,18 +2858,18 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 blocks.append(str(apt.time_slot_start.date()))
 
-        if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
-            from ondoc.integrations import service
-            pincode = None
-            integration_dict = dc_obj.get_integration_dict()
-            class_name = integration_dict['class_name']
-            integrator_obj_id = integration_dict['id']
-            integrator_obj = service.create_integrator_obj(class_name)
-            clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
-                                                                  blocks=blocks, dc_obj=dc_obj,
-                                                                  total_leaves=total_leaves)
-        else:
-            clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
+        # if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
+        #     from ondoc.integrations import service
+        #     pincode = None
+        #     integration_dict = dc_obj.get_integration_dict()
+        #     class_name = integration_dict['class_name']
+        #     integrator_obj_id = integration_dict['id']
+        #     integrator_obj = service.create_integrator_obj(class_name)
+        #     clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
+        #                                                           blocks=blocks, dc_obj=dc_obj,
+        #                                                           total_leaves=total_leaves)
+        # else:
+        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
 
         resp_data = {"timeslots": clinic_timings.get('timeslots', []),
                      "upcoming_slots": clinic_timings.get('upcoming_slots', []),
@@ -2930,12 +2999,11 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        emails = list()
         if valid_data.get('is_cloud_lab_email'):
+            receivers_data = UserConfig.objects.filter(key='feedback_cloudlab_email_receivers').first()
+            emails = receivers_data.data if (receivers_data and type(receivers_data.data) is list) else list()
             subject_string = valid_data.get('subject_string')
             message = valid_data.get('feedback')
-            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com",
-                      "rajivk@policybazaar.com"]
         else:
             valid_data.pop('subject_string', None)
             subject_string = "Feedback Mail from " + str(user.phone_number)
@@ -3552,14 +3620,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             obj = self.get_error_obj(data)
             obj['error_message'] = 'Cannot Update an invalid/error appointment!'
             obj.update(self.get_offline_response_obj(appnt, request))
-            logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
+            logger.info("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
             response['obj'] = obj
             response['break'] = True
         elif appnt.status == models.OfflineOPDAppointments.CANCELLED or appnt.status == models.OfflineOPDAppointments.NO_SHOW:
             obj = self.get_error_obj(data)
             obj['error_message'] = 'Cannot Update a Cancelled/NoShow appointment!'
             obj.update(self.get_offline_response_obj(appnt, request))
-            logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
+            logger.info("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
             response['obj'] = obj
             response['break'] = True
 
@@ -4561,6 +4629,85 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
 
 class HospitalViewSet(viewsets.GenericViewSet):
 
+    @use_slave
+    def near_you_hospitals(self, request):
+        from numpy.distutils.fcompiler import str2bool
+        return Response({})
+        request_data = request.query_params
+        serializer = serializers.HospitalNearYouSerializer(data=request_data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        result_count = 0
+        hospital_serializer = None
+        if validated_data and validated_data.get('long') and validated_data.get('lat'):
+            point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+            day = datetime.datetime.today().weekday()
+            gold_request = str2bool(request_data.get('gold', 0))
+            vip_request = validated_data.get('from_vip') or str2bool(request_data.get('vip', 0))
+
+            hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors', 'hospital_documents', 'matrix_city',
+                                                                  Prefetch('hospital_doctors__availability',
+                                                                           queryset=DoctorClinicTiming.objects.filter(day=day))). \
+                filter(enabled_for_online_booking=True,
+                       hospital_doctors__enabled_for_online_booking=True,
+                       hospital_doctors__doctor__enabled_for_online_booking=True,
+                       hospital_doctors__doctor__is_live=True, is_live=True).annotate(
+                bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True)),
+                distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
+
+            # if validated_data.get('from_vip'):
+            #     hospital_queryset = hospital_queryset.filter(enabled_for_prepaid=True)
+
+            if gold_request:
+                hospital_queryset = hospital_queryset.filter(enabled_for_gold=True)
+            elif vip_request:
+                hospital_queryset = hospital_queryset.filter(enabled_for_plus_plans=True)
+            else:
+                hospital_queryset = hospital_queryset.filter(enabled_for_prepaid=True)
+
+            result_count = hospital_queryset.count()
+
+            temp_hospital_ids = hospital_queryset.values_list('id', flat=True)
+            hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                              EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True, context={'request': request,
+                                                                                                             'hosp_entity_dict': hosp_entity_dict})
+            hospital_percentage_dict = dict()
+
+            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True, is_selected=True).first()
+            if not plan:
+                plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+
+            hospital_queryset = hospital_queryset[:20]
+            if plan:
+                convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
+
+                for hospital in hospital_queryset:
+                    doctor_clinics = hospital.hospital_doctors.all()
+                    percentage = 0
+                    for doc in doctor_clinics:
+                        doc_clinic_timing = doc.availability.all()[0] if doc.availability.all() else None
+                        if doc_clinic_timing:
+                            mrp = doc_clinic_timing.mrp
+                            agreed_price = doc_clinic_timing.fees
+                            if agreed_price and mrp:
+                                percentage = max(((mrp-(agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj, convenience_percentage_obj)))/mrp)*100, percentage)
+                    hospital_percentage_dict[hospital.id] = round(percentage, 2)
+
+            # hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True,
+            #                                                           context={"request": request})
+            hospitals_result = hospital_serializer.data
+            for data in hospitals_result:
+                data['vip_percentage'] = hospital_percentage_dict[data.get('id')] if plan and hospital_percentage_dict.get(data.get('id')) else 0
+
+            return Response({'count': result_count, 'hospitals': hospitals_result})
+        return Response({})
+
     def list_by_url(self, request, url, *args, **kwargs):
         url = url.lower()
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
@@ -4669,12 +4816,15 @@ class HospitalViewSet(viewsets.GenericViewSet):
         provider_ids = validated_data.get('provider_ids')
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
+
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                              'hospitalcertification_set__certification',
                                                               'hospital_documents',
                                                               'hosp_availability',
                                                               'health_insurance_providers',
                                                               'network__hospital_network_documents',
-                                                              'hospitalspeciality_set').exclude(location__dwithin=(
+                                                              'hospitalspeciality_set',
+                                                              'hospital_doctors').exclude(location__dwithin=(
             Point(float(long),
                   float(lat)),
             D(m=min_distance))).filter(
@@ -4684,7 +4834,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            distance=Distance('location', pnt)).order_by('-is_ipd_hospital', 'distance')
+            distance=Distance('location', pnt), bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                           hospital_doctors__enabled_for_online_booking=True,
+                                           hospital_doctors__doctor__enabled_for_online_booking=True,
+                                           hospital_doctors__doctor__is_live=True, is_live=True))).order_by('-is_ipd_hospital', 'distance')
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
         if ipd_pk:
@@ -4747,6 +4900,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @use_slave
     def retrive(self, request, pk, entity=None):
         serializer = serializers.HospitalDetailRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -4757,12 +4911,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
+                                                         'hospitalcertification_set__certification',
                                                          'hosp_availability',
                                                          'question_answer',
                                                          'hospitalspeciality_set', Prefetch('imagehospital',
                                                                                             HospitalImage.objects.all().order_by(
-                                                                                                '-cover_image'))).filter(
-            id=pk, is_live=True).first()
+                                                                                                '-cover_image'))).filter(id=pk, is_live=True).first()
         if not hospital_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -4795,10 +4949,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
                 breadcrumb.append({'title':  hospital_obj.name, 'url': None, 'link_title': None})
                 response['breadcrumb'] = breadcrumb
-            # else:
-            #
-            #     breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
-            #                   {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}]
+            else:
+
+                breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
+                              {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}]
             #     if entity.locality_value:
             #         breadcrumb.append({"title": "{} Hospitals".format(entity.locality_value),
             #                            "url": "hospitals/hospitals-in-{}-hspcit".format(entity.locality_value),
@@ -4808,8 +4962,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
             #                            "url": "hospitals/hospitals-in-{}-{}-hsplitcit".format(entity.sublocality_value,
             #                                                                                   entity.locality_value),
             #                            "link_title": "{}".format(entity.sublocality_value)})
-            #     breadcrumb.append({'title': hospital_obj.name, 'url': None, 'link_title': None})
-            #     response['breadcrumb'] = breadcrumb
+                breadcrumb.append({'title': hospital_obj.name, 'url': None, 'link_title': None})
+                response['breadcrumb'] = breadcrumb
 
             if hospital_obj.name and entity.locality_value:
                 title = hospital_obj.name
@@ -4835,6 +4989,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
         listing_schema = self.build_listing_schema_for_hospital(hosp_serializer)
         breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb']) if response.get('breadcrumb') else None
         all_schema = [x for x in [schema, listing_schema, breadcrumb_schema] if x]
+        response['certifications'] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in hospital_obj.hospitalcertification_set.all() if data.certification]
+
         response['seo'] = {'title': title, "description": description, "schema": schema,
                            "h1_title": h1_title, 'all_schema': all_schema}
         response['canonical_url'] = canonical_url
@@ -5015,6 +5171,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         response = self.ipd_procedure_detail(request, entity.ipd_procedure_id, **kwargs)
         return response
 
+    @use_slave
     def ipd_procedure_detail(self, request, pk, *args, **kwargs):
         request_data = request.query_params
         temp_request_data = kwargs.get('request_data')
@@ -5128,6 +5285,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
             obj.save()
         return Response({'message': 'Success'})
 
+    @use_slave
     def list_by_alphabet(self, request):
         import re
         alphabet = request.query_params.get('alphabet')
@@ -5176,3 +5334,76 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
             to_be_updated_dict['planned_date'] = temp_planned_date
         IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(**to_be_updated_dict)
         return Response({'message': 'Success'})
+
+
+class RecordAPIView(viewsets.GenericViewSet):
+    """This class defines the create behavior of our rest api."""
+    def list(self, request):
+        params = request.query_params
+        lat = params.get('lat', 28.450367)
+        long = params.get('long', 77.071848)
+        radius = int(params.get('radius')) if params.get('radius') else 2000
+        rank = params.get('rank', [])
+        phlebo = params.get('phlebo', [])
+        onboarded = params.get('onboarded', [])
+        interested_in_diagnostics = params.get('interested_in_diagnostics', [])
+        interested_in_pharmacy = params.get('interested_in_pharmacy', [])
+        ready_to_use_wallet = params.get('ready_to_use_wallet', [])
+        digital_only_report = params.get('digital_only_report', [])
+
+        response = dict()
+
+        queryset = GoogleMapRecords.objects.all()
+        if rank:
+            queryset = queryset.filter(label__in=rank)
+        if phlebo:
+            queryset = queryset.filter(has_phlebo__in=phlebo.split(','))
+        if onboarded:
+            queryset = queryset.filter(onboarded__in=onboarded.split(','))
+        if interested_in_diagnostics:
+            queryset = queryset.filter(interested_in_diagnostics__in=interested_in_diagnostics.split(','))
+        if interested_in_pharmacy:
+            queryset = queryset.filter(interested_in_pharmacy__in=interested_in_pharmacy.split(','))
+        if ready_to_use_wallet:
+            queryset = queryset.filter(ready_to_use_wallet__in=ready_to_use_wallet.split(','))
+        if digital_only_report:
+            queryset = queryset.filter(digital_only_report__in=digital_only_report.split(','))
+        if lat and long and radius:
+            point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+            queryset = queryset.filter(location__distance_lte=(pnt, radius))
+
+        serializer = serializers.RecordSerializer(queryset, many=True,
+                                                  context={"request": request})
+        serialized_data = serializer.data
+        response['map_data'] = serialized_data
+        response['labels'] = list(queryset.values('label').distinct())
+
+        return Response(response)
+
+
+# View to see all points
+def record_map(request):
+    return render(request, "home.html")
+
+
+# create a new location
+def create_record(request):
+    from ondoc.crm.admin.doctor import GoogleMapRecordForm
+    form = GoogleMapRecordForm(request.POST or None)
+
+    if form.is_valid():
+        instance = form.save(commit=False)
+        # get coordinates
+        location = geolocator.geocode(instance.location)
+        instance.latitude = location.latitude
+        instance.longitude = location.longitude
+        instance.save()
+        return HttpResponseRedirect('/')
+
+    context = {
+        "form": form
+    }
+
+    return render(request, "doctor/create.html", context)
+

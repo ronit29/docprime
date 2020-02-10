@@ -114,6 +114,7 @@ def availablelabtestajaxsave(request):
         return JsonResponse({'error': "Invalid Request"})
 
 
+# This method use to upload csv and excel to available lab test
 def testcsvupload(request):
     import csv
     import openpyxl
@@ -183,6 +184,9 @@ def update_records_from_csv(lpg_queryset, sheet):
                     instance = existing_test.first()
                     if instance:
                         instance.mrp = row_object.get('mrp')
+                        instance.custom_agreed_price = row_object.get('custom_agreed_price')
+                        instance.custom_deal_price = row_object.get('custom_deal_price')
+                        instance.insurance_agreed_price = row_object.get('insurance_agreed_price')
                 else:
                     serialized_data = AjaxAvailableLabTestSerializer(instance=instance, data=row_object)
                     if serialized_data.is_valid(raise_exception=True):
@@ -220,6 +224,9 @@ def update_records_from_excel(lpg_queryset, excel_data):
                     instance = existing_test.first()
                     if instance:
                         instance.mrp = data.get('mrp')
+                        instance.custom_agreed_price = data.get('custom_agreed_price', None)
+                        instance.custom_deal_price = data.get('custom_deal_price', None)
+                        instance.insurance_agreed_price = data.get('insurance_agreed_price', None)
                 else:
                     serialized_data = AjaxAvailableLabTestSerializer(instance=instance, data=data)
                     if serialized_data.is_valid(raise_exception=True):

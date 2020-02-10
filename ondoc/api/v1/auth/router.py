@@ -9,7 +9,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
                     DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet, UserRatingViewSet, AppointmentViewSet,
                     WhatsappOptinViewSet, DoctorScanViewSet, TokenFromUrlKey, ProfileEmailUpdateViewset,
-                    BajajAllianzUserViewset, MatrixUserViewset, SendCartUrlViewSet)
+                    BajajAllianzUserViewset, MatrixUserViewset, SendCartUrlViewSet, SbiGUserViewset, PGRefundViewset)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -18,6 +18,7 @@ urlpatterns = [
     # path('otp/verify', OTP.as_view({'post': 'verify'}), name='otp-verify'),
     path('login', UserViewset.as_view({'post': 'login'}), name='user-login'),
     path('bagic_user', BajajAllianzUserViewset.as_view({'post': 'user_login_via_bagic'}), name='bagic-login'),
+    path('sbig_user', SbiGUserViewset.as_view({'post': 'user_login_via_sbig'}), name='sbig-login'),
     path('doctor/login', UserViewset.as_view({'post': 'doctor_login'}), name='doctor-login'),
     path('logout', UserViewset.as_view({'post': 'logout'}), name='user-logout'),
     path('doctor/logout', UserViewset.as_view({'post': 'logout'}), name='doctor-logout'),
@@ -75,4 +76,6 @@ urlpatterns = [
     path('profile-email/update/init', ProfileEmailUpdateViewset.as_view({'post': 'create'}), name='update-profile-email-init'),
     path('profile-email/update', ProfileEmailUpdateViewset.as_view({'post': 'update_email'}), name='update-profile-email'),
     path('matrix_user', MatrixUserViewset.as_view({'post': 'user_login_via_matrix'}), name='matrix-login'),
+    path('save_pg_refund', PGRefundViewset.as_view({'post': 'save_pg_refund'}), name='save-pg-refund'),
+    path('get_referral_amt', ReferralViewSet.as_view({'get': 'get_referral_amt'}), name='get-referral-amt'),
 ]

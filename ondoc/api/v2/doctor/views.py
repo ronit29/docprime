@@ -30,7 +30,7 @@ import json, decimal, requests
 from django.utils import timezone
 
 from ondoc.diagnostic.models import LabAppointment
-from ondoc.doctor.models import OpdAppointment
+from ondoc.doctor.models import OpdAppointment, DoctorClinic
 from ondoc.communications.models import SMSNotification
 from ondoc.notification.models import NotificationAction
 from ondoc.api.v1.doctor import serializers as doctor_serializers
@@ -472,9 +472,9 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorLeaveSerializer(queryset, many=True)
         return Response(serializer.data)
 
-    def create_leave_data(self, hospital_id, validated_data, start_time, end_time):
+    def create_leave_data(self, hospital_id,doctor_id, validated_data, start_time, end_time):
         return {
-                    "doctor": validated_data.get('doctor_id').id,
+                    "doctor": doctor_id,
                     "hospital": hospital_id,
                     "start_time": start_time,
                     "end_time": end_time,
@@ -492,6 +492,7 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         hospital_id = validated_data.get("hospital_id").id if validated_data.get("hospital_id") else None
         start_time = validated_data.get("start_time")
         end_time = validated_data.get("end_time")
+        doctor_id = validated_data.get("doctor_id").id if validated_data.get("doctor_id") else None
 
         if not start_time:
             start_time = self.INTERVAL_MAPPING[validated_data.get("interval")][0]
@@ -500,9 +501,14 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         if not hospital_id:
             assoc_hospitals = validated_data.get('doctor_id').hospitals.all()
             for hospital in assoc_hospitals:
-                doctor_leave_data.append(self.create_leave_data(hospital.id, validated_data, start_time, end_time))
+                doctor_leave_data.append(self.create_leave_data(hospital.id, doctor_id, validated_data, start_time, end_time))
+        if not doctor_id and hospital_id:
+            # For all the doctor leaves in a hospital
+            doctor_clinics = DoctorClinic.objects.filter(hospital=hospital_id, hospital__is_live=True,doctor__is_live=True)
+            for doctor_clinic in doctor_clinics:
+                doctor_leave_data.append(self.create_leave_data(hospital_id,doctor_clinic.doctor.id, validated_data, start_time, end_time))
         else:
-            doctor_leave_data.append(self.create_leave_data(hospital_id, validated_data, start_time, end_time))
+            doctor_leave_data.append(self.create_leave_data(hospital_id, doctor_id, validated_data, start_time, end_time))
 
         doctor_leave_serializer = serializers.DoctorLeaveSerializer(data=doctor_leave_data, many=True)
         doctor_leave_serializer.is_valid(raise_exception=True)
@@ -1311,7 +1317,7 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
         save_pg_response.apply_async((PgLogs.ECONSULT_ORDER_REQUEST, None, None, None, data, user.id),
-                                     eta=timezone.localtime(), )
+                                     eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
         doc = consultation.doctor
         use_wallet = data.get('use_wallet', True)
@@ -1454,6 +1460,8 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
                 if not sample_objs or not obj.enabled:
                     continue
                 ret_obj['hospital_id'] = hospital.id
+                ret_obj['lab_id'] = lab.id
+                ret_obj['lab_name'] = lab.name
                 test_data = serializers.SelectedTestsDetailsSerializer(obj).data
                 ret_obj.update(test_data)
                 sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_objs, many=True).data
@@ -1499,19 +1507,28 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
                                                                                       context={"barcode_details": barcode_details}).data
             patient_details = v1_doc_serializers.OfflinePatientSerializer(offline_patient).data
             patient_details.update({'patient_mobile': str(offline_patient.get_patient_mobile())})
+            selected_tests_details = serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data
+            extras = {
+                'test_count': len(available_lab_tests),
+                'mrp_total': sum(test_detail["mrp"] for test_detail in selected_tests_details),
+                'hospital_price_total': sum(test_detail["hospital_price"] for test_detail in selected_tests_details),
+                'b2b_price_total': sum(test_detail["b2b_price"] for test_detail in selected_tests_details),
+            }
             if not order_obj:
                 order_obj = prov_models.PartnerLabSamplesCollectOrder(offline_patient=offline_patient,
                                                                       patient_details=patient_details,
                                                                       hospital=hospital, doctor=doctor, lab=lab,
                                                                       samples=samples_data, created_by=request.user,
                                                                       collection_datetime=valid_data.get("collection_datetime"),
-                                                                      selected_tests_details=serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data,
-                                                                      status=status)
+                                                                      selected_tests_details=selected_tests_details,
+                                                                      status=status,
+                                                                      extras=extras)
             else:
                 order_obj.status = status
                 order_obj.samples = samples_data
                 order_obj.collection_datetime = valid_data.get("collection_datetime")
-                order_obj.selected_tests_details = serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data
+                order_obj.selected_tests_details = selected_tests_details
+                order_obj.extras = extras
             order_obj.save()
             if lab_alerts:
                 order_obj.lab_alerts.set(lab_alerts, clear=True)

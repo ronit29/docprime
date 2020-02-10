@@ -15,6 +15,7 @@ import datetime
 import json
 import os
 from mongoengine import *
+from pymongo.read_preferences import ReadPreference
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -44,10 +45,10 @@ SECRET_KEY = env('DJANGO_SECRET_KEY')
 JWT_AUTH = {
     'JWT_VERIFY': True,
     'JWT_VERIFY_EXPIRATION': True,
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=365),
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(minutes=5),
     'JWT_AUTH_HEADER_PREFIX': 'Token',
     'JWT_ALLOW_REFRESH': True,
-    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=365),
+    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(minutes=5),
 }
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -73,8 +74,13 @@ DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 DATABASES = {
     'default': env.db('DATABASE_URL'),
 }
-
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+
+if(env('DJANGO_SETTINGS_MODULE')=='config.settings.production'):
+    DATABASES['slave'] = env.db('SLAVE_DATABASE_URL') if env.db('SLAVE_DATABASE_URL') else env.db('DATABASE_URL')
+    DATABASES['slave']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+
+
 # if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
 #     DATABASES['doc_read'] = env.db('READ_DATABASE_URL')
 #     DATABASES['doc_read']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
@@ -102,8 +108,12 @@ try:
     if env('MONGO_DB_NAME') and env('MONGO_DB_HOST') and env('MONGO_DB_PORT'):
         mongo_port = int(env('MONGO_DB_PORT'))
         if env('MONGO_DB_USERNAME', None) and env('MONGO_DB_PASSWORD', None):
-            connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port, username=env('MONGO_DB_USERNAME'),
-                                            password=env('MONGO_DB_PASSWORD'), authentication_source='admin')
+            # connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port, username=env('MONGO_DB_USERNAME'),
+            #                                 password=env('MONGO_DB_PASSWORD'), authentication_source='admin')
+            connect(host=env('MONGO_CONNECTION_STRING'), read_preference=ReadPreference.PRIMARY_PREFERRED)
+            # host = 'mongodb://' + env('MONGO_DB_USERNAME') + ':' + env('MONGO_DB_PASSWORD') + '@' + 10.20.5.148:27017,10.20.6.116:27017/DocPrimeLogs?replicaSet=rs5'
+            # connect(host='mongodb://ankitPBpyuser:ajd87GHSd@10.20.5.148:27017,10.20.6.116:27017/DocPrimeLogs?replicaSet=rs5', authentication_source='admin')
+
         else:
             connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port)
         MONGO_STORE = env.bool('MONGO_STORE', default=False)
@@ -128,7 +138,6 @@ DJANGO_APPS = (
     'django.contrib.sites',
     'django.contrib.sitemaps',
     'reversion_compare',
-    'ddtrace.contrib.django',
 )
 THIRD_PARTY_APPS = (
 
@@ -151,7 +160,8 @@ THIRD_PARTY_APPS = (
     'qrcode',
     'Crypto',
     'multiselectfield',
-    'django_select2'
+    'django_select2',
+    'geopy'
 )
 
 
@@ -203,6 +213,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django.middleware.gzip.GZipMiddleware',
     'ondoc.articles.middleware.CsrfGetParamMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -270,7 +281,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         # https://docs.djangoproject.com/en/dev/ref/settings/#template-dirs
         'DIRS': [
-            str(APPS_DIR.path('templates')),
+            str(APPS_DIR.path('static')),
         ],
         'OPTIONS': {
             # https://docs.djangoproject.com/en/dev/ref/settings/#template-debug
@@ -391,6 +402,7 @@ MAXMIND_LICENSE_KEY = env('MAXMIND_LICENSE_KEY')
 MAXMIND_CITY_API_URL = env('MAXMIND_CITY_API_URL')
 OTP_BYPASS_NUMBERS = env.list('OTP_BYPASS_NUMBERS')
 TIME_BEFORE_APPOINTMENT_TO_SEND_OTP = env.int('TIME_BEFORE_APPOINTMENT_TO_SEND_OTP', default=60)  # in minutes
+TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION = env.int('TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION', default=60)  # in minutes
 TIME_AFTER_APPOINTMENT_TO_SEND_CONFIRMATION = env.int('TIME_AFTER_APPOINTMENT_TO_SEND_CONFIRMATION', default=120)
 TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION = env.int('TIME_AFTER_APPOINTMENT_TO_SEND_SECOND_CONFIRMATION', default=1440)
 TIME_AFTER_APPOINTMENT_TO_SEND_THIRD_CONFIRMATION = env.int('TIME_AFTER_APPOINTMENT_TO_SEND_THIRD_CONFIRMATION', default=2880)
@@ -425,6 +437,8 @@ SETTLEMENT_AUTH=env('SETTLEMENT_AUTH', default=None)
 THYROCARE_NAME_PARAM_REQUIRED_TESTS = env('THYROCARE_NAME_PARAM_REQUIRED_TESTS', default='')
 IS_INSURANCE_ACTIVE = env.bool('IS_INSURANCE_ACTIVE')
 IS_PLUS_ACTIVE = env.bool('IS_PLUS_ACTIVE')
+MEDANTA_AND_ARTEMIS_HOSPITAL_IDS = env('MEDANTA_AND_ARTEMIS_HOSPITAL_IDS')
+REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS_TIME = env('REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS_TIME')
 
 
 ANYMAIL = {
@@ -534,4 +548,16 @@ SPO_DP_AUTH_TOKEN = env('SPO_DP_AUTH_TOKEN')
 CARE_PLAN_FOR_VIP=env('CARE_PLAN_FOR_VIP')
 VIP_SALESPOINT_URL=env('VIP_SALESPOINT_URL')
 VIP_SALESPOINT_AUTHTOKEN=env('VIP_SALESPOINT_AUTHTOKEN')
-VIP_CANCELLATION_PERIOD=env('VIP_CANCELLATION_PERIOD')
+DOCTORS_COUNT=env('DOCTORS_COUNT')
+LAB_COUNT=env('LAB_COUNT')
+VIP_CANCELLATION_PERIOD=env.int('VIP_CANCELLATION_PERIOD')
+USE_SLAVE_DB=env.bool('USE_SLAVE_DB', False)
+RABBITMQ_LOGS_QUEUE=env('RABBITMQ_LOGS_QUEUE')
+TRUECALLER_SOURCES=env.list('TRUECALLER_SOURCES')
+RABBITMQ_TRACKING_QUEUE=env('RABBITMQ_TRACKING_QUEUE')
+SBIG_AUTH_TOKEN=env('SBIG_AUTH_TOKEN')
+GOLD_MERCHANT_CODE=env('GOLD_MERCHANT_CODE')
+VIP_MERCHANT_CODE=env('VIP_MERCHANT_CODE')
+SBIG_BASE_URL=env('SBIG_BASE_URL')
+REFERRAL_CASHBACK_AMOUNT=env('REFERRAL_CASHBACK_AMOUNT')
+CORS_ALLOW_HEADERS = ['accept', 'accept-encoding', 'authorization', 'content-type', 'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with', 'app-name']

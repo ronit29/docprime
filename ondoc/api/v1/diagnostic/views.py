@@ -7,23 +7,29 @@ from itertools import groupby
 import dateutil
 from django.contrib.contenttypes.models import ContentType
 
+from config.settings.db_router import DatabaseInfo
 from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.common.middleware import use_slave
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
-from ondoc.plus.models import PlusUser
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity, SearchCriteria
+from ondoc.plus.models import PlusUser, PlusPlans, TempPlusUser
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
+from ondoc.plus.models import PlusUser, PlusPlans
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
+    get_max_convenience_reference
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
                                      LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds,
-                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead)
+                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead,
+                                     LabAppointmentFeedback)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -87,6 +93,7 @@ logger = logging.getLogger(__name__)
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request, *args, **kwargs):
         coupon_code = request.query_params.get('coupon_code')
         profile = request.query_params.get('profile_id')
@@ -191,11 +198,12 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
 
 
 class LabList(viewsets.ReadOnlyModelViewSet):
-    queryset = AvailableLabTest.objects.all()
+    queryset = AvailableLabTest.objects.none()
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
     @transaction.non_atomic_requests
+    @use_slave
     def list_packages(self, request, **kwrgs):
         parameters = request.query_params
         serializer = diagnostic_serializer.LabPackageListSerializer(data=parameters)
@@ -270,10 +278,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         utm_available = False
         salespoint_query = ""
-        utm_source = request.query_params.get('UtmSource')
+        utm_source = request.query_params.get('utm_source')
         if utm_source and SalesPoint.is_affiliate_available(utm_source):
             utm_available = True
-            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('utm_source'))
             salespoint_query = ' INNER JOIN "salespoint_test_mapping" ON ("available_lab_test"."id" = "salespoint_test_mapping"."available_tests_id")'
 
 
@@ -383,7 +391,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             package_count_query += filter_query
 
         package_count_query = package_count_query.format(lab_network_query=lab_network_query, salespoint_query=salespoint_query)
-        package_count = RawSql(package_count_query, params).fetch_all()
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+
+        package_count = RawSql(package_count_query, params, db).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
         if not temp_categories_ids:
@@ -407,7 +419,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for item in entity_url_qs:
             entity_url_dict.setdefault(item.get('lab_id'), [])
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
-        lab_data = Lab.objects.prefetch_related('lab_documents', 'lab_timings', 'network',
+        lab_data = Lab.objects.select_related('lab_pricing_group')\
+                              .prefetch_related('lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').in_bulk(lab_ids)
 
         category_data = {}
@@ -453,13 +466,29 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'test_id': test_id,
                                                                 'parameter_count': parameter_count,
                                                                 'icon': icon_url, 'priority': priority}
-            single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse= True)
+            single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse=True)
             category_data[temp_package.id] = single_test_data_sorted
+
+        #APi optim
+        labdata_pricing_groups=[]
+        # for key, lab in lab_data.items():
+        #     labdata_pricing_groups.append(lab.lab_pricing_group.id)
+        # avl_objs = AvailableLabTest.objects.select_related('lab_pricing_group').filter(lab_pricing_group__id__in=labdata_pricing_groups)
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data,
-                                                             'package_free_or_not_dict': package_free_or_not_dict})
+                                                             'package_free_or_not_dict': package_free_or_not_dict,
+                                                             'insurance_threshold_amount':insurance_threshold_amount,
+                                                             'search_criteria_query':search_criteria,
+                                                             # 'avl_objs': avl_objs,
+                                                             'default_plan_query':default_plan})
 
         category_to_be_shown_in_filter_ids = set()
         category_queryset = []
@@ -560,9 +589,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
 
-        utm_source = request.query_params.get('UtmSource')
+        utm_source = request.query_params.get('utm_source')
         if utm_source and SalesPoint.is_affiliate_available(utm_source):
-            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('utm_source'))
 
             main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                              'test__parameter', 'categories',
@@ -1103,12 +1132,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
             #entity_id = entity.entity_id
-            response = self.retrieve(request, entity.entity_id, entity)
+            response = self.retrieve(request, entity.entity_id, None, entity)
             return response
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request, **kwargs):
         parameters = request.query_params
         if kwargs.get('parameters'):
@@ -1255,6 +1285,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
+    @use_slave
     def search(self, request, **kwargs):
         tests = []
         parameters = request.query_params
@@ -1473,9 +1504,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if name:
             search_key = re.findall(r'[a-z0-9A-Z.:]+',name)
             search_key = " ".join(search_key).lower()
-            search_key = "".join(search_key.split("."))
+            # search_key = "".join(search_key.split("."))
             filtering_query.append("lb.name ilike %(name)s")
-            filtering_params['name'] = search_key + '%'
+            filtering_params['name'] = '%' + search_key + '%'
             # filtering_params_query1.append(
             #     "name ilike %(name)s")
 
@@ -1615,7 +1646,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     price_result['string'] = 'where price>=0'
 
         order_by = self.apply_search_sort(parameters)
-
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
         if ids:
             query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
@@ -1660,7 +1693,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          '''.format(filter_query_string=filter_query_string, 
                             group_filter_query_string=group_filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query, filtering_params).fetch_all()
+            lab_search_result = RawSql(query, filtering_params, db).fetch_all()
         else:
             query1 = '''select * from (select id, network_id, name , distance, order_priority, new_network_rank, rank,
                     max(new_network_rank) over(partition by 1) result_count from 
@@ -1690,7 +1723,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     rank'''.format(
                     filter_query_string=filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query1, filtering_params).fetch_all()
+            lab_search_result = RawSql(query1, filtering_params, db).fetch_all()
 
         return lab_search_result
 
@@ -1723,10 +1756,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}, vip_data_dict={}, user=None):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
+        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings',
+                                                                      'home_collection_charges', 'lab_certificate',
+                                                                      'lab_certificate__certification')
 
         entity = EntityUrls.objects.filter(entity_id__in=ids, url_type='PAGEURL', is_valid='t',
                                            entity_type__iexact='Lab').values('entity_id', 'url')
+        test_obj = None
         id_url_dict = dict()
         for data in entity:
             id_url_dict[data['entity_id']] = data['url']
@@ -1745,14 +1781,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     to_attr="selected_group"
                 )
             )
+            test_obj = LabTest.objects.filter(id__in=test_ids).first()
+
         labs = labs.filter(id__in=ids)
         # resp_queryset = list()
         temp_var = dict()
         tests = dict()
         lab = dict()
 
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold')
+        is_gold = False
+        if search_criteria:
+            search_criteria = search_criteria.first()
+            is_gold = search_criteria.search_value
+
         for obj in labs:
-            if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
+            if insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
                 obj.is_home_collection_enabled = False
             temp_var[obj.id] = obj
             tests[obj.id] = list()
@@ -1766,7 +1810,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         {"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
                          "number_of_tests": test.test.number_of_tests,
                          'categories': test.test.get_all_categories_detail(), "url": test.test.url,
-                         "insurance_agreed_price": test.insurance_agreed_price
+                         "insurance_agreed_price": test.insurance_agreed_price,
+                         "agreed_price": test.custom_agreed_price if test.custom_agreed_price else test.computed_agreed_price
                          })
 
         # day_now = timezone.now().weekday()
@@ -1794,12 +1839,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
             row['is_insurance_enabled'] = lab_obj.is_insurance_enabled
-            row['is_vip_enabled'] = lab_obj.enabled_for_plus_plans
+            row['is_vip_enabled'] = lab_obj.is_enabled_for_plus_plans()
             row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
             row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
 
             row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
             row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
+            row['is_gold'] = is_gold
             # if lab_obj.always_open:
             #     lab_timing = "12:00 AM - 11:45 PM"
             #     next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
@@ -1835,7 +1881,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             # {'lab_timing': lab_timing, 'lab_timing_data': lab_timing_data}, {
             #     'next_lab_timing_dict': next_lab_timing_dict, 'next_lab_timing_data_dict': next_lab_timing_data_dict}
             # lab_timing, lab_timing_data, next_lab_timing_dict, next_lab_timing_data_dict = lab_obj.lab_timings_today_and_next()[0:4]
-            lab_timing_temp_dict = lab_obj.lab_timings_today_and_next()
+            lab_timing_temp_dict = lab_obj.lab_timings_today_and_next(test_obj=test_obj)
             lab_timing, lab_timing_data = lab_timing_temp_dict['lab_timing'], lab_timing_temp_dict['lab_timing_data']
             next_lab_timing_dict, next_lab_timing_data_dict = lab_timing_temp_dict['next_lab_timing_dict'], \
                                                               lab_timing_temp_dict['next_lab_timing_data_dict']
@@ -1845,12 +1891,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             else:
                 row["distance_related_charges"] = 0
 
+            row["is_radiology_test"] = False
+            if test_obj and test_obj.test_type == 1:
+                row["is_radiology_test"] = True
+
             row["lab_timing"] = lab_timing
             row["lab_timing_data"] = lab_timing_data
             row["next_lab_timing"] = next_lab_timing_dict
             row["next_lab_timing_data"] = next_lab_timing_data_dict
             row["tests"] = tests.get(row["id"])
             row["city"] = lab_obj.city
+            row["certifications"] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in lab_obj.lab_certificate.all() if data.certification]
 
             if lab_obj.id in id_url_dict.keys():
                 row['url'] = id_url_dict[lab_obj.id]
@@ -1878,6 +1929,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 res['vip'] = deepcopy(vip_data_dict)
                 all_tests_under_lab = res.get('tests', [])
                 bool_array = list()
+                gold_bool_array = list()
 
                 # For Insurance. Checking the eligibility of test to be booked under Insurance.
                 if all_tests_under_lab and res['is_insurance_enabled']:
@@ -1890,19 +1942,34 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 elif res['is_insurance_enabled'] and not all_tests_under_lab:
                     res['insurance']['is_insurance_covered'] = True
 
-
                 # For Vip. Checking the eligibility of test to be booked under VIP.
                 engine_response = {}
+                res['vip']['is_gold_member'] = True if plus_user_obj and plus_user_obj.plan.is_gold else False
                 if all_tests_under_lab and res['is_vip_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
+                        price_data = {"mrp": paticular_test_in_lab.get('mrp', 0),
+                                      "deal_price": paticular_test_in_lab.get('deal_price', 0),
+                                      "fees": paticular_test_in_lab.get('agreed_price', 0),
+                                      "cod_deal_price": paticular_test_in_lab.get('deal_price', 0)}
+                        price_engine = get_price_reference(plus_user_obj, "LABTEST")
+                        if not price_engine:
+                            price = paticular_test_in_lab.get('mrp', 0)
+                        else:
+                            price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user_obj, "LABTEST")
+                        if plus_user_obj and plus_user_obj.plan:
+                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user_obj.plan)
+                        else:
+                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST")
                         coverage = False
+                        res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
-                            engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0), price_engine_price=price, calculated_convenience_amount=res['vip']['vip_convenience_amount'])
                             coverage = engine_response.get('is_covered', False)
-                        bool_array.append(coverage)
+                        gold_bool_array.append(coverage)
 
-                    if False not in bool_array and len(bool_array) > 0:
+                    if False not in gold_bool_array and len(gold_bool_array) > 0:
                         res['vip']['covered_under_vip'] = True
                         res['vip']['vip_amount'] = engine_response.get('amount_to_be_paid', 0) if engine_response else 0
 
@@ -1952,24 +2019,33 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return lab_network
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve(self, request, lab_id, profile_id=None, entity=None):
         profile = None
 
         lab_obj = Lab.objects.select_related('network')\
-                             .prefetch_related('rating', 'lab_documents')\
+                             .prefetch_related('rating', 'lab_documents', 'lab_certificate', 'lab_certificate__certification')\
                              .filter(id=lab_id, is_live=True).first()
 
         if not lab_obj:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+        utilization = {}
+        vip_object = None
         user = request.user
-        if profile_id and user and user.is_authenticated:
-            profile = UserProfile.objects.filter(pk=profile_id).first()
-            if not profile:
-                return Response(status=status.HTTP_404_NOT_FOUND)
+        if user and user.is_authenticated:
 
-            if not profile in user.profiles.all():
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+            if profile_id:
+                profile = UserProfile.objects.filter(pk=profile_id).first()
+                if not profile:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+                if not profile in user.profiles.all():
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            vip_object = user.active_plus_user
+            if vip_object and not vip_object.plan.is_gold:
+                utilization = vip_object.get_utilization
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=lab_id,
@@ -2049,6 +2125,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_serializer_data = test_serializer.data
         is_prescription_needed = False
+        deep_utilization = copy.deepcopy(utilization)
+
         if request.user and request.user.is_authenticated:
             insurance = request.user.active_insurance
             if insurance and test_serializer_data:
@@ -2069,7 +2147,36 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count
 
-        # disable home pickup for insured customers if lab charges home collection
+        if vip_object and deep_utilization:
+            counter = 0
+            for single_test_serializer_data in temp_data['tests']:
+                price_data = {"mrp": single_test_serializer_data.get('mrp'), "deal_price": single_test_serializer_data.get('deal_price'), "cod_deal_price": single_test_serializer_data.get('deal_price'), "fees": single_test_serializer_data.get('agreed_price')}
+
+                entity = "LABTEST" if not single_test_serializer_data.get('is_package') else "PACKAGE"
+                price_engine = get_price_reference(vip_object, entity)
+                if not price_engine:
+                    price = Decimal(single_test_serializer_data.get('mrp'))
+                else:
+                    price = Decimal(price_engine.get_price(price_data))
+
+                engine = get_class_reference(vip_object, entity)
+                if engine:
+                    engine_response = engine.validate_booking_entity(cost=price, id=single_test_serializer_data.get('test_id'),
+                                                   mrp=Decimal(single_test_serializer_data.get('mrp')),
+                                                   deal_price=single_test_serializer_data.get('deal_price'),
+                                                   utilization=deep_utilization, price_engine_price=price)
+
+                    single_test_serializer_data['vip']['covered_under_vip'] = engine_response['is_covered']
+                    single_test_serializer_data['vip']['vip_amount'] = engine_response['amount_to_be_paid']
+
+                    if engine_response['is_covered'] and engine_response['vip_amount_deducted']:
+                        engine.update_utilization(deep_utilization, engine_response['vip_amount_deducted'])
+
+                    temp_data['tests'][counter] = single_test_serializer_data
+
+                counter = counter + 1
+
+    # disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and temp_data.get('lab'):
             active_insurance = request.user.active_insurance
             threshold = None
@@ -2088,6 +2195,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         temp_data.get('lab')['is_home_collection_enabled'] = False
                         for x in temp_data.get('tests', []):
                             x['is_home_collection_enabled'] = False
+
+        temp_data['certifications'] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in lab_obj.lab_certificate.all() if data.certification]
                                 
                 #         temp_data.get('lab')['is_home_collection_enabled'] = False
 
@@ -2490,9 +2599,21 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
+        profile = validated_data.get('profile')
+        plus_plan = validated_data.get('plus_plan', None)
+
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.get_user_insurance(request.user)
         plus_user = request.user.active_plus_user
+        if plus_plan and plus_user is None:
+            plus_user = TempPlusUser.objects.create(user=request.user, plan=plus_plan, profile=profile)
+
+        if not plus_user:
+            payment_type = validated_data.get('payment_type')
+        else:
+            payment_type = OpdAppointment.GOLD if plus_user.plan.is_gold else OpdAppointment.VIP
+            validated_data['payment_type'] = payment_type
+
         if user_insurance and user_insurance.status in [UserInsurance.ACTIVE, UserInsurance.ONHOLD]:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
@@ -2506,26 +2627,34 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
             data['insurance_message'] = insurance_validate_dict['insurance_message']
+            data['payment_type'] = OpdAppointment.INSURANCE if insurance_validate_dict.get('is_insured') else validated_data['payment_type']
 
-            if data['is_appointment_insured']:
-                data['payment_type'] = OpdAppointment.INSURANCE
-                appointment_test_ids = validated_data.get('test_ids', [])
-                if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
-                    return Response(status=status.HTTP_400_BAD_REQUEST,
-                                    data={'error': 'Some error occured. Please try again after some time.',
-                                          'request_errors': {
-                                              'message': 'Some error occured. Please try again after some time.'
-                                          }})
+            # if data['is_appointment_insured']:
+            #     data['payment_type'] = OpdAppointment.INSURANCE
+            #     appointment_test_ids = validated_data.get('test_ids', [])
+            #     if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
+            #         return Response(status=status.HTTP_400_BAD_REQUEST,
+            #                         data={'error': 'Some error occured. Please try again after some time.',
+            #                               'request_errors': {
+            #                                   'message': 'Some error occured. Please try again after some time.'
+            #                               }})
         elif plus_user:
             plus_user_dict = plus_user.validate_plus_appointment(validated_data)
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
-            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
+            data['vip_amount'] = int(plus_user_dict.get('vip_amount_deducted'))
+            data['amount_to_be_paid'] = int(plus_user_dict.get('amount_to_be_paid'))
             if data['cover_under_vip']:
-                data['payment_type'] = OpdAppointment.VIP
-
+                if plus_user.plan.is_gold:
+                    data['payment_type'] = OpdAppointment.GOLD
+                    data['is_gold_member'] = True
+                else:
+                    data['payment_type'] = OpdAppointment.VIP
+                    data['is_gold_member'] = False
+                validated_data['payment_type'] = data['payment_type']
+            else:
+                validated_data['payment_type'] = validated_data.get('payment_type')
         else:
             data['is_appointment_insured'], data['insurance_id'], data['insurance_message'], data['is_vip_member'],\
             data['cover_under_vip'], data['plus_user_id'], data['vip_amount'] = False, None, "", False, False, None, 0
@@ -2548,7 +2677,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 multiple_appointments = True
 
         cart_items = []
-        if multiple_appointments:
+        if multiple_appointments and not plus_plan:
             pathology_data = None
             all_tests = []
             for test_timing in validated_data.get('test_timings'):
@@ -2600,14 +2729,26 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 new_data['is_home_pickup'] = test_timings[0]['is_home_pickup']
             else:
                 new_data = copy.deepcopy(data)
-            cart_item = Cart.add_items_to_cart(request, validated_data, new_data, Order.LAB_PRODUCT_ID)
-            if cart_item:
-                cart_items.append(cart_item)
+
+            if plus_plan:
+                validated_data['start_date'] = dateutil.parser.parse(new_data['start_date'])
+                validated_data['start_time'] = new_data['start_time']
+                validated_data['is_home_pickup'] = new_data['is_home_pickup']
+
+            else:
+                cart_item = Cart.add_items_to_cart(request, validated_data, new_data, Order.LAB_PRODUCT_ID)
+                if cart_item:
+                    cart_items.append(cart_item)
 
         if hasattr(request, 'agent') and request.agent:
             resp = {'is_agent': True, "status":1}
         else:
-            resp = account_models.Order.create_order(request, cart_items, validated_data.get("use_wallet"))
+            if not plus_plan:
+                resp = account_models.Order.create_order(request, cart_items, validated_data.get("use_wallet"))
+            else:
+                if kwargs.get('is_dummy'):
+                    return validated_data
+                resp = account_models.Order.create_new_order(request, validated_data, False)
 
         return Response(data=resp)
 
@@ -2882,6 +3023,15 @@ class LabAppointmentView(mixins.CreateModelMixin,
         else:
             return False
 
+    def retrieve_detail(self, request, pk=None):
+        user = request.user
+        queryset = LabAppointment.objects.filter(pk=pk)[0]
+        if queryset:
+            serializer = serializers.LabAppointmentRetrieveSerializer(queryset, context={'request': request})
+            return Response(serializer.data)
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
 
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
@@ -2995,6 +3145,7 @@ class LabTimingListView(mixins.ListModelMixin,
         return Response(resp_data)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list_v3(self, request, *args, **kwargs):
         from ondoc.integrations import service
         params = request.query_params
@@ -3213,6 +3364,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
     serializer_class = diagnostic_serializer.AvailableLabTestSerializer
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve(self, request, lab_id):
         params = request.query_params
         queryset = AvailableLabTest.objects.select_related().filter(test__searchable=True,
@@ -3527,6 +3679,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
 
         return Response(final_result)
 
+    @use_slave
     def list_by_alphabet(self, request):
         alphabet = request.GET.get('alphabet')
         if not alphabet:
@@ -3691,7 +3844,6 @@ class DigitalReports(viewsets.GenericViewSet):
 
 
 class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
-
     def retrieve_by_url(self, request, *args, **kwargs):
         url = request.data.get('url')
         if not url:
@@ -3967,6 +4119,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
         return discounted_price
 
+
 class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
 
     def category_landing_url(self, request):
@@ -4065,7 +4218,6 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
         else:
             city = MatrixMappedCity.objects.filter(name=city_name).first()
 
-
         ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, matrix_city=city, lead_source=lead_source)
         try:
             ipd_med_page_object.save()
@@ -4075,10 +4227,34 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
             logger.error(str(e))
             return Response({'message': 'Lead is not created.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 class AllMatrixCitiesViewSet(viewsets.GenericViewSet):
 
+    @use_slave
     def retrieve(self, request):
 
         main_queryset = MatrixMappedCity.objects.all().values("id", "name")
 
         return Response(main_queryset)
+
+
+class MatrixViewSet(viewsets.GenericViewSet):
+
+    def send_feedback_to_matrix(self, request):
+        appointment_id = self.request.query_params.get('appointment_id')
+        if not appointment_id:
+            return Response({'result': 'appointment id not present'})
+        data = self.request.data
+        comment = data.get('comment') if data.get('comment') else None
+        ratings = data.get('ratings') if data.get('ratings') else None
+
+        if appointment_id and ratings:
+            app_feedback = LabAppointmentFeedback.objects.filter(appointment_id=appointment_id)
+            if not app_feedback:
+                LabAppointmentFeedback.objects.create(appointment_id= appointment_id, comment=comment, ratings=ratings)
+            else:
+                return Response({'result': 'feedback already exists'})
+        else:
+            return Response({'result': 'either appointment id or rating not present'})
+
+        return Response(status=status.HTTP_200_OK)

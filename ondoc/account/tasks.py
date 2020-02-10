@@ -310,7 +310,7 @@ def refund_curl_task(self, req_data):
             save_pg_response.apply_async(
                 (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(),
                  req_data, req_data.get('user'),),
-                eta=timezone.localtime(), )
+                eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 logger.error("Response content - " + str(response.content) + " with request data - " + json.dumps(req_data))
@@ -410,7 +410,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 req_data[key] = str(req_data[key])
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id, ), eta=timezone.localtime(), )
+            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id, ), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
@@ -630,3 +630,85 @@ def purchase_order_closing_counter_automation():
         if poc_instance and poc_instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
             poc_instance.is_enabled = False
             poc_instance.save()
+
+
+@task()
+def update_convenience_charge():
+    from ondoc.diagnostic.models import AvailableLabTest
+    from ondoc.plus.models import PlusPlans
+    from ondoc.doctor.models import DoctorClinicTiming
+    from ondoc.sms.backends.backend import NodeJsSmsBackend
+    engine = NodeJsSmsBackend()
+
+    # engine.send("Job Started", 9560488461, False)
+    # engine.send("Job Started", 9871047545, False)
+
+    chunk_size = 1000
+    gold_plans = list(PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True))
+
+    # Update AvailableLabTest convenience_charge
+
+    latest_test_id = AvailableLabTest.objects.filter().latest('id').id
+    earliest_test_id = AvailableLabTest.objects.filter().earliest('id').id
+
+    to_loop = range(earliest_test_id, latest_test_id+chunk_size, chunk_size)
+
+    start = 0
+    for c, upper in enumerate(to_loop):
+        print(start, upper)
+        qs = AvailableLabTest.objects.filter(id__gte=start, id__lt=upper).all()
+
+        for avt_obj in qs:
+            price_structure = {}
+            price_data = {
+                "mrp": avt_obj.mrp,
+                "computed_agreed_price": avt_obj.computed_agreed_price,
+                "custom_agreed_price": avt_obj.custom_agreed_price,
+                "computed_deal_price": avt_obj.computed_deal_price,
+                "custom_deal_price": avt_obj.custom_deal_price,
+                "supplier_price": avt_obj.supplier_price,
+                "insurance_agreed_price": avt_obj.insurance_agreed_price,
+                "fees": avt_obj.custom_agreed_price if avt_obj.custom_agreed_price else avt_obj.computed_agreed_price,
+                "deal_price": avt_obj.custom_deal_price if avt_obj.custom_deal_price else avt_obj.computed_deal_price
+            }
+
+            for plan in gold_plans:
+                convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
+                price_structure[plan.id] = convenience_charge
+
+            AvailableLabTest.objects.filter(id=avt_obj.id).update(convenience_pricing=price_structure)
+
+        start = upper
+
+    # engine.send("Lab Completed", 9560488461, False)
+    # engine.send("Lab Completed", 9871047545, False)
+
+    # Update DoctorClinicTiming convenience_charge
+
+    latest_doctor_id = DoctorClinicTiming.objects.filter().latest('id').id
+    earliest_doctor_id = DoctorClinicTiming.objects.filter().earliest('id').id
+
+    to_loop = range(earliest_doctor_id, latest_doctor_id + chunk_size, chunk_size)
+
+    start = 0
+    for c, upper in enumerate(to_loop):
+        qs = DoctorClinicTiming.objects.filter(id__gte=start, id__lt=upper).all()
+        print(start, upper)
+        for doctor_clinic_timing_obj in qs:
+            price_structure = {}
+            price_data = {"mrp": doctor_clinic_timing_obj.mrp, "deal_price": doctor_clinic_timing_obj.deal_price,
+                          "cod_deal_price": doctor_clinic_timing_obj.cod_deal_price,
+                          "fees": doctor_clinic_timing_obj.fees,
+                          'custom_deal_price': doctor_clinic_timing_obj.custom_deal_price}
+
+            for plan in gold_plans:
+                convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
+                                                                              default_plan_query=plan)
+                price_structure[plan.id] = convenience_charge
+
+            DoctorClinicTiming.objects.filter(id=doctor_clinic_timing_obj.id).update(convenience_pricing=price_structure)
+
+        start = upper
+
+    # engine.send("Doctor Completed", 9560488461, False)
+    # engine.send("Doctor Completed", 9871047545, False)

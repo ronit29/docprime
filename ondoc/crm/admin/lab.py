@@ -25,6 +25,7 @@ from django.contrib import messages
 from reversion_compare.admin import CompareVersionAdmin
 
 from ondoc.account.models import Order, Invoice
+from ondoc.api.v1.diagnostic.serializers import LabAppointmentCreateSerializer
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import Hospital, CancellationReason
@@ -37,7 +38,8 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
                                      TestParameterChat, LabTestThresholds, LabTestCategoryUrls,
-                                     LabTestCategoryLandingURLS)
+                                     LabTestCategoryLandingURLS, LabtestNameMaster)
+from ondoc.integrations.Integrators import Thyrocare
 from ondoc.integrations.models import IntegratorHistory, IntegratorLabCode
 from ondoc.notification.models import EmailNotification, NotificationAction
 from ondoc.prescription.models import AppointmentPrescription
@@ -358,6 +360,8 @@ class LabCertificationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+    fields = ['certification']
+    search_fields = ['certification']
 
 
 class LabForm(FormCleanMixin):
@@ -829,9 +833,12 @@ class LabAppointmentForm(RefundableAppointmentForm):
         # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
         #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
-            date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
-            dt_field = parse_datetime(date_time_field)
-            time_slot_start = make_aware(dt_field)
+            if self.request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+                raise forms.ValidationError("You cannot change appointment date time.")
+            else:
+                date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
+                dt_field = parse_datetime(date_time_field)
+                time_slot_start = make_aware(dt_field)
         else:
             raise forms.ValidationError("Enter valid start date and time.")
         if time_slot_start:
@@ -891,23 +898,53 @@ class LabAppointmentForm(RefundableAppointmentForm):
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 
         if cleaned_data.get('status') not in [LabAppointment.CANCELLED, LabAppointment.COMPLETED, None]:
-            if self.instance.id:
-                selected_test_ids = lab_test.values_list('test', flat=True)
-                is_lab_timing_available = LabTiming.objects.filter(
-                    lab=lab,
-                    lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-                    day=time_slot_start.weekday(),
-                    start__lte=hour, end__gt=hour).exists()
-                # if not is_lab_timing_available:
-                #     raise forms.ValidationError("This lab test is not available on selected day and time.")
-                if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
-                    if not lab.is_home_collection_enabled:
-                        raise forms.ValidationError("Home Pickup is disabled for the lab")
-                    if hour < 7.0 or hour > 19.0:
-                        raise forms.ValidationError("No time slot available")
+            if self.instance and self.instance.is_thyrocare:
+                if self.instance.status == LabAppointment.BOOKED and cleaned_data.get('status') == LabAppointment.ACCEPTED:
+                    pass
                 else:
-                    if not lab.always_open and not is_lab_timing_available:
-                        raise forms.ValidationError("No time slot available")
+                    pathology_home_pickup = self.instance.is_home_pickup
+                    pincode = self.instance.address.get('pincode', None)
+                    selected_date = cleaned_data.get('start_date')
+                    thyrocare_obj = Thyrocare()
+                    curr_time = thyrocare_obj.time_slot_extraction([cleaned_data.get('start_time')], selected_date)
+                    if curr_time and curr_time.get(selected_date):
+                        for data in curr_time.get(selected_date):
+                            if data.get('timing') and data.get('timing')[0].get('value'):
+                                curr_time = data.get('timing')[0].get('value')
+                    else:
+                        curr_time = None
+                    if not pincode:
+                        raise forms.ValidationErrorr("PinCode not found")
+                    if not pathology_home_pickup:
+                        raise forms.ValidationError("Home Pickup not enabled")
+
+                    available_slots = self.instance.lab.get_available_slots(pathology_home_pickup, pincode, selected_date)
+                    selected_day_slots = available_slots.get('time_slots').get(selected_date) if available_slots.get('time_slots') else None
+                    if not selected_day_slots:
+                        raise forms.ValidationError("No time slots available")
+                    serializer_obj = LabAppointmentCreateSerializer()
+                    current_day_slots = serializer_obj.get_slots_list(selected_day_slots)
+
+                    if not curr_time in current_day_slots:
+                        raise forms.ValidationError("Invalid Time slot")
+            else:
+                if self.instance.id:
+                    selected_test_ids = lab_test.values_list('test', flat=True)
+                    is_lab_timing_available = LabTiming.objects.filter(
+                        lab=lab,
+                        lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                        day=time_slot_start.weekday(),
+                        start__lte=hour, end__gt=hour).exists()
+                    # if not is_lab_timing_available:
+                    #     raise forms.ValidationError("This lab test is not available on selected day and time.")
+                    if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
+                        if not lab.is_home_collection_enabled:
+                            raise forms.ValidationError("Home Pickup is disabled for the lab")
+                        if hour < 7.0 or hour > 19.0:
+                            raise forms.ValidationError("No time slot available")
+                    else:
+                        if not lab.always_open and not is_lab_timing_available:
+                            raise forms.ValidationError("No time slot available")
 
         if cleaned_data.get('status') and cleaned_data.get('status') == LabAppointment.COMPLETED:
             if self.instance and self.instance.id and not self.instance.status == OpdAppointment.ACCEPTED:
@@ -1158,6 +1195,10 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CompareVersionAdmin):
 
         if obj and obj.status is not LabAppointment.CREATED:
             read_only = read_only + ['status_change_comments']
+
+        if request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+            read_only = read_only + ['status', 'status_change_comments']
+
         return read_only
 
     def refund_initiated(self, obj):
@@ -1419,7 +1460,7 @@ class TestPackageFormSet(forms.BaseInlineFormSet):
             lab_test = data.get('lab_test')
             if not lab_test:
                 continue
-            if self.instance.test_type != LabTest.OTHER and self.instance.test_type != lab_test.test_type:
+            if self.instance.is_package is False and self.instance.test_type != LabTest.OTHER and self.instance.test_type != lab_test.test_type:
                 raise forms.ValidationError('Test-{} is not correct for the Package.'.format(lab_test.name))
             if lab_test.is_package is True:
                 raise forms.ValidationError('{} is a test package'.format(lab_test.name))
@@ -1486,9 +1527,12 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         all_parent_categories = []
         count_is_primary = 0
         for value in self.cleaned_data:
-            if value and not value.get("DELETE"):
-                all_parent_categories.append(value.get('parent_category'))
-                if value.get('is_primary', False):
+            if value:
+                if not value.get("DELETE"):
+                    all_parent_categories.append(value.get('parent_category'))
+                    if value.get('is_primary', False):
+                        count_is_primary += 1
+                else:
                     count_is_primary += 1
         # If lab test is a package its parent can only be package category.
         if self.instance.is_package:
@@ -1548,13 +1592,13 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('min_age cannot be more than max_age')
         else:
             if cleaned_data.get('min_age'):
-                raise forms.ValidationError('Please dont enter min_age')
+                raise forms.ValidationError('Please do not enter min_age')
             if cleaned_data.get('max_age'):
-                raise forms.ValidationError('Please dont enter max_age')
+                raise forms.ValidationError('Please do not enter max_age')
             if cleaned_data.get('gender_type'):
-                raise forms.ValidationError('Please dont enter gender_type')
-            if cleaned_data.get('reference_code'):
-                raise forms.ValidationError('Please dont enter reference code for a test')
+                raise forms.ValidationError('Please do not enter gender_type')
+            # if cleaned_data.get('reference_code'):
+            #     raise forms.ValidationError('Please dont enter reference code for a test')
 
 
 class LabTestReportThresholdInline(AutoComplete, TabularInline):
@@ -1720,7 +1764,7 @@ class CommonPackageAdmin(VersionAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)
-        form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True)
+        form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True).order_by('name')
         return form
 
 
@@ -1771,3 +1815,8 @@ class LabTestCategoryLandingURLSInline(admin.TabularInline):
 class LabTestCategoryUrlsAdmin(admin.ModelAdmin):
     model = LabTestCategoryUrls
     inlines = [LabTestCategoryLandingURLSInline]
+
+
+class LabTestNameMasterAdmin(admin.ModelAdmin):
+    models = LabtestNameMaster
+

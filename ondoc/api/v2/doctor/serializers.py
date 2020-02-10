@@ -31,7 +31,7 @@ class DoctorBlockCalenderSerializer(serializers.Serializer):
     start_time = serializers.TimeField(required=False)
     end_date = serializers.DateField()
     end_time = serializers.TimeField(required=False)
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Doctor.objects.all())
+    doctor_id = serializers.PrimaryKeyRelatedField(required=False, queryset=doc_models.Doctor.objects.all())
     hospital_id = serializers.PrimaryKeyRelatedField(required=False, queryset=doc_models.Hospital.objects.all())
 
     def validate(self, attrs):
@@ -822,6 +822,9 @@ class PartnerLabTestsListSerializer(serializers.Serializer):
                                                                     .prefetch_related(
                                                                         'lab__lab_pricing_group',
                                                                         'lab__lab_pricing_group__available_lab_tests',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test__packages',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test__parameter',
                                                                         'lab__lab_pricing_group__available_lab_tests__sample_details',
                                                                         'lab__lab_pricing_group__available_lab_tests__sample_details__sample',
                                                                     ) \
@@ -860,6 +863,10 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         order_obj = provider_models.PartnerLabSamplesCollectOrder.objects.filter(id=id).first()
         if id and not order_obj:
             raise serializers.ValidationError('invalid order id')
+        if attrs.get('status') and order_obj:
+            status_update_check = order_obj.status_update_checks(attrs.get('status'))
+            if not status_update_check["is_correct"]:
+                raise serializers.ValidationError(status_update_check["message"])
         if attrs.get('only_status_update'):
             if not attrs.get('id'):
                 raise serializers.ValidationError('Order id is required for just status update')
@@ -886,6 +893,9 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
                                                                                                'hospital__hospital_doctors__doctor',
                                                                                                'lab__lab_pricing_group',
                                                                                                'lab__lab_pricing_group__available_lab_tests',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test__packages',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test__parameter',
                                                                                                'lab__lab_pricing_group__available_lab_tests__sample_details',
                                                                                                'lab__lab_pricing_group__available_lab_tests__sample_details__sample',
                                                                                                ) \
@@ -921,16 +931,47 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
 
 
 class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
+    b2c_rate = serializers.SerializerMethodField()              # temporarily mrp
+    mrp = serializers.FloatField()                              # mrp
+    hospital_price = serializers.SerializerMethodField()        # deal price
+    b2b_price = serializers.SerializerMethodField()             # agreed price
     lab_test_id = serializers.IntegerField(source="test.id")
     lab_test_name = serializers.CharField(source="test.name")
-    b2c_rate = serializers.SerializerMethodField()
+    lab_test_is_package = serializers.BooleanField(source="test.is_package")
+    lab_test_package_details = serializers.SerializerMethodField()
+    lab_test_parameter_details = serializers.SerializerMethodField()
 
     def get_b2c_rate(self, obj):
-        return int(obj.get_deal_price())
+        return float(obj.mrp) if obj.mrp else 0
+        # return int(obj.get_deal_price())
+
+    def get_hospital_price(self, obj):
+        deal_price = obj.get_deal_price()
+        return float(deal_price) if deal_price else None
+
+    def get_b2b_price(self, obj):
+        agreed_price = obj.custom_agreed_price if obj.custom_agreed_price else obj.computed_agreed_price
+        return float(agreed_price) if agreed_price else None
+
+    def get_lab_test_package_details(self, obj):
+        package_details = list()
+        if obj.test.is_package and hasattr(obj.test, 'packages'):
+            for package_mapping in obj.test.packages.all():
+                package_details.append({"test_id": package_mapping.lab_test.id,
+                                        "test_name": package_mapping.lab_test.name})
+        return package_details
+
+    def get_lab_test_parameter_details(self, obj):
+        parameter_details = list()
+        if not obj.test.is_package and hasattr(obj.test, 'parameter'):
+            for parameter in obj.test.parameter.all():
+                parameter_details.append({"id": parameter.id, "name": parameter.name})
+        return parameter_details
 
     class Meta:
         model = diag_models.AvailableLabTest
-        fields = ('lab_test_id', 'lab_test_name', 'b2c_rate')
+        fields = ('b2c_rate', 'mrp', 'hospital_price', 'b2b_price', 'lab_test_id', 'lab_test_name',
+                  'lab_test_is_package', 'lab_test_package_details', 'lab_test_parameter_details')
 
 
 class PartnerLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
@@ -987,7 +1028,7 @@ class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = provider_models.PartnerLabSamplesCollectOrder
         fields = ('id', 'created_at', 'updated_at', 'status', 'collection_datetime', 'samples', 'offline_patient',
-                  'hospital', 'doctor', 'lab_alerts', 'selected_tests_details', 'lab_reports')
+                  'lab', 'hospital', 'doctor', 'lab_alerts', 'selected_tests_details', 'lab_reports', 'extras')
 
 
 class TestSamplesLabAlertsModelSerializer(serializers.ModelSerializer):

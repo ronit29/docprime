@@ -1,9 +1,13 @@
+from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.plus.models import PlusUser, PlusMembers, PlusPlans, PlusPlanUtmSources, PlusPlanUtmSourceMapping
 from django.conf import settings
 import requests
 from rest_framework import status
 import logging
 import json
+
+from ondoc.salespoint.mongo_models import SalesPointLog
+
 logger = logging.getLogger(__name__)
 
 
@@ -183,6 +187,10 @@ class PlusIntegration:
             request_data = utm_param_dict.get('request_data', {})
             auth_token = utm_param_dict.get('auth_token', "")
 
+            if request_data:
+                plus_user_id = request_data.get('DocPrimeBookingID', None)
+                plus_user_obj = PlusUser.objects.filter(id=plus_user_id).first()
+
             response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
                                                                                   'Content-Type': 'application/json'})
 
@@ -192,6 +200,7 @@ class PlusIntegration:
                 resp['error'] = "Error while saving data!!"
             else:
                 resp['data'] = "successfully save!!"
+            SalesPointLog.create_spo_logs(plus_user_obj, request_data, response.json())
         except Exception as e:
             # logger.error(json.dumps(request_data))
             logger.info("[ERROR] {}".format(e))
@@ -210,13 +219,13 @@ class PlusIntegration:
         order = plus_obj.order
         action_data = order.action_data
         utm_params = action_data.get('utm_parameter', None)
-        utm_source = utm_params.get('utm_source', None)
+        utm_source = utm_params.get('utm_source', None) if utm_params else None;
         if not utm_source:
             return
 
         plan['plan_name'] = plus_plan.plan_name
         plan['plan_id'] = plus_plan.id
-        plus_member = plus_obj.plus_members.all().filter(relation=PlusMembers.Relations.SELF).first()
+        plus_member = plus_obj.plus_members.all().filter(is_primary_user=True).order_by('id').first()
         member['name'] = plus_member.first_name
         member['dob'] = str(plus_member.dob)
         member['email'] = plus_member.email
@@ -241,3 +250,15 @@ class PlusIntegration:
 
         resp = PlusIntegration.get_response(resp)
         # return Response(data=resp, status=status.HTTP_200_OK)
+
+    @classmethod
+    def assign_coupons_to_user_after_purchase(cls, plus_obj):
+        if plus_obj and plus_obj.plan:
+            if not plus_obj.plan.is_gold:
+                plus_type = 1
+            else:
+                plus_type = 0
+
+            active_coupons = Coupon.get_vip_gold_active_coupons(plus_type, plus_obj.plan.id)
+            if active_coupons:
+                UserSpecificCoupon.assign_coupons_to_user(active_coupons, plus_obj.user)

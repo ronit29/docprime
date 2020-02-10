@@ -21,7 +21,7 @@ import logging
 from ondoc.authentication import models as auth_model
 from ondoc.account import models as account_model
 from django.core.validators import MaxValueValidator, MinValueValidator
-from ondoc.authentication.models import UserProfile, User
+from ondoc.authentication.models import UserProfile, User, TransactionMixin
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from ondoc.common.helper import Choices
@@ -34,7 +34,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from num2words import num2words
 # from hardcopy import bytestring_to_pdf
-import math
+import math, uuid
 import reversion
 import numbers
 from ondoc.account.models import Order, Merchant, MerchantPayout, PgTransaction, PayoutMapping
@@ -46,6 +46,7 @@ from ondoc.notification import tasks as notification_tasks
 from dateutil.relativedelta import relativedelta
 
 
+#generate insurance policy number - not in use now
 def generate_insurance_policy_number():
     query = '''select nextval('userinsurance_policy_num_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
@@ -59,6 +60,7 @@ def generate_insurance_policy_number():
         raise ValueError('Sequence Produced is not valid.')
 
 
+#generate insurance policy number insurer wise
 def generate_insurance_insurer_policy_number(insurance_plan):
     if not insurance_plan:
         raise Exception('Could not generate policy number according to the insurer.')
@@ -85,6 +87,7 @@ def generate_insurance_insurer_policy_number(insurance_plan):
         raise ValueError('Sequence Produced is not valid.')
 
 
+#generate insurance reciept number
 def generate_insurance_reciept_number():
     query = '''select nextval('userinsurance_policy_reciept_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
@@ -525,7 +528,7 @@ class BankHolidays(auth_model.TimeStampedModel):
         db_table = "bank_holidays"
 
 
-class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
+class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin, TransactionMixin):
     from ondoc.account.models import MoneyPool
 
     ACTIVE = 1
@@ -961,7 +964,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         html_body = render_to_string("pdfbody.html", context=context)
         policy_number = self.policy_number
         certificate_number = policy_number.split('/')[-1]
-        filename = "{}.pdf".format(str(certificate_number))
+        filename = "{}-{}.pdf".format(str(certificate_number), uuid.uuid4().hex)
         #
         # extra_args = {
         #     'virtual-time-budget': 6000
@@ -1508,12 +1511,21 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
 
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
+        from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
-            with transaction.atomic():
-                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id, visitor_info=visitor_info)
-                if event_data and visitor_info:
-                    TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
-                                             user=self.user, triggered_at=datetime.datetime.utcnow())
+            if settings.MONGO_STORE:
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased,
+                                                            appointmentId=self.id, visitor_info=visitor_info)
+                MongoTrackingEvent.save_event(event_name=event_data.get('event'), data=event_data,
+                                              visit_id=visitor_info.get('visit_id'),
+                                              visitor_id=visitor_info.get('visitor_id'),
+                                              user=self.user, triggered_at=datetime.datetime.utcnow())
+
+        #     with transaction.atomic():
+        #         event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id, visitor_info=visitor_info)
+                # if event_data and visitor_info:
+                    # TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                    #                          user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 

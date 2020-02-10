@@ -22,7 +22,7 @@ import time
 
 class Thyrocare(BaseIntegrator):
 
-    # for getting thyrocare API Key
+    # This method provides thyrocare API Key
     @classmethod
     def thyrocare_auth(cls):
         url = '%s/common.svc/%s/%s/portalorders/DSA/login' % (settings.THYROCARE_BASE_URL, settings.THYROCARE_USERNAME, settings.THYROCARE_PASSWORD)
@@ -36,6 +36,7 @@ class Thyrocare(BaseIntegrator):
             'api_key': resp_data['API_KEY']
         }
 
+    # This provides all the test data of thyrocare.
     @classmethod
     def thyrocare_data(cls, obj_id, type):
         from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorTestMapping
@@ -102,6 +103,7 @@ class Thyrocare(BaseIntegrator):
     def thyrocare_offer_data(cls, obj_id, type):
         cls.thyrocare_data(obj_id, type)
 
+    # This method provides available time slots for selected date.
     def _get_appointment_slots(self, pincode, date, **kwargs):
         if not pincode or not date:
             resp_list = dict()
@@ -139,6 +141,7 @@ class Thyrocare(BaseIntegrator):
         res_data = {"time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
         return res_data
 
+    # This method check if area is serviceable or not.
     def _get_is_user_area_serviceable(self, pincode):
         url = "%s/order.svc/%s/%s/PincodeAvailability" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, pincode)
         response = requests.get(url)
@@ -152,6 +155,7 @@ class Thyrocare(BaseIntegrator):
 
         return True if resp_data['status'] == 'Y' else False
 
+    # This method is use to push appointment to thyrocare.
     def _post_order_details(self, lab_appointment, **kwargs):
         from ondoc.integrations.models import IntegratorHistory
 
@@ -183,6 +187,7 @@ class Thyrocare(BaseIntegrator):
 
         return None
 
+    # Preparing data for order.
     def prepare_data(self, tests, lab_appointment):
         from ondoc.integrations.models import IntegratorTestMapping
 
@@ -270,6 +275,7 @@ class Thyrocare(BaseIntegrator):
         today = date.today()
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
+    # This method provides report of lab test.
     @classmethod
     def get_generated_report(cls):
         from ondoc.integrations.models import IntegratorResponse
@@ -278,6 +284,7 @@ class Thyrocare(BaseIntegrator):
                 integrator_bookings = IntegratorResponse.objects.filter(integrator_class_name=Thyrocare.__name__, report_received=False)
                 formats = ['pdf', 'xml']
                 for booking in integrator_bookings:
+                    print(booking.id)
                     dp_appointment = booking.content_object
                     if dp_appointment.time_slot_start + timedelta(days=1) <= timezone.now():
                         lead_id = booking.lead_id
@@ -286,6 +293,7 @@ class Thyrocare(BaseIntegrator):
 
                         for format in formats:
                             url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
+                            print(url)
                             response = requests.get(url)
                             response = response.json()
                             if response.get('RES_ID') == 'RES0000':
@@ -298,18 +306,21 @@ class Thyrocare(BaseIntegrator):
             except Exception as e:
                 logger.error(str(e))
 
+    # This method is use to save report urls to db and update appointment.
     @classmethod
     def save_reports(cls, integrator_response, result):
         from ondoc.integrations.models import IntegratorResponse, IntegratorReport
 
         # Save reports URL
-        obj, created = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
+        if result.get('pdf', '') and result.get('xml', ''):
+            obj, created = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
 
-        # Update integrator response when both type of report present
-        if obj.pdf_url and obj.xml_url:
-            cls.upload_report(obj)
-            IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
+            # Update integrator response when both type of report present
+            if obj.pdf_url and obj.xml_url:
+                cls.upload_report(obj)
+                IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
 
+    # This method is use to upload reports to s3 server and send to users.
     @classmethod
     def upload_report(cls, report):
         formats = ['pdf', 'xml']
@@ -350,6 +361,7 @@ class Thyrocare(BaseIntegrator):
         except Exception as e:
             logger.error(str(e))
 
+    # This method is use to cancel the booked appointment.
     def _cancel_order(self, appointment, integrator_response, retry_count):
         from ondoc.integrations.models import IntegratorHistory
 
@@ -388,6 +400,7 @@ class Thyrocare(BaseIntegrator):
                                              status_code, retry_count, status, '')
             logger.error("[ERROR] %s" % response.get('RESPONSE'))
 
+    # To get order summary of a pushed order.
     def _order_summary(self, integrator_response):
         from ondoc.integrations.models import IntegratorHistory
 
@@ -466,6 +479,7 @@ class Thyrocare(BaseIntegrator):
         time_dict[date].append(pm_dict)
         return time_dict
 
+    # This method provides test parameters.
     @classmethod
     def get_test_parameter(cls):
         from ondoc.diagnostic.models import TestParameterChat
