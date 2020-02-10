@@ -70,7 +70,7 @@
             </div>
             <div class="form-group">
                 <label class="col-sm-2 control-label">Clinic Rank</label>
-                <div class="col-sm-10 rank-selection">
+                <div class="col-sm-10" id="rank-selection">
                     <label class="checkbox-inline">
                         <input type="checkbox" id="rank-1" value="1"> 1
                     </label>
@@ -93,7 +93,7 @@
             </div>
             <div class="form-group">
                 <label class="col-sm-2 control-label">Has Phlebo</label>
-                <div class="col-sm-10 phlebo-selection">
+                <div class="col-sm-10" id="phlebo-selection">
                     <label class="checkbox-inline">
                         <input type="checkbox" id="phlebo-1" value="1"> NA
                     </label>
@@ -107,7 +107,7 @@
             </div>
             <div class="form-group">
                 <label class="col-sm-2 control-label">Onboarded</label>
-                <div class="col-sm-10 onboarded-selection">
+                <div class="col-sm-10" id="onboarded-selection">
                     <label class="checkbox-inline">
                         <input type="checkbox" id="onboarded-1" value="1"> Null
                     </label>
@@ -122,6 +122,65 @@
                     </label>
                 </div>
             </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Interested In Diagnostics</label>
+                <div class="col-sm-10" id="iid-selection">
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="iid-1" value="1"> Null
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="iid-2" value="2"> Yes
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="iid-3" value="3"> No
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Interested In Pharmacy</label>
+                <div class="col-sm-10" id="iip-selection">
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="iip-1" value="1"> Null
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="iip-2" value="2"> Yes
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="iip-3" value="3"> No
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Ready To Use Wallet</label>
+                <div class="col-sm-10" id="rtuw-selection">
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="rtuw-1" value="1"> Null
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="rtuw-2" value="2"> Yes
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="rtuw-3" value="3"> No
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-2 control-label">Digital Only Report</label>
+                <div class="col-sm-10" id="dor-selection">
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="dor-1" value="1"> Null
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="dor-2" value="2"> Yes
+                    </label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="dor-3" value="3"> No
+                    </label>
+                </div>
+            </div>
+
             <div class="form-group">
                 <div class="col-sm-offset-2 col-sm-10">
                     <button type="submit" class="btn btn-primary" id="update_map">Update</button>
@@ -155,23 +214,22 @@
         </div>
     </div>
 
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCxzOncSHC1FRfKCTYCAnjOctzsMjMtxj0&callback=initialize&libraries=geometry" async defer></script>
     <script>
-        jQuery(function($) {
-            // Asynchronously Load the map API
-            var script = document.createElement('script');
-            script.src = "//maps.googleapis.com/maps/api/js?sensor=false&callback=initialize&libraries=geometry&key=AIzaSyCxzOncSHC1FRfKCTYCAnjOctzsMjMtxj0";
-            document.body.appendChild(script);
-        });
-
         var polygonData = polygonArr = []
         var centerPointData = map_markers = []
         var map
         var markerCnt = {}
-        var phlebos = {1: 'NA', 2: 'Yes', 3: 'No'}
+        var default_choices = {1: 'NA', 2: 'Yes', 3: 'No'}
         var onboarded = {1: 'Null', 2: 'Yes', 3: 'No', 4: 'Maybe'}
         var clinicsListTable
+        var updateMap, dataFetched, reFetch = false
 
         $(document).ready(function() {
+            fetchData()
+        })
+
+        function fetchData() {
             $.ajax({
                 url: '/api/v1/location/cluster_map_data',
                 success: function( data ) {
@@ -179,16 +237,20 @@
                     center_point_data = data['center_point_data']
                     polygonData = convertJsonStringToObjects(polygon_data)
                     centerPointData = convertJsonStringToObjects(center_point_data)
-                    detectLocation()
                     setCenterPointData()
                     setPolygonData()
-                    getAndUpdateLocation()
+                    dataFetched = true
+                    if (reFetch) {
+                        $('#update_map').trigger('click')
+                    }
                 }
             })
-        })
+        }
 
         function initialize() {
+            updateMap = true
             generateMap()
+            detectLocation()
         }
 
         function setPolygonData() {
@@ -243,6 +305,18 @@
                 $.each(centerPointData.defaults.onboarded, function(index, value) {
                     $("#onboarded-" + value).prop( "checked", true );
                 })
+                $.each(centerPointData.defaults.interested_in_diagnostics, function(index, value) {
+                    $("#iid-" + value).prop( "checked", true );
+                })
+                $.each(centerPointData.defaults.interested_in_pharmacy, function(index, value) {
+                    $("#iip-" + value).prop( "checked", true );
+                })
+                $.each(centerPointData.defaults.ready_to_use_wallet, function(index, value) {
+                    $("#rtuw-" + value).prop( "checked", true );
+                })
+                $.each(centerPointData.defaults.digital_only_report, function(index, value) {
+                    $("#dor-" + value).prop( "checked", true );
+                })
             }
             if (centerPointData.center_points) {
                 $.each(centerPointData.center_points, function( index, value ) {
@@ -256,51 +330,45 @@
             $("#inputLng").val(long)
         }
 
-        function getSelectedRank() {
-            var selected_rank = []
-            $.each($(".rank-selection input[type='checkbox']:checked"), function(){
-                selected_rank.push($(this).val());
-            });
-            return selected_rank
-        }
-
-        function getSelectedPhlebo() {
-            var selected_phlebo = []
-            $.each($(".phlebo-selection input[type='checkbox']:checked"), function(){
-                selected_phlebo.push($(this).val());
-            });
-            return selected_phlebo
-        }
-
-        function getSelectedOnboarded() {
-            var selected_onboarded = []
-            $.each($(".onboarded-selection input[type='checkbox']:checked"), function(){
-                selected_onboarded.push($(this).val());
-            });
-            return selected_onboarded
-        }
-
         function detectLocation() {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition((position) => {
-                    setLatLong(position.coords.latitude, position.coords.longitude)
-                    var pos = {
-                       lat: position.coords.latitude,
-                       lng: position.coords.longitude
-                    };
-                    //var infoWindow = new google.maps.InfoWindow({
-                    //   map: map
-                    //});
-                    //infoWindow.setPosition(pos);
-                    //infoWindow.setContent('<b>You are here.</b>');
-                    map.setCenter(pos);
-                    var marker = new google.maps.Marker({
-                        position: pos,
-                        map: map,
-                        title: String(pos.lat) + ", " + String(pos.lng),
-                        icon:'https://cdn.docprime.com/media/web/custom_images/man-user_1.png'
-                    });
-                })
+                navigator.geolocation.getCurrentPosition(
+                    successCallback,
+                    errorCallback
+                );
+            }
+        }
+
+        function successCallback(position) {
+            setLatLong(position.coords.latitude, position.coords.longitude)
+            var pos = {
+               lat: position.coords.latitude,
+               lng: position.coords.longitude
+            };
+            map.setCenter(pos);
+            var marker = new google.maps.Marker({
+                position: pos,
+                map: map,
+                title: String(pos.lat) + ", " + String(pos.lng),
+                icon:'https://cdn.docprime.com/media/web/custom_images/man-user_1.png'
+            });
+            if (updateMap && dataFetched) {
+                $('#update_map').trigger('click')
+            } else {
+                reFetch = true
+            }
+            updateMap = false
+        }
+
+        function errorCallback(error) {
+            if (error.code == error.PERMISSION_DENIED) {
+                setLatLong(28.450367, 77.071848)
+                if (updateMap && dataFetched) {
+                    $('#update_map').trigger('click')
+                } else {
+                    reFetch = true
+                }
+                updateMap = false
             }
         }
 
@@ -310,14 +378,39 @@
         })
 
         function getAndUpdateLocation() {
-            lat = $("#inputLat").val()
-            lng = $("#inputLng").val()
-            radius = $("#inputRadius").val()
-            selected_rank = getSelectedRank();
-            selected_phlebo = getSelectedPhlebo()
-            selected_onboarded = getSelectedOnboarded()
+            lat = $("#inputLat").val();
+            lng = $("#inputLng").val();
+            radius = $("#inputRadius").val();
+            selected_rank = getSelectedCheckboxesByName('rank-selection');
+            selected_phlebo = getSelectedCheckboxesByName('phlebo-selection');
+            selected_onboarded = getSelectedCheckboxesByName('onboarded-selection');
+            selected_iid = getSelectedCheckboxesByName('iid-selection');
+            selected_iip = getSelectedCheckboxesByName('iip-selection');
+            selected_rtuw = getSelectedCheckboxesByName('rtuw-selection');
+            selected_dor = getSelectedCheckboxesByName('dor-selection');
 
-            updateLocationData(lat, lng, radius, selected_rank, selected_phlebo, selected_onboarded)
+            filters = {}
+            filters['lat'] = lat
+            filters['lng'] = lng
+            filters['radius'] = radius
+            filters['rank'] = selected_rank
+            filters['phlebo'] = selected_phlebo
+            filters['onboarded'] = selected_onboarded
+            filters['iid'] = selected_iid
+            filters['iip'] = selected_iip
+            filters['rtuw'] = selected_rtuw
+            filters['dor'] = selected_dor
+
+            updateLocationData(filters)
+        }
+
+        function getSelectedCheckboxesByName(element_id) {
+            var selected = []
+            element_container = $("#" + element_id)
+            $.each(element_container.find("input[type='checkbox']:checked"), function(){
+                selected.push($(this).val());
+            });
+            return selected
         }
 
         function generateMap() {
@@ -330,7 +423,21 @@
             map.setTilt(45);
         }
 
-        function updateLocationData(lat=null, lng=null, radius=null, rank=[], phlebo=[], onboarded=[]){
+        function updateLocationData(filters={}){
+            lat = lng = radius = null
+            rank = phlebo = onboarded = iid = iip = rtuw = dor = []
+            if (!$.isEmptyObject(filters)) {
+                if ('lat' in filters) { lat = filters['lat']}
+                if ('lng' in filters) { lng = filters['lng']}
+                if ('radius' in filters) { radius = filters['radius']}
+                if ('rank' in filters) { rank = filters['rank']}
+                if ('phlebo' in filters) { phlebo = filters['phlebo']}
+                if ('onboarded' in filters) { onboarded = filters['onboarded']}
+                if ('iid' in filters) { iid = filters['iid']}
+                if ('iip' in filters) { iip = filters['iip']}
+                if ('rtuw' in filters) { rtuw = filters['rtuw']}
+                if ('dor' in filters) { dor = filters['dor']}
+            }
             var url = "/api/v1/doctor/record_api?"
             if (lat && lng){
                 url += '&lat='+ lat
@@ -347,6 +454,18 @@
             }
             if (onboarded.length) {
                 url += '&onboarded='+ onboarded
+            }
+            if (iid.length) {
+                url += '&interested_in_diagnostics='+ iid
+            }
+            if (iip.length) {
+                url += '&interested_in_pharmacy='+ iip
+            }
+            if (rtuw.length) {
+                url += '&ready_to_use_wallet='+ rtuw
+            }
+            if (dor.length) {
+                url += '&digital_only_report='+ dor
             }
             $.ajax({
                 url: url,
@@ -401,9 +520,14 @@
                             is_potential: markers[i]['is_potential'],
                             monday_timing: markers[i]['monday_timing'],
                             hospital_id: markers[i]['hospital_id'],
+                            has_phlebo: default_choices[markers[i]['has_phlebo']],
                             link: markers[i]['link'],
-                            has_phlebo: phlebos[markers[i]['has_phlebo']]
-                           }
+                            crm_link: markers[i]['crm_link'],
+                            interested_in_diagnostics: default_choices[markers[i]['interested_in_diagnostics']],
+                            interested_in_pharmacy: default_choices[markers[i]['interested_in_pharmacy']],
+                            ready_to_use_wallet: default_choices[markers[i]['ready_to_use_wallet']],
+                            digital_only_report: default_choices[markers[i]['digital_only_report']]
+                    }
                 });
                 marker.setMap(map)
                 map_markers.push(marker)
@@ -416,7 +540,10 @@
                         $.each(marker.data, function(key, value) {
                             if (key == 'link') {
                                 infoContent += '<a class="btn btn-info btn-xs" href='+ marker.data['link'] +' target="_blank">Get Direction</a>'
-                            } else {
+                            } else if (key == 'crm_link') {
+                                // do nothing
+                            }
+                            else {
                                 infoContent += '<tr><td>' + key + '</td><td>' + value + '</td></tr>'
                             }
                         })
@@ -435,7 +562,7 @@
 
             // Override our map zoom level once our fitBounds function runs (Make sure it only runs once)
             var boundsListener = google.maps.event.addListener((map), 'bounds_changed', function(event) {
-                this.setZoom(14);
+                this.setZoom(12);
                 google.maps.event.removeListener(boundsListener);
             });
         }
@@ -511,7 +638,11 @@
                     $('.table.clinicsList tbody').append('<tr></tr>')
                     marker_value = Object.values(map_markers[i].data)
                     $.each(marker_value, function(index, value) {
-                        $('.table.clinicsList tbody tr:eq(' + i + ')').append('<td>'+ value +'</td>')
+                        if (index == 18 || index == 19) {
+                            $('.table.clinicsList tbody tr:eq(' + i + ')').append("<td><a target='_blank' href='"+ value +"'>"+ value +"</a></td>")
+                        } else {
+                            $('.table.clinicsList tbody tr:eq(' + i + ')').append('<td>'+ value +'</td>')
+                        }
                     })
                 }
                 clinicsListTable = $('.table.clinicsList').DataTable();
