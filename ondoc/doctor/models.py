@@ -3257,7 +3257,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
 
-        if self.status == self.BOOKED:
+        if (not old_instance and self.status == self.BOOKED) or (old_instance and old_instance.status!=self.status and self.status==self.BOOKED):
             try:
                 notification_tasks.opd_send_confirmation_notification.apply_async(({'appointment_id': self.id, 'payment_type': self.payment_type},), countdown=1)
             except Exception as e:
