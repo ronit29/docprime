@@ -10,7 +10,6 @@ requests==2.18.4
 django-cors-headers==2.2.0
 django-filter==1.1.0
 python-dateutil==2.7.3
-django-import-export==1.0.0
 raven==6.8.0
 boto3==1.7.60
 django-storages==1.6.6
