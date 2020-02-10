@@ -3250,14 +3250,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if self.is_medanta_appointment() and not self.created_by_native() and self.status == self.BOOKED:
             push_opd_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
 
-        if self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED and str(self.hospital_id) not in settings.MEDANTA_AND_ARTEMIS_HOSPITAL_IDS:
+        if self.status == self.ACCEPTED and old_instance and old_instance.status != self.ACCEPTED and str(self.hospital_id) not in settings.MEDANTA_AND_ARTEMIS_HOSPITAL_IDS:
             try:
                 notification_tasks.opd_send_completion_notification.apply_async((self.id, self.payment_type, ),
                     eta=self.time_slot_start - datetime.timedelta(minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION), )
             except Exception as e:
                 logger.error(str(e))
 
-        if self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED:
+        if (not old_instance and self.status == self.BOOKED) or (old_instance and old_instance.status!=self.status and self.status==self.BOOKED):
             try:
                 notification_tasks.opd_send_confirmation_notification.apply_async(({'appointment_id': self.id, 'payment_type': self.payment_type},), countdown=1)
             except Exception as e:
