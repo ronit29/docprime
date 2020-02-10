@@ -5435,13 +5435,16 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     NA = 1
     YES = 2
     NO = 3
-    DEFAULT_CHOICES = [(NA, "NA"), (YES, "Yes"), (NO, "No")]
+    MAYBE = 4
+    DEFAULT_CHOICES = [(NA, "NA"), (YES, "Yes"), (NO, "No"), (MAYBE, "Maybe")]
 
-    ONBOARDED_NA = 1
-    ONBOARDED_YES = 2
-    ONBOARDED_NO = 3
-    ONBOARDED_MAYBE = 4
-    ONBOARDED_CHOICES = [(ONBOARDED_YES, "Yes"), (ONBOARDED_NO, "No"), (ONBOARDED_MAYBE, "Maybe"), (ONBOARDED_NA, "Null")]
+    PHLEBO_NA = 1
+    PHLEBO_INCLINIC = 2
+    PHLEBO_LABPAYROLL = 3
+    PHLEBO_ON_CALL = 4
+    PHLEBO_NO = 5
+    PHLEBO_CHOICES = [(PHLEBO_NA, "NA"), (PHLEBO_INCLINIC, "In Clinic"), (PHLEBO_LABPAYROLL, "On Lab/Meddo Payroll"),
+                         (PHLEBO_ON_CALL, "On Call"), (PHLEBO_NO, "No Phlebo")]
 
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     text = models.CharField(max_length=500)
@@ -5464,10 +5467,10 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     is_bookable = models.SmallIntegerField(null=True, blank=True)
     phone_number = models.CharField(max_length=500, null=True, blank=True)
     hospital_id = models.IntegerField(null=True, blank=True)
-    has_phlebo = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
+    has_phlebo = models.SmallIntegerField(choices=PHLEBO_CHOICES, default=NA)
     phlebo_type = models.CharField(max_length=100, null=True, blank=True)
     serial_number = models.IntegerField(blank=True, null=True)
-    onboarded = models.SmallIntegerField(choices=ONBOARDED_CHOICES, default=ONBOARDED_NA)
+    onboarded = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
     interested_in_diagnostics = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
     interested_in_pharmacy = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
     samples_per_month = models.IntegerField(blank=True, null=True)
