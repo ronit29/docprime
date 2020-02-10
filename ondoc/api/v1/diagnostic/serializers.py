@@ -127,9 +127,13 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_rating(self, obj):
         if self.parent:
             return None
-        app = LabAppointment.objects.select_related('profile').filter(lab_id=obj.id).all()
+        app = obj.labappointment.all().select_related('profile')
+
         if obj.network:
-            app = LabAppointment.objects.select_related('profile').filter(lab__network=obj.network).all()
+            app = app.filter(lab__network=obj.network).all()
+        else:
+            app = app.filter(lab_id=obj.id).all()
+
         query = self.context.get('rating_queryset')
         rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-ratings', '-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(rating_queryset, many=True, context={'app': app})
