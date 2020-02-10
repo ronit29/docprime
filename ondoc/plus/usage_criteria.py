@@ -604,18 +604,34 @@ class DoctorTotalWorth(AbstractCriteria):
         utilization['available_total_worth'] = int(utilization['available_total_worth']) - int(deducted_amount)
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
-        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
+        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost, 'convenience_charge': 0}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
 
         vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
         available_amount = vip_utilization.get('available_total_worth', 0)
-
-        if not available_amount:
+        mrp = kwargs.get('mrp', 0)
+        plan = self.plus_obj.plan
+        deal_price = int(kwargs.get('deal_price', 0))
+        price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
+        convenience_charge = kwargs.get('calculated_convenience_amount', 0) if kwargs.get(
+            'calculated_convenience_amount') else 0
+        total_cost = cost + convenience_charge
+        if plan.is_gold and total_cost >= deal_price:
             return resp
 
-        if available_amount > 0:
+        if not available_amount or available_amount <= 0:
+            return resp
+
+        if plan.is_corporate:
+            corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "DOCTOR")
+            if not corporate_cost_engine:
+                return resp
+            cost = corporate_cost_engine.get_price(price_data)
+            upper_limit = int(plan.corporate_doctor_upper_limit)
+            if upper_limit < cost:
+                return resp
             if available_amount >= cost:
                 vip_amount_deducted = cost
                 amount_to_be_paid = 0
@@ -624,11 +640,30 @@ class DoctorTotalWorth(AbstractCriteria):
                 vip_amount_deducted = int(available_amount)
                 amount_to_be_paid = int(cost - available_amount)
                 is_covered = True
-
+        else:
+            if not plan.is_gold:
+                if available_amount >= cost:
+                    vip_amount_deducted = cost
+                    amount_to_be_paid = 0
+                    is_covered = True
+                else:
+                    vip_amount_deducted = int(available_amount)
+                    amount_to_be_paid = int(cost - available_amount)
+                    is_covered = True
+            else:
+                difference_amount = int(mrp - cost)
+                if available_amount >= difference_amount:
+                    vip_amount_deducted = difference_amount
+                    amount_to_be_paid = cost
+                    is_covered = True
+                else:
+                    vip_amount_deducted = int(available_amount)
+                    amount_to_be_paid = cost + (int(difference_amount) - int(available_amount))
+                    is_covered = True
         resp['vip_amount_deducted'] = vip_amount_deducted
         resp['amount_to_be_paid'] = amount_to_be_paid
         resp['is_covered'] = is_covered
-
+        resp['convenience_charge'] = convenience_charge
         return resp
 
 
@@ -647,22 +682,59 @@ class LabtestTotalWorth(AbstractCriteria):
         amount_to_be_paid = cost
         vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
         total_amount_left = vip_utilization.get('available_total_worth')
+        mrp = kwargs.get('mrp', 0)
+        is_covered = False
+        plan = self.plus_obj.plan
+        deal_price = int(kwargs.get('deal_price', 0))
+        price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
+        convenience_charge = kwargs.get('calculated_convenience_amount', 0) if kwargs.get(
+            'calculated_convenience_amount') else 0
+        total_cost = cost + convenience_charge
+        if plan.is_gold and total_cost >= deal_price:
+            return resp
 
         if not total_amount_left or total_amount_left <= 0:
             return resp
 
         is_covered = True
-        if cost <= total_amount_left:
-            vip_amount_deducted = cost
-            amount_to_be_paid = 0
-        elif 0 < total_amount_left < cost:
-            vip_amount_deducted = total_amount_left
-            amount_to_be_paid = cost - total_amount_left
+        if plan.is_corporate:
+            corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "LABTEST")
+            if not corporate_cost_engine:
+                return resp
+            cost = corporate_cost_engine.get_price(price_data)
+            upper_limit = int(plan.corporate_lab_upper_limit)
+            if upper_limit < cost:
+                return resp
+            if total_amount_left >= cost:
+                vip_amount_deducted = cost
+                amount_to_be_paid = 0
+                is_covered = True
+            else:
+                vip_amount_deducted = int(total_amount_left)
+                amount_to_be_paid = int(cost - total_amount_left)
+                is_covered = True
+        else:
+            if not plan.is_gold:
+                if cost <= total_amount_left:
+                    vip_amount_deducted = cost
+                    amount_to_be_paid = 0
+                elif 0 < total_amount_left < cost:
+                    vip_amount_deducted = total_amount_left
+                    amount_to_be_paid = cost - total_amount_left
+            else:
+                difference_amount = mrp - cost
+                if difference_amount <= total_amount_left:
+                    vip_amount_deducted = difference_amount
+                    amount_to_be_paid = cost
+                elif 0 < total_amount_left < difference_amount:
+                    vip_amount_deducted = total_amount_left
+                    amount_to_be_paid = cost + (difference_amount - total_amount_left)
 
         resp['vip_amount_deducted'] = int(vip_amount_deducted)
         resp['amount_to_be_paid'] = int(amount_to_be_paid)
         resp['is_covered'] = is_covered
         return resp
+
 
 usage_criteria_class_mapping = {
     'DOCTOR': {
