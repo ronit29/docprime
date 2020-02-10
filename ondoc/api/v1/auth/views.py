@@ -530,7 +530,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.save()
 
         if add_to_gold_members:
-            saved_profile = request.user.profiles.filter().order_by('-created_at').first()
+            saved_profile = request.user.profiles.filter().order_by('-updated_at').first()
             request.user.active_plus_user.add_user_profile_to_members(saved_profile)
 
         return Response(serializer.data)

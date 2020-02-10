@@ -481,7 +481,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             'is_primary_user': False,
             'first_name': user_profile.name
         }]
-        PlusMembers.create_plus_members(self, members=members)
+        PlusMembers.create_plus_members(self, members_list=members)
 
     # Purchased gold plan have few states , some are valid and some are not valid, check if plan is still valid or not.
     def is_valid(self):
