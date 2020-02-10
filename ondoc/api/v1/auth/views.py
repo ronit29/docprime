@@ -2440,7 +2440,7 @@ class SendBookingUrlViewSet(GenericViewSet):
         if not utm_tags:
             utm_tags = {}
         utm_source = utm_tags.get('utm_source', {})
-        landing_url = request.data.get('landing_url')
+        landing_url = request.data.get('landing_url', '')
         message_medium = request.data.get('message_medium', None)
 
         # agent_token = AgentToken.objects.create_token(user=request.user)

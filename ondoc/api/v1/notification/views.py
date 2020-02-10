@@ -202,9 +202,9 @@ class WhatsappNotificationViewSet(viewsets.GenericViewSet):
         if not hasattr(request, 'agent'):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Only agent is allowed to perform this action.'})
 
-        callback = request.data.get('callback')
+        callback = request.data.get('callback', '')
         template = request.data.get('template')
-        if not callback or not template:
+        if callback is None or not template:
             return Response({'error': 'Callback and template not provided.'}, status= status.HTTP_400_BAD_REQUEST)
 
         user_token = JWTAuthentication.generate_token(request.user, request)
