@@ -2660,5 +2660,5 @@ class GoogleMapRecordsResource(resources.ModelResource):
 class GoogleMapRecordsAdmin(ImportExportMixin, VersionAdmin, ActionAdmin):
     search_fields = ('hospital_name', 'lead_rank',)
     list_display = ('id', 'hospital_name', 'lead_rank', )
-    formats = (base_formats.XLS,)
+    # formats = (base_formats.XLS,)
     resource_class = GoogleMapRecordsResource
