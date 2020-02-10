@@ -54,6 +54,3 @@ django-reversion-compare
 pandas
 newrelic
 geopy
-xlrd==1.2.0
-xlwt==1.3.0
-odfpy==1.4.0
