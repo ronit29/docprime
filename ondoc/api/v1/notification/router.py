@@ -14,6 +14,7 @@ urlpatterns = [
          views.ChatNotificationViewSet.as_view({"post": "chat_send"}),
          name="notificationfromchat"),
     path('preview/<str:template_name>',  views.DynamicTemplate.as_view(), name='dynamic-template'),
+    path('send/whatsapp',  views.WhatsappNotificationViewSet.as_view({'post': 'send_landing_whatsapp'}), name='send_landing_whatsapp'),
     path("ipd/emailnotifications", views.IPDIntimateEmailNotificationViewSet.as_view({"post": "send_email_notification"}),
          name="ipd_hospital_email_notifications"),
 ]

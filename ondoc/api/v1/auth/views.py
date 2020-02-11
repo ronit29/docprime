@@ -35,7 +35,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate,
                                          WhiteListedLoginTokens)
-from ondoc.notification.models import SmsNotification, EmailNotification
+from ondoc.notification.models import SmsNotification, EmailNotification, WhtsappNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs, PaymentProcessStatus
 from ondoc.account.mongo_models import PgLogs as mongo_pglogs
@@ -2439,8 +2439,9 @@ class SendBookingUrlViewSet(GenericViewSet):
         utm_tags = request.data.get('utm_spo_tags', {})
         if not utm_tags:
             utm_tags = {}
-        utm_source = utm_tags.get('utm_source', '')
-        landing_url = request.data.get('landing_url')
+        utm_source = utm_tags.get('utm_source', {})
+        landing_url = request.data.get('landing_url', '')
+        message_medium = request.data.get('message_medium', None)
 
         # agent_token = AgentToken.objects.create_token(user=request.user)
         user_token = JWTAuthentication.generate_token(request.user, request)
@@ -2454,10 +2455,14 @@ class SendBookingUrlViewSet(GenericViewSet):
             if not landing_url:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'No Landing url found.'})
             SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url, user_id=request.user.id)
+            if message_medium == 'WHATSAPP':
+                self.send_whatsapp(request, token, utm_source, landing_url)
             return Response({"status": 1})
 
         if purchase_type == 'vip_purchase':
             SmsNotification.send_vip_booking_url(token, str(request.user.phone_number), utm_source=utm_source, user_id=request.user.id)
+            if message_medium == 'WHATSAPP':
+                self.send_whatsapp(request, token, utm_source, "vip-club-member-details")
             return Response({"status": 1})
 
         if not user_profile:
@@ -2472,7 +2477,25 @@ class SendBookingUrlViewSet(GenericViewSet):
             booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name,  user=user_profile.user)
             EmailNotification.send_booking_url(token=token, email=user_profile.email, user=user_profile.user)
 
+        if message_medium == 'WHATSAPP':
+            self.send_whatsapp(request, token, utm_source, landing_url)
+
         return Response({"status": 1})
+
+    def send_whatsapp(self, request, token, utm_source, landing_url):
+        whatsapp_template = 'gold_payment_template'
+        utm_source = utm_source.get('utm_source', {})
+        booking_url = "{}/agent/booking?user_id={}&token={}".format(settings.CONSUMER_APP_DOMAIN, request.user.id,
+                                                                    token)
+        if utm_source:
+            booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
+                landing_url=landing_url, utm_source=utm_source)
+        else:
+            booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false".format(
+                landing_url=landing_url)
+        short_url = generate_short_url(booking_url)
+        whatsapp_payload = [short_url]
+        WhtsappNotification.send_whatsapp(request.user.phone_number, whatsapp_template, whatsapp_payload, None)
 
 
 class SendCartUrlViewSet(GenericViewSet):
