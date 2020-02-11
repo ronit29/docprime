@@ -241,8 +241,8 @@
         var centerPointData = map_markers = []
         var map
         var markerCnt = {}
-        var default_choices = {1: 'NA', 2: 'Yes', 3: 'No'}
-        var onboarded = {1: 'Null', 2: 'Yes', 3: 'No', 4: 'Maybe'}
+        var default_choices = {1: 'NA', 2: 'Yes', 3: 'No', 4: 'Maybe'}
+        var phlebo_choices = {1: 'NA', 2: 'In Clinic', 3: 'On Lab/Meddo Payroll', 4: 'On Call', 5: 'No Phlebo'}
         var clinicsListTable
         var updateMap, dataFetched, reFetch = false
 
@@ -526,7 +526,7 @@
                     data: {
                             hospital_name: markers[i]['hospital_name'],
                             address: markers[i]['address'],
-                            onboarded: onboarded[markers[i]['onboarded']],
+                            onboarded: default_choices[markers[i]['onboarded']],
                             phone_number: markers[i]['phone_number'],
                             lead_rank: markers[i]['lead_rank'],
                             serial_number: markers[i]['serial_number'],
@@ -541,7 +541,7 @@
                             is_potential: markers[i]['is_potential'],
                             monday_timing: markers[i]['monday_timing'],
                             hospital_id: markers[i]['hospital_id'],
-                            has_phlebo: default_choices[markers[i]['has_phlebo']],
+                            has_phlebo: phlebo_choices[markers[i]['has_phlebo']],
                             link: markers[i]['link'],
                             crm_link: markers[i]['crm_link'],
                             interested_in_diagnostics: default_choices[markers[i]['interested_in_diagnostics']],
@@ -596,7 +596,7 @@
                 markerCnt[i] = {}
                 totalCntInPolygon[i] = 0
 
-                for(var j=1; j <= 6; j++) {
+                for(var j=1; j <= 7; j++) {
                     markerCnt[i][j] = 0
                     totalCntInLevel[j] = 0
                 }
@@ -605,7 +605,7 @@
             for (var k = 0; k < map_markers.length; k++) {
                 for(var i=0; i < polygonArr.length; i++) {
                     if (google.maps.geometry.poly.containsLocation(map_markers[k].getPosition(), polygonArr[i])) {
-                        for(var j=1; j <= 6; j++) {
+                        for(var j=1; j <= 7; j++) {
                             if (parseInt(map_markers[k].label) == j) {
                                 markerCnt[i][j] = markerCnt[i][j] + 1
                                 totalCntInPolygon[i] = totalCntInPolygon[i] + 1
