@@ -2081,6 +2081,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing = None
         lab_timing_data = list()
         distance_related_charges = None
+        rating_queryset = None
 
         distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
         if lab_obj.always_open:
