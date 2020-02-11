@@ -1,10 +1,11 @@
 from itertools import groupby
 
+from ondoc.authentication.backends import JWTAuthentication
 from ondoc.authentication.models import UserProfile
 from ondoc.communications.models import EMAILNotification
 from ondoc.doctor.models import Hospital
 from ondoc.notification import models
-from ondoc.api.v1.utils import IsNotAgent
+from ondoc.api.v1.utils import IsNotAgent, generate_short_url
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from ondoc.api.pagination import paginate_queryset
@@ -17,8 +18,10 @@ from rest_framework import status
 from django.shortcuts import HttpResponse
 from django.views import View
 from django.template import Context, Template
-from ondoc.notification.models import DynamicTemplates, RecipientEmail, NotificationAction, IPDIntimateEmailNotification
+from ondoc.notification.models import DynamicTemplates, RecipientEmail, NotificationAction, \
+    IPDIntimateEmailNotification, WhtsappNotification
 from datetime import date
+from django.conf import settings
 
 
 class AppNotificationViewSet(viewsets.GenericViewSet):
@@ -189,3 +192,32 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
                                                     dob=dob, email_notifications=emails, profile_id=user_profile_id)
 
         return Response({})
+
+
+class WhatsappNotificationViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, )
+
+    def send_landing_whatsapp(self, request):
+        if not hasattr(request, 'agent'):
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Only agent is allowed to perform this action.'})
+
+        callback = request.data.get('callback', '')
+        template = request.data.get('template')
+        if callback is None or not template:
+            return Response({'error': 'Callback and template not provided.'}, status= status.HTTP_400_BAD_REQUEST)
+
+        user_token = JWTAuthentication.generate_token(request.user, request)
+        token = user_token['token'].decode("utf-8") if 'token' in user_token else None
+        if '?' not in callback:
+            short_url = "{}/agent/booking?token={}&callbackurl={}&user_id={}&queryParams={}".\
+                format(settings.CONSUMER_APP_DOMAIN, token, callback, request.user.id, '')
+        else:
+            query_params = callback.split('?')[1]
+            short_url = "{}/agent/booking?token={}&callbackurl={}&user_id={}&queryParams={}".\
+                format(settings.CONSUMER_APP_DOMAIN, token, callback, request.user.id, query_params)
+
+        short_url = generate_short_url(short_url)
+        whatsapp_payload = [short_url]
+        WhtsappNotification.send_whatsapp(request.user.phone_number, template, whatsapp_payload, None)
+        return Response({'success': True})
