@@ -2655,7 +2655,7 @@ class GoogleMapRecordsResource(resources.ModelResource):
                   'is_potential', 'has_booking', 'monday_timing', 'address', 'is_bookable', 'hospital_id',
                   'phone_number', 'has_phlebo', 'serial_number', 'onboarded', 'phlebo_type', 'interested_in_diagnostics',
                   'interested_in_pharmacy', 'samples_per_month', 'cluster',
-                  'ready_to_use_wallet', 'digital_only_report', 'latitude', 'longitude', )
+                  'ready_to_use_wallet', 'digital_only_report', 'latitude', 'longitude', 'image',)
 
 class GoogleMapRecordsAdmin(ImportExportMixin, VersionAdmin, ActionAdmin):
     search_fields = ('hospital_name', 'lead_rank',)
