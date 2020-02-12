@@ -5473,7 +5473,7 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     onboarded = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
     interested_in_diagnostics = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
     interested_in_pharmacy = models.SmallIntegerField(choices=DEFAULT_CHOICES, default=NA)
-    samples_per_month = models.IntegerField(blank=True, null=True)
+    samples_per_month = models.CharField(max_length=500, null=True, blank=True)
     latitude_sales = models.DecimalField(max_digits=9, decimal_places=6, default=None, null=True, blank=True)
     longitude_sales = models.DecimalField(max_digits=9, decimal_places=6, default=None, null=True, blank=True)
     cluster = models.CharField(max_length=100, null=True, blank=True)
