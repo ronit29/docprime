@@ -1916,7 +1916,9 @@ class OpdNotification(Notification):
                 user_and_email.append({'user': user, 'email': email})
         spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated, instance)
         if notification_type in (NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
-                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT):
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT,
+                                 NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT,
+                                 NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC):
             user_and_phone_number.clear()
 
         user_and_phone_number.extend(spoc_numbers)

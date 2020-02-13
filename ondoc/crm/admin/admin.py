@@ -60,7 +60,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      OfflinePatientAdmin,
                      UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin,
                      PurchaseOrderCreationAdmin, SponsoredServicesAdmin, HospitalSponsoredServicesAdmin,
-                     DoctorSponsoredServicesAdmin)
+                     DoctorSponsoredServicesAdmin, GoogleMapRecordsAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
 from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin, PermissionAdmin
@@ -336,6 +336,6 @@ admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrder
 admin.site.register(SearchCriteria, SearchCriteriaAdmin)
 admin.site.register(Permission, PermissionAdmin)
 admin.site.register(Certifications)
-admin.site.register(GoogleMapRecords)
+admin.site.register(GoogleMapRecords, GoogleMapRecordsAdmin)
 admin.site.register(LabtestNameMaster, LabTestNameMasterAdmin)
 admin.site.register(GoogleLatLong, GoogleLatLongAdmin)
