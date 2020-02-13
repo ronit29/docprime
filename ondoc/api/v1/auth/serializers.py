@@ -224,13 +224,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if not plus_membership:
             return resp
         resp['is_member_allowed'] = False
-        resp['is_corporate_plan'] = False
         plus_members_count = plus_membership.get_members.count()
         resp['expiry_date'] = plus_membership.expire_date.date()
         resp['total_members_allowed'] = plus_membership.plan.total_allowed_members
-        if plus_membership.plan.is_corporate:
-            resp['is_corporate_plan'] = True
-        if resp['total_members_allowed'] and resp['total_members_allowed'] > 0 and plus_members_count >=0 and (resp['total_members_allowed'] - plus_members_count > 0):
+        if resp['total_members_allowed'] and resp['total_members_allowed'] > 0 and plus_members_count >=0 and \
+                (resp['total_members_allowed'] - plus_members_count > 0) and not plus_membership.plan.is_corporate:
             resp['is_member_allowed'] = True
         resp['purchase_date'] = plus_membership.purchase_date.date()
         primary_member = plus_membership.get_primary_member_profile()
