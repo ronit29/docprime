@@ -466,6 +466,19 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             if default_profile.email and not data.get('email'):
                 data['email'] = default_profile.email
 
+        plus_user_obj = request.user.active_plus_user
+        plus_user_obj = plus_user_obj if plus_user_obj.is_valid() else None
+        associated_plus_member = None
+        if plus_user_obj:
+            associated_plus_member = PlusMembers.objects.filter(plus_user=plus_user_obj, profile=obj).first()
+
+        if associated_plus_member and data.get('name') and data.get('name') != obj.name:
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Profile covered in the gold cannot edit their name."
+                                   }
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
             return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
         
