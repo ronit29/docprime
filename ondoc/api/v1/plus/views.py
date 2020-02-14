@@ -182,6 +182,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['city_code'] = member.get('city_code', None)
                     pre_insured_members['email'] = member.get('email', None) if member.get('email') else default_email
                     pre_insured_members['relation'] = member.get('relation', None)
+                    pre_insured_members['gender'] = member.get('gender', None)
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
                         'profile') is not None else None
                     pre_insured_members['is_primary_user'] = True
