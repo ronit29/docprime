@@ -88,7 +88,7 @@ class CartViewSet(viewsets.GenericViewSet):
         valid_data['data']['vip_convenience_amount'] = vip_data_dict.get('vip_convenience_amount')
         valid_data['data']['payment_type'] = vip_data_dict.get('payment_type')
 
-        if plus_user:
+        if plus_user and plus_user.plan and not plus_user.plan.is_gold:
             cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
             for cart in cart_items:
                 if not cart.data.get('payment_type') == valid_data['data']['payment_type']:
@@ -384,7 +384,7 @@ class CartViewSet(viewsets.GenericViewSet):
         user = request.user
         plus_user = user.active_plus_user
 
-        if plus_user:
+        if plus_user and plus_user.plan and not plus_user.plan.is_gold:
             cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
             import itertools
             for item1, item2 in itertools.combinations(cart_items, 2):
