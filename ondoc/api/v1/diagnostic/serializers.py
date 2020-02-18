@@ -702,14 +702,19 @@ class CommonTestSerializer(serializers.ModelSerializer):
     icon = serializers.SerializerMethodField
     test_type = serializers.ReadOnlyField(source='test.test_type')
     url = serializers.ReadOnlyField(source='test.url')
+    svg_icon = serializers.SerializerMethodField
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
 
+    def get_svg_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj['svg_icon']) if obj['svg_icon'] else None
+
     class Meta:
         model = CommonTest
-        fields = ('id', 'name', 'icon', 'show_details', 'test_type', 'url')
+        fields = ('id', 'name', 'icon', 'show_details', 'test_type', 'url', 'svg_icon')
 
 
 class CommonPackageSerializer(serializers.ModelSerializer):
@@ -724,6 +729,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     lab = LabModelSerializer()
     discounted_price = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
+    svg_icon = serializers.SerializerMethodField()
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
@@ -749,6 +755,10 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.icon.url) if obj.icon else None
+
+    def get_svg_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.svg_icon.url) if obj.svg_icon else None
 
     def get_agreed_price(self, obj):
         if obj._selected_test:
@@ -856,7 +866,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab', 'vip')
+        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab', 'vip', 'svg_icon',)
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
