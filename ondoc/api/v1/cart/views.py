@@ -383,6 +383,15 @@ class CartViewSet(viewsets.GenericViewSet):
 
         user = request.user
         plus_user = user.active_plus_user
+
+        if plus_user:
+            cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
+            import itertools
+            for item1, item2 in itertools.combinations(cart_items, 2):
+                if(item1.data.get('payment_type') != item2.data.get('payment_type')):
+                    return Response({"status": 0, "message": "Please remove other appointments from cart to add"},
+                                    status.HTTP_400_BAD_REQUEST)
+
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
