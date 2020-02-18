@@ -160,12 +160,14 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 return Response({"message": "Plus Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
             if valid_data:
                 user = request.user
+                default_profile = user.get_default_profile()
+                default_email = default_profile.email if default_profile else None
                 pre_insured_members = {}
                 plus_members = []
 
                 for member in members:
                     pre_insured_members['dob'] = member['dob']
-                    pre_insured_members['title'] = member['title']
+                    pre_insured_members['title'] = member.get('title')
                     pre_insured_members['first_name'] = member['first_name']
                     pre_insured_members['last_name'] = member.get('last_name') if member.get('last_name') else ''
                     # pre_insured_members['address'] = member['address']
@@ -178,8 +180,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['pincode'] = member.get('pincode', None)
                     pre_insured_members['city'] = member.get('city', None)
                     pre_insured_members['city_code'] = member.get('city_code', None)
-                    pre_insured_members['email'] = member.get('email', None)
+                    pre_insured_members['email'] = member.get('email', None) if member.get('email') else default_email
                     pre_insured_members['relation'] = member.get('relation', None)
+                    pre_insured_members['gender'] = member.get('gender', None)
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
                         'profile') is not None else None
                     pre_insured_members['is_primary_user'] = True
