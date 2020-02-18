@@ -735,6 +735,16 @@ def payment_details(request, order):
     if plus_merchant_code:
         pgdata['insurerCode'] = plus_merchant_code
 
+    plus_user = user.active_plus_user
+    if plus_user and plus_user.order and order.action_data.get('plus_plan'):
+        transactions = plus_user.order.getTransactions()
+        parent_product_id = order.CORP_VIP_PRODUCT_ID if plus_user.plan.is_corporate else order.VIP_PRODUCT_ID
+        if transactions:
+            vip_order_transaction = transactions[0]
+            pgdata['refOrderId'] = str(vip_order_transaction.order_id)
+            pgdata['refOrderNo'] = str(vip_order_transaction.order_no)
+            pgdata['parentProductId'] = str(parent_product_id)
+
     secret_key, client_key = get_pg_secret_client_key(order)
     filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}
     pgdata.clear()
