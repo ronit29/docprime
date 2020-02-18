@@ -736,11 +736,18 @@ def payment_details(request, order):
         pgdata['insurerCode'] = plus_merchant_code
 
     plus_user = user.active_plus_user
-    if plus_user and plus_user.order and order.action_data.get('plus_plan'):
+    is_partial_vip_enabled = False
+    vip_order_transaction = None
+    parent_product_id = None
+    if plus_user and plus_user.order:
         transactions = plus_user.order.getTransactions()
         parent_product_id = order.CORP_VIP_PRODUCT_ID if plus_user.plan.is_corporate else order.VIP_PRODUCT_ID
-        if transactions:
-            vip_order_transaction = transactions[0]
+        for ord in order.orders.all():
+            from ondoc.doctor.models import OpdAppointment
+            if ord.action_data and ord.action_data.get('payment_type') == OpdAppointment.VIP and transactions:
+                vip_order_transaction = transactions[0]
+                is_partial_vip_enabled = True
+        if is_partial_vip_enabled and transactions and vip_order_transaction and parent_product_id:
             pgdata['refOrderId'] = str(vip_order_transaction.order_id)
             pgdata['refOrderNo'] = str(vip_order_transaction.order_no)
             pgdata['parentProductId'] = str(parent_product_id)
