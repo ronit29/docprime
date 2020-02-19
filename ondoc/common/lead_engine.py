@@ -106,6 +106,7 @@ class DropOff(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),
@@ -147,6 +148,7 @@ class Medicine(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "PaymentStatus": 0,
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "IPDIsInsured": 1 if user and user.active_insurance and user.active_insurance.is_valid() else 0,
@@ -183,6 +185,7 @@ class LabAds(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),
@@ -224,6 +227,7 @@ class DocAds(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),

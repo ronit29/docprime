@@ -3110,7 +3110,7 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
 
 class RecordSerializer(serializers.ModelSerializer):
-
+    crm_link = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
 
     def get_link(self, obj):
@@ -3125,8 +3125,15 @@ class RecordSerializer(serializers.ModelSerializer):
 
         return link
 
+    def get_crm_link(self, obj):
+        crm_link = "https://admin.docprime.com/admin/doctor/googlemaprecords/" + str(obj.id) + "/change/"
+
+        return crm_link
+
     class Meta:
        model = GoogleMapRecords
-       fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label", "reason", "hospital_name",    "place_id",
+       fields = (["id", "location", "text", "created_at", "latitude", "longitude", "updated_at", "image", "label", "reason", "hospital_name", "place_id",
                   "multi_speciality", "has_phone", "lead_rank", "combined_rating", "combined_rating_count", "is_potential", "has_booking", "monday_timing",
-                 "address" , "is_bookable", "link", "hospital_id", "phone_number"])
+                  "address", "is_bookable", "link", "hospital_id", "phone_number", "has_phlebo", "serial_number", "onboarded", "crm_link", "phlebo_type",
+                  "interested_in_diagnostics", "interested_in_pharmacy", "samples_per_month", "latitude_sales", "longitude_sales", "cluster",
+                  "ready_to_use_wallet", "digital_only_report"])

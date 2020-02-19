@@ -898,6 +898,13 @@ class Order(TimeStampedModel):
                 appointment_detail = labappointment_transform(appointment_detail)
                 action = cls.LAB_APPOINTMENT_CREATE
 
+            extra_info = {
+                'utm_tags': request.data.get('utm_tags', {}),
+                'visitor_info': request.data.get('visitor_info', {})
+            }
+
+            appointment_detail['extras'] = extra_info
+
             if appointment_detail.get('payment_type') == OpdAppointment.PREPAID:
                 order = cls.objects.create(
                     product_id=product_id,
@@ -1000,16 +1007,18 @@ class Order(TimeStampedModel):
 
         # utility to fetch and save visitor info for an parent order
         visitor_info = None
-        try:
-            from ondoc.api.v1.tracking.views import EventCreateViewSet
-            with transaction.atomic():
-                event_api = EventCreateViewSet()
-                visitor_id, visit_id = event_api.get_visit(request)
-                visitor_info = {"visitor_id": visitor_id, "visit_id": visit_id,
-                                "from_app": request.data.get("from_app", None),
-                                "app_version": request.data.get("app_version", None)}
-        except Exception as e:
-            logger.info("Could not fetch visitor info - " + str(e))
+        # try:
+        #     from ondoc.api.v1.tracking.views import EventCreateViewSet
+        #     with transaction.atomic():
+        #         event_api = EventCreateViewSet()
+        #         visitor_id, visit_id = event_api.get_visit(request)
+
+        # ADD THIS IF NEED INFO #
+        #     visitor_info = {"from_app": request.data.get("from_app", None),
+        #                         "app_version": request.data.get("app_version", None)}
+        #
+        # except Exception as e:
+        #     logger.info("Could not fetch visitor info - " + str(e))
 
         # building separate orders for all fulfillments
         fulfillment_data = copy.deepcopy(fulfillment_data)
@@ -1040,6 +1049,13 @@ class Order(TimeStampedModel):
                     action = Order.GOLD_CREATE
 
                 appointment_detail = plus_subscription_transform(appointment_detail)
+
+            extra_info = {
+                'utm_tags': request.data.get('utm_tags', {}),
+                'visitor_info': request.data.get('visitor_info', {})
+            }
+
+            appointment_detail['extras'] = extra_info
 
             if appointment_detail.get('payment_type') in [OpdAppointment.GOLD]:
                 order = cls.objects.create(

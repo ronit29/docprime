@@ -2424,3 +2424,12 @@ class CityLatLong(TimeStampedModel):
 
     class Meta:
         db_table = 'city_lat_long'
+
+
+class ClusterMap(TimeStampedModel):
+    is_active = models.BooleanField(default=True)
+    polygon_data = models.TextField(blank=True, null=True)
+    center_point_data = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'cluster_map'

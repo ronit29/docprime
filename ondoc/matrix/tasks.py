@@ -10,7 +10,7 @@ import json
 import logging
 import datetime
 from ondoc.authentication.models import Address, SPOCDetails, QCModel
-from ondoc.api.v1.utils import log_requests_on
+from ondoc.api.v1.utils import log_requests_on, generate_short_url
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids, constants
 
@@ -378,7 +378,8 @@ def push_appointment_to_matrix(self, data):
         appointment_user = appointment.user
         if appointment_user:
             last_24_time = datetime.datetime.now() - datetime.timedelta(days=1)
-            if GeneralMatrixLeads.objects.filter(created_at__gte=last_24_time, phone_number=int(appointment_user.phone_number), lead_type__in=['DROPOFF', 'LABADS']).exists():
+            if GeneralMatrixLeads.objects.filter(created_at__gte=last_24_time, phone_number=int(appointment_user.phone_number),
+                                                 lead_type__in=['DROPOFF', 'LABADS'], matrix_lead_id__isnull=False).exists():
 
                 lead_engine_obj = lead_class_referance("CANCELDROPOFFLEADVIAAPPOINTMENT", appointment)
                 success = lead_engine_obj.process_lead()
@@ -1493,13 +1494,19 @@ def create_prescription_lead_to_matrix(self, data):
             phone_number = appointment.profile.phone_number
         else:
             phone_number = appointment.user.phone_number
+        feedback_url = "%s/chat-ratings?&appointment_id=%s" \
+                         % (settings.BASE_URL, appointment.id)
+        tiny_feedback_url = generate_short_url(feedback_url)
 
         request_data = {
             "Name": appointment.profile.name if appointment.profile else "",
             "ProductId": 14,
             "PrimaryNo": phone_number,
             "LeadSource": "Prescriptions",
-            "ExitPointUrl": booking_url
+            "ExitPointUrl": booking_url,
+            "VIPPlanName": None,
+            "IPDBookingId": appointment.id,
+            "URL": tiny_feedback_url
         }
 
         url = settings.MATRIX_API_URL
