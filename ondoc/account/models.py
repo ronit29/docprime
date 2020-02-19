@@ -627,8 +627,6 @@ class Order(TimeStampedModel):
                                                 transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         return user_insurance_obj
 
-
-
     def update_order(self, data):
         self.reference_id = data.get("reference_id", self.reference_id)
         self.payment_status = data.get("payment_status", self.payment_status)
@@ -3034,6 +3032,40 @@ class MerchantPayout(TimeStampedModel):
                 return 1
             else:
                 return 1
+
+    # Check payout is paid or not
+    def paid_to_provider(self):
+        if self.status == self.PAID and self.pg_status == 'SETTLEMENT_COMPLETED' and self.utr_no:
+            return True
+
+        return False
+
+    # Transfer revenue from nodal to current a/c.
+    @classmethod
+    def create_appointment_revenue_payout(cls):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        from django.db.models import Q
+
+        # Manage Revenue Transfer - Add a flag in appointments
+        opd_appointments = OpdAppointment.objects.filter((Q(payment_type=OpdAppointment.PREPAID) | Q(payment_type=OpdAppointment.GOLD)) & Q(status=OpdAppointment.COMPLETED) & Q(revenue_transferred=None))
+        lab_appointments = LabAppointment.objects.filter((Q(payment_type=OpdAppointment.PREPAID) | Q(payment_type=OpdAppointment.GOLD)) & Q(status=OpdAppointment.COMPLETED) & Q(revenue_transferred=None))
+
+        for opd_appointment in opd_appointments:
+            appointment_payout = opd_appointment.merchant_payout
+            if appointment_payout:
+                if appointment_payout.paid_to_provider():
+                    appointment_payout.transfer_revenue_to_current_account(opd_appointment)
+
+        for lab_appointment in lab_appointments:
+            appointment_payout = lab_appointment.merchant_payout
+            if appointment_payout:
+                if appointment_payout.paid_to_provider():
+                    appointment_payout.transfer_revenue_to_current_account(lab_appointment)
+
+    def transfer_revenue_to_current_account(self, appointment):
+        revenue = appointment.get_revenue()
+
 
     class Meta:
         db_table = "merchant_payout"

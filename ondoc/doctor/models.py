@@ -2672,9 +2672,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     documents = GenericRelation(Documents)
     fraud = GenericRelation(Fraud)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
-    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
-                                  on_delete=models.DO_NOTHING)
+    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None, on_delete=models.DO_NOTHING)
     plus_plan_data = GenericRelation(PlusAppointmentMapping)
+    revenue_transferred = models.NullBooleanField(null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -3352,8 +3352,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
-
-
 
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:
