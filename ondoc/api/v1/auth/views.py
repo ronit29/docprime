@@ -467,7 +467,6 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 data['email'] = default_profile.email
 
         plus_user_obj = request.user.active_plus_user
-        plus_user_obj = plus_user_obj if plus_user_obj.is_valid() else None
         associated_plus_member = None
         if plus_user_obj:
             associated_plus_member = PlusMembers.objects.filter(plus_user=plus_user_obj, profile=obj).first()
