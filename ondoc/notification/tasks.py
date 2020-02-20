@@ -390,8 +390,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
         response = requests.post(url, data=json.dumps(req_data), headers=headers)
         if response.status_code == status.HTTP_200_OK:
-            save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,),
-                                         eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            if settings.SAVE_LOGS:
+                save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,),
+                                             eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             resp_data = response.json()
             #logger.error(resp_data)
             if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
@@ -926,7 +927,8 @@ def request_payout(req_data, order_data):
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
     resp_data = response.json()
-    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    if settings.SAVE_LOGS:
+        save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     if response.status_code == status.HTTP_200_OK:
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
@@ -1166,7 +1168,8 @@ def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
             else:
                 print("Payment acknowledged")
         json_url = '{"url": "%s"}' % url
-        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, None, json_url, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, None, json_url, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1280,7 +1283,8 @@ def push_plus_lead_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         # MatrixLog.create_matrix_logs(plus_lead_obj, request_data, response.json())
-        save_matrix_logs.apply_async((plus_lead_obj.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((plus_lead_obj.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1379,7 +1383,8 @@ def push_insurance_banner_lead_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         # MatrixLog.create_matrix_logs(banner_obj, request_data, response.json())
-        save_matrix_logs.apply_async((banner_obj.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((banner_obj.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1613,7 +1618,8 @@ def send_capture_payment_request(self, product_id, appointment_id):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
 
             resp_data = response.json()
-            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            if settings.SAVE_LOGS:
+                save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
             args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'CAPTURE'}
             status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'), resp_data.get('txStatus'))
@@ -1693,7 +1699,8 @@ def send_release_payment_request(self, product_id, appointment_id):
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 resp_data = response.json()
-                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                if settings.SAVE_LOGS:
+                    save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
                 args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'RELEASE'}
                 status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'),
@@ -1717,20 +1724,21 @@ def send_release_payment_request(self, product_id, appointment_id):
 
 @task(bind=True)
 def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id, log_created_at=None, *args, **kwargs):
-    try:
-        from ondoc.account.mongo_models import PgLogs
-        if order_id.__class__.__name__ == 'list':
-            PgLogs.save_single_pg_response(log_type, order_id, txn_id, response, request, user_id)
-        else:
-            if response:
-                if not isinstance(response, dict):
-                    response = json.loads(response)
-                response.pop('created_at', None)
-            PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
-    except Exception as e:
-        # todo - temporary commented to avoid error logs in sentry
-        # logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
-        pass
+    if settings.SAVE_LOGS:
+        try:
+            from ondoc.account.mongo_models import PgLogs
+            if order_id.__class__.__name__ == 'list':
+                PgLogs.save_single_pg_response(log_type, order_id, txn_id, response, request, user_id)
+            else:
+                if response:
+                    if not isinstance(response, dict):
+                        response = json.loads(response)
+                    response.pop('created_at', None)
+                PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
+        except Exception as e:
+            # todo - temporary commented to avoid error logs in sentry
+            # logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+            pass
 
 
 @task(bind=True)
@@ -1825,34 +1833,35 @@ def send_partner_lab_notifications(order_id, notification_type=None, report_list
 
 @task(bind=True, max_retries=3)
 def save_matrix_logs(self, id, obj_type, request_data, response):
-    try:
-        from ondoc.matrix.mongo_models import MatrixLog
-        from ondoc.diagnostic.models import LabAppointment
-        from ondoc.doctor.models import OpdAppointment
-        from ondoc.insurance.models import UserInsurance, InsuranceLead
-        from ondoc.plus.models import PlusUser, PlusLead
-        from ondoc.common.models import GeneralMatrixLeads
+    if settings.SAVE_LOGS:
+        try:
+            from ondoc.matrix.mongo_models import MatrixLog
+            from ondoc.diagnostic.models import LabAppointment
+            from ondoc.doctor.models import OpdAppointment
+            from ondoc.insurance.models import UserInsurance, InsuranceLead
+            from ondoc.plus.models import PlusUser, PlusLead
+            from ondoc.common.models import GeneralMatrixLeads
 
-        object = None
-        if obj_type == 'lab_appointment':
-            object = LabAppointment.objects.filter(id=id).first()
-        elif obj_type == 'opd_appointment':
-            object = OpdAppointment.objects.filter(id=id).first()
-        elif obj_type == 'user_insurance':
-            object = UserInsurance.objects.filter(id=id).first()
-        elif obj_type == 'plus_user':
-            object = PlusUser.objects.filter(id=id).first()
-        elif obj_type == 'plus_lead':
-            object = PlusLead.objects.filter(id=id).first()
-        elif obj_type == 'insurance_lead':
-            object = InsuranceLead.objects.filter(id=id).first()
-        elif obj_type == 'general_leads':
-            object = GeneralMatrixLeads.objects.filter(id=id).first()
+            object = None
+            if obj_type == 'lab_appointment':
+                object = LabAppointment.objects.filter(id=id).first()
+            elif obj_type == 'opd_appointment':
+                object = OpdAppointment.objects.filter(id=id).first()
+            elif obj_type == 'user_insurance':
+                object = UserInsurance.objects.filter(id=id).first()
+            elif obj_type == 'plus_user':
+                object = PlusUser.objects.filter(id=id).first()
+            elif obj_type == 'plus_lead':
+                object = PlusLead.objects.filter(id=id).first()
+            elif obj_type == 'insurance_lead':
+                object = InsuranceLead.objects.filter(id=id).first()
+            elif obj_type == 'general_leads':
+                object = GeneralMatrixLeads.objects.filter(id=id).first()
 
-        MatrixLog.create_matrix_logs(object, request_data, response)
+            MatrixLog.create_matrix_logs(object, request_data, response)
 
-    except Exception as e:
-        logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+        except Exception as e:
+            logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
 
 
 @task(bind=True, max_retries=2)
