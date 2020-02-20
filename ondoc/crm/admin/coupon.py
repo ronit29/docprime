@@ -241,7 +241,7 @@ class VipGoldPlanAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if not self.request.user.is_authenticated:
             return PlusPlans.objects.none()
-        queryset = PlusPlans.objects.all()
+        queryset = PlusPlans.objects.order_by('id')
 
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)

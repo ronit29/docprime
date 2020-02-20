@@ -805,7 +805,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             "cover_under_vip": False,
             "vip_amount": 0,
             "plus_user_id": None,
-            "vip_convenience_amount": 0
+            "vip_convenience_amount": 0,
+            "payment_type": OpdAppointment.PREPAID
         }
         vip_valid_dict = self.validate_plus_appointment(appointment_data)
         vip_data_dict['vip_convenience_amount'] = vip_valid_dict.get('vip_convenience_amount')
@@ -882,6 +883,10 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 else:
                     return vip_data_dict
         vip_data_dict['is_gold_member'] = True if request.user.active_plus_user.plan.is_gold else False
+        if vip_data_dict['is_vip_member'] and not vip_data_dict['is_gold_member']:
+            vip_data_dict['payment_type'] = OpdAppointment.VIP
+        elif vip_data_dict['is_gold_member'] and not vip_data_dict['is_vip_member']:
+            vip_data_dict['payment_type'] = OpdAppointment.GOLD
         return vip_data_dict
 
     # Get count of lab appointments which have been booked via gold policy.
