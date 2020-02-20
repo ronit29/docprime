@@ -223,7 +223,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
         plus_membership = obj.get_plus_membership
         if not plus_membership:
             return resp
+        resp['is_member_allowed'] = False
+        plus_members_count = plus_membership.get_members.count()
         resp['expiry_date'] = plus_membership.expire_date.date()
+        resp['total_members_allowed'] = plus_membership.plan.total_allowed_members
+        if resp['total_members_allowed'] and resp['total_members_allowed'] > 0 and plus_members_count >=0 and \
+                (resp['total_members_allowed'] - plus_members_count > 0) and not plus_membership.plan.is_corporate:
+            resp['is_member_allowed'] = True
         resp['purchase_date'] = plus_membership.purchase_date.date()
         primary_member = plus_membership.get_primary_member_profile()
         if primary_member:
@@ -237,8 +243,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance:
-            if self.instance.is_gold_profile:
-                raise serializers.ValidationError("Gold Member Profile can not be editable.")
+            # if self.instance.is_gold_profile:
+            #     raise serializers.ValidationError("Gold Member Profile can not be editable.")
             if self.instance.is_insured_profile:
                 raise serializers.ValidationError("Insured Member profile can not be editable.")
         return attrs

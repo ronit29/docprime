@@ -378,7 +378,8 @@ def push_appointment_to_matrix(self, data):
         appointment_user = appointment.user
         if appointment_user:
             last_24_time = datetime.datetime.now() - datetime.timedelta(days=1)
-            if GeneralMatrixLeads.objects.filter(created_at__gte=last_24_time, phone_number=int(appointment_user.phone_number), lead_type__in=['DROPOFF', 'LABADS']).exists():
+            if GeneralMatrixLeads.objects.filter(created_at__gte=last_24_time, phone_number=int(appointment_user.phone_number),
+                                                 lead_type__in=['DROPOFF', 'LABADS'], matrix_lead_id__isnull=False).exists():
 
                 lead_engine_obj = lead_class_referance("CANCELDROPOFFLEADVIAAPPOINTMENT", appointment)
                 success = lead_engine_obj.process_lead()

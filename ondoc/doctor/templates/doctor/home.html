@@ -28,9 +28,11 @@
     .gm-style-iw {
         /*width: 320px;*/
         max-width: 330px !important;
+        max-height: 221px !important;
     }
     .gm-style-iw-d {
         max-width: 330px !important;
+        max-height: 221px !important;
     }
     .table.markerTable {
         font-size: 10.5px;
@@ -525,11 +527,11 @@
                     label: markers[i]['label'],
                     data: {
                             hospital_name: markers[i]['hospital_name'],
+                            serial_number: markers[i]['serial_number'],
                             address: markers[i]['address'],
                             onboarded: default_choices[markers[i]['onboarded']],
                             phone_number: markers[i]['phone_number'],
                             lead_rank: markers[i]['lead_rank'],
-                            serial_number: markers[i]['serial_number'],
                             is_bookable: markers[i]['is_bookable'],
                             has_booking: markers[i]['has_booking'],
                             place_id: markers[i]['place_id'],
