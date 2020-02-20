@@ -2679,6 +2679,28 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
+    # # Calculate OPD appointment revenue
+    # def get_revenue(self):
+    #     paid_by_user = None
+    #     if self.price_data and self.price_data.get('wallet_amount'):
+    #         paid_by_user = self.price_data.get('wallet_amount')
+    #     else:
+    #         order = Order.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID).first()
+    #         if order and order.is_parent():
+    #             paid_by_pg = order.amount if order.amount else 0
+    #             paid_by_wallet = order.wallet_amount if order.wallet_amount else 0
+    #             paid_by_user = paid_by_pg + paid_by_wallet
+    #         else:
+    #             order = Order.objects.filter(id=order.parent_id).first()
+    #             if order:
+    #                 paid_by_pg = order.amount if order.amount else 0
+    #                 paid_by_wallet = order.wallet_amount if order.wallet_amount else 0
+    #                 paid_by_user = paid_by_pg + paid_by_wallet
+    #
+    #     paid_to_provider = self.fees
+    #     revenue = paid_by_user - paid_to_provider
+    #     return revenue
+
     def get_cod_amount(self):
         result = int(self.mrp)
         deal_price = int(self.deal_price)

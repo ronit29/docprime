@@ -1718,7 +1718,7 @@ class ConsumerAccount(TimeStampedModel):
                 wallet_txn.save()
             consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
-            
+
         self.save()
 
     def debit_refund(self, txn_entity_obj=None, initiate_refund=1):
@@ -2333,7 +2333,7 @@ class OrderLog(TimeStampedModel):
         db_table = "order_log"
 
 
-class MerchantPayout(TimeStampedModel):    
+class MerchantPayout(TimeStampedModel):
 
     PENDING = 1
     ATTEMPTED = 2
@@ -2346,6 +2346,9 @@ class MerchantPayout(TimeStampedModel):
     AUTOMATIC = 1
     MANUAL = 2
 
+    PROVIDER_PAYOUT = 1
+    REVENUE_PAYOUT = 2
+
     DoctorPayout = Order.DOCTOR_PRODUCT_ID
     LabPayout = Order.LAB_PRODUCT_ID
     InsurancePremium = Order.INSURANCE_PRODUCT_ID
@@ -2356,8 +2359,9 @@ class MerchantPayout(TimeStampedModel):
     IFT = "IFT"
     INTRABANK_IDENTIFIER = "KKBK"
     STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (INPROCESS, 'In Process'), (FAILED_FROM_QUEUE, 'Failed from Queue'), (FAILED_FROM_DETAIL, 'Failed from Detail'), (ARCHIVE, 'Archive')]
-    PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
+    PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
+    PAYOUT_TYPE_CHOICES = [(PROVIDER_PAYOUT, 'Provider Payout'), (REVENUE_PAYOUT, 'Revenue Payout')]
 
     payment_mode = models.CharField(max_length=100, blank=True, null=True, choices=PAYMENT_MODE_CHOICES)
     payout_ref_id = models.IntegerField(null=True, unique=True)
@@ -2382,6 +2386,7 @@ class MerchantPayout(TimeStampedModel):
     tds_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     recreated_from = models.ForeignKey('self', on_delete=models.DO_NOTHING, null=True, blank=True)
     remarks = models.TextField(max_length=100, null=True, blank=True)
+    payout_type = models.PositiveIntegerField(default=None, choices=PAYOUT_TYPE_CHOICES, null=True, blank=True)
 
     def save(self, *args, **kwargs):
 
@@ -2389,50 +2394,61 @@ class MerchantPayout(TimeStampedModel):
         if not self.id:
             first_instance = True
 
-        if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and (self.status==self.PENDING or self.status==self.ATTEMPTED) and self.type==self.AUTOMATIC:
-            self.type = self.AUTOMATIC
-            self.update_billed_to_content_type()
-            # if not self.content_object:
-            #     self.content_object = self.get_billed_to()
-            # if not self.paid_to:
-            #     self.paid_to = self.get_merchant()
+        if self.payout_type == self.PROVIDER_PAYOUT or self.payout_type is None:
+            if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and (self.status==self.PENDING or self.status==self.ATTEMPTED) and self.type==self.AUTOMATIC:
+                self.type = self.AUTOMATIC
+                self.update_billed_to_content_type()
+                # if not self.content_object:
+                #     self.content_object = self.get_billed_to()
+                # if not self.paid_to:
+                #     self.paid_to = self.get_merchant()
 
-            try:
-                has_txn, order_data, appointment = self.has_transaction()
-                if has_txn:
-                    # # Moved this to process payout
-                    # if self.status == self.PENDING:
-                    #     self.status = self.ATTEMPTED
-                    transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
-                else:
-                    transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,), countdown=5))
-            except Exception as e:
-                logger.error(str(e))
+                try:
+                    has_txn, order_data, appointment = self.has_transaction()
+                    if has_txn:
+                        # # Moved this to process payout
+                        # if self.status == self.PENDING:
+                        #     self.status = self.ATTEMPTED
+                        transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+                    else:
+                        transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,), countdown=5))
+                except Exception as e:
+                    logger.error(str(e))
 
-        if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
-            self.status = self.PAID
+            if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
+                self.status = self.PAID
 
-        if self.utr_no and self.booking_type == self.InsurancePremium and self.paid_to != Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first():
-            self.create_insurance_transaction()
+            if self.utr_no and self.booking_type == self.InsurancePremium and self.paid_to != Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first():
+                self.create_insurance_transaction()
 
-        if (not first_instance and self.status != self.PENDING) and not self.booking_type == self.InsurancePremium:
-            from ondoc.matrix.tasks import push_appointment_to_matrix
+            if (not first_instance and self.status != self.PENDING) and not self.booking_type == self.InsurancePremium:
+                from ondoc.matrix.tasks import push_appointment_to_matrix
 
-            appointment = self.get_corrosponding_appointment()
+                appointment = self.get_corrosponding_appointment()
 
-            if appointment and appointment.__class__.__name__ == 'LabAppointment':
-                transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
-                                                                                       'sub_product_id': 2},), countdown=15))
-            elif appointment and appointment.__class__.__name__ == 'OpdAppointment':
-                transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
-                                                                                       'sub_product_id': 2},), countdown=15))
+                if appointment and appointment.__class__.__name__ == 'LabAppointment':
+                    transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
+                                                                                           'sub_product_id': 2},), countdown=15))
+                elif appointment and appointment.__class__.__name__ == 'OpdAppointment':
+                    transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
+                                                                                           'sub_product_id': 2},), countdown=15))
+        else:
+            if self.id and hasattr(self, 'process_payout') and self.process_payout and (self.status == self.PENDING or self.status == self.ATTEMPTED):
+                revenue_payout = RevenuePayoutMapping.objects.filter(revenue_payout_id=self.id).first()
+                provider_payout = revenue_payout.provider_payout
+                try:
+                    has_txn, order_data, appointment = provider_payout.has_transaction()
+                    if has_txn:
+                        transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+                except Exception as e:
+                    logger.error(str(e))
 
         super().save(*args, **kwargs)
 
         if first_instance:
             MerchantPayout.objects.filter(id=self.id).update(payout_ref_id=self.id)
 
-    # @classmethod
+    # # @classmethod
     # def creating_pending_insurance_transactions(cls):
     #     pending = cls.objects.filter(booking_type=cls.InsurancePremium, utr_no__isnull=False)
     #     for p in pending:
@@ -2484,12 +2500,12 @@ class MerchantPayout(TimeStampedModel):
             counter = 0
 
             for payout in all_payouts:
-                for transfer in transfers: 
+                for transfer in transfers:
                     if not hasattr(payout,'_removed'):
                         payout._removed = False
                     if not hasattr(transfer,'_removed'):
                         transfer._removed = False
-                   
+
                     if not payout._removed and not transfer._removed and payout.payable_amount == transfer.amount:
                         transfer._removed = True
                         payout._removed = True
@@ -2561,12 +2577,18 @@ class MerchantPayout(TimeStampedModel):
 
     # Get appointment from payout
     def get_appointment(self):
-        if self.lab_appointment.all():
-            return self.lab_appointment.all()[0]
-        elif self.opd_appointment.all():
-            return self.opd_appointment.all()[0]
-        elif self.user_insurance.all():
-            return self.user_insurance.all()[0]
+        if self.payout_type == self.REVENUE_PAYOUT:
+            revenue_payout = RevenuePayoutMapping.objects.filter(revenue_payout_id=self.id).first()
+            provider_payout = revenue_payout.provider_payout
+        else:
+            provider_payout = self
+
+        if provider_payout.lab_appointment.all():
+            return provider_payout.lab_appointment.all()[0]
+        elif provider_payout.opd_appointment.all():
+            return provider_payout.opd_appointment.all()[0]
+        elif provider_payout.user_insurance.all():
+            return provider_payout.user_insurance.all()[0]
         return None
 
     # Check if amount need to transfer to different nodal
@@ -2945,6 +2967,10 @@ class MerchantPayout(TimeStampedModel):
             new_obj.charged_amount = self.charged_amount
             new_obj.booking_type = self.booking_type
             new_obj.tds_amount = self.tds_amount
+            new_obj.payout_type = self.payout_type
+            if self.payout_type == self.REVENUE_PAYOUT:
+                new_obj.paid_to_id = self.paid_to_id
+
             if self.booking_type == self.InsurancePremium:
                 new_obj.content_type_id = self.content_type_id
                 new_obj.object_id = self.object_id
@@ -2956,7 +2982,8 @@ class MerchantPayout(TimeStampedModel):
             if appointment:
                 new_obj.save()
                 MerchantPayout.objects.filter(id=self.id).update(status=self.ARCHIVE)
-                appointment.update_payout_id(new_obj.id)
+                if self.payout_type == self.PROVIDER_PAYOUT:
+                    appointment.update_payout_id(new_obj.id)
                 print('New payout created for ' + str(self.id))
 
     # Update merchant and billing amount when changed
@@ -3064,11 +3091,40 @@ class MerchantPayout(TimeStampedModel):
                     appointment_payout.transfer_revenue_to_current_account(lab_appointment)
 
     def transfer_revenue_to_current_account(self, appointment):
-        revenue = appointment.get_revenue()
+        try:
+            revenue = appointment.get_revenue()
+            if revenue > 0:
+                # Adding new revenue payout
+                self.generate_revenue_payout(appointment, revenue)
+            else:
+                appointment.update_appointment_revenue_transferred()
+        except Exception as e:
+            print(e)
+            pass
 
+    def generate_revenue_payout(self, appointment, revenue):
+        payout = MerchantPayout(paid_to_id=settings.DOCPRIME_CURRENT_AC_MERCHANT, charged_amount=0.0, payable_amount=revenue,
+                                booking_type=self.booking_type, payout_type=self.REVENUE_PAYOUT)
+        payout.save()
+        # Add revenue mapping
+        rpm = RevenuePayoutMapping(provider_payout=self, content_object=appointment, revenue_payout=payout)
+        rpm.save()
+
+        appointment.update_appointment_revenue_transferred()
 
     class Meta:
         db_table = "merchant_payout"
+
+
+class RevenuePayoutMapping(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+    provider_payout = models.ForeignKey(MerchantPayout, on_delete=models.SET_NULL, null=True, related_name='provider_payout')
+    revenue_payout = models.ForeignKey(MerchantPayout, on_delete=models.SET_NULL, null=True, related_name='revenue_payout')
+
+    class Meta:
+        db_table = "revenue_payout_mapping"
 
 
 class PayoutMapping(TimeStampedModel):
