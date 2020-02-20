@@ -583,7 +583,8 @@ def single_booking_payment_details(request, orders):
     order_ids = list(map(lambda x: x['orderId'], orders_list))
     args = {'user_id': user.id, 'order_ids': order_ids, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    if settings.SAVE_LOGS:
+        save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     pgdata['items'] = orders_list
     return pgdata, payment_required
 
@@ -760,7 +761,8 @@ def payment_details(request, order):
 
     args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    if settings.SAVE_LOGS:
+        save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     # print(pgdata)
     return pgdata, payment_required
 

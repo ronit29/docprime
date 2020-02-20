@@ -402,7 +402,8 @@ def push_appointment_to_matrix(self, data):
             qs = LabAppointment.objects.filter(id=appointment.id)
             obj_type = 'lab_appointment'
 
-        save_matrix_logs.apply_async((qs.first().id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((qs.first().id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1513,8 +1514,8 @@ def create_prescription_lead_to_matrix(self, data):
         matrix_api_token = settings.MATRIX_API_TOKEN
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
-
-        save_matrix_logs.apply_async((appointment.id, 'lab_appointment', request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((appointment.id, 'lab_appointment', request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info(json.dumps(request_data))
             logger.info("[ERROR] Appointment Prescription could not be published to the matrix system")

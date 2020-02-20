@@ -58,7 +58,8 @@ class AbstractLead(ABC):
         return status_code, resp_data
 
     def log_responses(self, request_data: dict, response_data: dict, *args, **kwargs):
-        save_matrix_logs.apply_async((self.obj.id, self.obj_type, request_data, response_data), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((self.obj.id, self.obj_type, request_data, response_data), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
     def process_lead(self, *args, **kwargs) -> bool:
         try:

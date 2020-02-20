@@ -270,8 +270,10 @@ class ChatOrderViewSet(viewsets.GenericViewSet):
         if user and user.is_anonymous:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
-        save_pg_response.apply_async((PgLogs.CHAT_ORDER_REQUEST, None, None, None, request.data, user.id),
-                                     eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+
+            save_pg_response.apply_async((PgLogs.CHAT_ORDER_REQUEST, None, None, None, request.data, user.id),
+                                         eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
         details = data.get('details', {})
         plan_id = data.get('plan_id')
@@ -374,8 +376,9 @@ class ChatConsultationViewSet(viewsets.GenericViewSet):
         order = user.orders.filter(reference_id=consultation.id).first()
         order_id = order.id if order else None
 
-        save_pg_response.apply_async((PgLogs.CHAT_CONSULTATION_CANCEL, order_id, None, None, request.data, user.id),
-                                     eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_pg_response.apply_async((PgLogs.CHAT_CONSULTATION_CANCEL, order_id, None, None, request.data, user.id),
+                                         eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if consultation.status != ChatConsultation.CANCELLED:
             refund_flag = 1
