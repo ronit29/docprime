@@ -1534,3 +1534,92 @@ def create_prescription_lead_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment Prescription lead to matrix- " + str(e))
+
+
+def send_report_review_data_to_chat(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.notification.tasks import save_matrix_logs
+    try:
+        appointment_id = data.get('appointment_id', None)
+        if not appointment_id:
+            raise Exception("Appointment id not found, could not push prescription lead to Matrix")
+
+        appointment = LabAppointment.objects.filter(id=appointment_id).first()
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        profile = appointment.profile
+        lab_tests = appointment.tests.all()
+        test_data = []
+        for test in lab_tests:
+            test_details = {
+                "test_id": test.id,
+                "mrp": "00.00",
+                "test": {
+                    "id": test.id,
+                    "name": test.name,
+                    "pre_test_info": test.pre_test_info,
+                    "why": test.why,
+                    "show_details": test.show_details,
+                    "url": test.url
+                },
+                "agreed_price": 0.0,
+                "deal_price": 0.0,
+                "test_type": test.test_type,
+                "is_home_collection_enabled": False
+            }
+
+            test_data.append(test_details)
+
+        request_data = {
+            "id": appointment.id,
+            "profile": {
+                "id": profile.id,
+                "name": profile.name,
+                "email": profile.email,
+                "gender": profile.gender,
+                "phone_number": profile.phone_number,
+                "is_otp_verified": profile.is_otp_verified,
+                "is_default_user": profile.is_default_user,
+                "profile_image": None,
+                "age": 54,
+                "user": appointment.user.id,
+                "dob": profile.dob,
+                "is_insured": False,
+                "updated_at": profile.updated_at,
+                "whatsapp_optin": profile.whatsapp_optin,
+                "whatsapp_is_declined": profile.whatsapp_is_declined,
+                "insurance_status": 0,
+                "is_vip_member": False,
+                "is_vip_gold_member": False
+            },
+            "lab_test": test_data,
+            "reports": appointment.get_report_urls(),
+            "report_files": appointment.get_report_type()
+        }
+
+        url = settings.CHAT_LAB_REPORT_API_URL
+        chat_lab_report_api_token = settings.CHAT_LAB_REPORT_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': chat_lab_report_api_token,
+                                                                              'Content-Type': 'application/json'})
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((appointment.id, 'lab_appointment', request_data, response.json()),
+                                         countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info(json.dumps(request_data))
+            logger.info("[ERROR] Chat Report Review Data Push Failed")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logger.error("Chat Report Review Data Push Failed  - " + str(response))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+        resp_data = response.json()
+        print(resp_data)
+
+        if not resp_data.get('Id', None):
+            return
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Appointment Prescription lead to matrix- " + str(e))
