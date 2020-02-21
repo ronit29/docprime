@@ -290,7 +290,12 @@ class CorporateGold(AbstractLead):
         super(CorporateGold, self).__init__(obj, None)
 
     def update_matrix_lead_id(self, response, *args, **kwargs):
-        pass
+        from ondoc.common.models import GeneralMatrixLeads
+        lead_id = response.get('Id')
+        if not lead_id:
+            raise Exception('Id not received from matrix')
+
+        GeneralMatrixLeads.objects.filter(id=self.obj.id).update(matrix_lead_id=lead_id)
 
     def prepare_lead_data(self, *args, **kwargs) -> Dict:
         obj = self.obj
