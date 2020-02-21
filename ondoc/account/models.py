@@ -2579,7 +2579,10 @@ class MerchantPayout(TimeStampedModel):
     def get_appointment(self):
         if self.payout_type == self.REVENUE_PAYOUT:
             revenue_payout = RevenuePayoutMapping.objects.filter(revenue_payout_id=self.id).first()
-            provider_payout = revenue_payout.provider_payout
+            if revenue_payout:
+                provider_payout = revenue_payout.provider_payout
+            else:
+                return None
         else:
             provider_payout = self
 
@@ -2982,8 +2985,10 @@ class MerchantPayout(TimeStampedModel):
             if appointment:
                 new_obj.save()
                 MerchantPayout.objects.filter(id=self.id).update(status=self.ARCHIVE)
-                if self.payout_type == self.PROVIDER_PAYOUT:
+                if self.payout_type == self.PROVIDER_PAYOUT or self.payout_type is None:
                     appointment.update_payout_id(new_obj.id)
+                if self.payout_type == self.REVENUE_PAYOUT:
+                    RevenuePayoutMapping.update_mapping(self.id, new_obj.id)
                 print('New payout created for ' + str(self.id))
 
     # Update merchant and billing amount when changed
@@ -3122,6 +3127,10 @@ class RevenuePayoutMapping(TimeStampedModel):
     content_object = GenericForeignKey()
     provider_payout = models.ForeignKey(MerchantPayout, on_delete=models.SET_NULL, null=True, related_name='provider_payout')
     revenue_payout = models.ForeignKey(MerchantPayout, on_delete=models.SET_NULL, null=True, related_name='revenue_payout')
+
+    @classmethod
+    def update_mapping(cls, payout_id, revenue_payout_id):
+        RevenuePayoutMapping.objects.filter(revenue_payout_id=payout_id).update(revenue_payout_id=revenue_payout_id)
 
     class Meta:
         db_table = "revenue_payout_mapping"
