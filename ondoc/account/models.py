@@ -2213,9 +2213,10 @@ class ConsumerRefund(TimeStampedModel):
                     # url = 'http://localhost:8000/api/v1/doctor/test'
                     print(url)
                     response = requests.post(url, data=json.dumps(req_data), headers=headers)
-                    save_pg_response.apply_async(
-                        (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(), req_data, req_data.get('user'),),
-                        eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                    if settings.SAVE_LOGS:
+                        save_pg_response.apply_async(
+                            (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(), req_data, req_data.get('user'),),
+                            eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                     if response.status_code == status.HTTP_200_OK:
                         resp_data = response.json()
                         if resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_SUCCESS_OK_STATUS:
@@ -2273,9 +2274,10 @@ class ConsumerRefund(TimeStampedModel):
             url_with_params = url + "?refId=" + str(requested_refund.id)
             json_url = '{"url": "%s"}' % url_with_params
             if order_id:
-                save_pg_response.apply_async(
-                    (PgLogsMongo.REQUESTED_REFUND_RESPONSE, order_id, requested_refund.pg_transaction_id, response.json(),
-                     json_url, requested_refund.user_id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                if settings.SAVE_LOGS:
+                    save_pg_response.apply_async(
+                        (PgLogsMongo.REQUESTED_REFUND_RESPONSE, order_id, requested_refund.pg_transaction_id, response.json(),
+                         json_url, requested_refund.user_id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 temp_data = resp_data.get("data")
@@ -2704,7 +2706,8 @@ class MerchantPayout(TimeStampedModel):
                 req_data[key] = str(req_data[key])
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogsMongo.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            if settings.SAVE_LOGS:
+                save_pg_response.apply_async((PgLogsMongo.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 #logger.error(resp_data)
@@ -2926,7 +2929,8 @@ class MerchantPayout(TimeStampedModel):
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 if order_id:
-                    save_pg_response.apply_async((PgLogsMongo.PAYOUT_SETTLEMENT_DETAIL, order_id, None, response.json(), req_data, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                    if settings.SAVE_LOGS:
+                        save_pg_response.apply_async((PgLogsMongo.PAYOUT_SETTLEMENT_DETAIL, order_id, None, response.json(), req_data, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     self.status_api_response = resp_data

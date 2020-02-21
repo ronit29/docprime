@@ -583,7 +583,8 @@ def single_booking_payment_details(request, orders):
     order_ids = list(map(lambda x: x['orderId'], orders_list))
     args = {'user_id': user.id, 'order_ids': order_ids, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    if settings.SAVE_LOGS:
+        save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     pgdata['items'] = orders_list
     return pgdata, payment_required
 
@@ -735,6 +736,23 @@ def payment_details(request, order):
     if plus_merchant_code:
         pgdata['insurerCode'] = plus_merchant_code
 
+    plus_user = user.active_plus_user
+    is_partial_vip_enabled = False
+    vip_order_transaction = None
+    parent_product_id = None
+    if plus_user and plus_user.order:
+        transactions = plus_user.order.getTransactions()
+        parent_product_id = order.CORP_VIP_PRODUCT_ID if plus_user.plan.is_corporate else order.VIP_PRODUCT_ID
+        for ord in order.orders.all():
+            from ondoc.doctor.models import OpdAppointment
+            if ord.action_data and ord.action_data.get('payment_type') == OpdAppointment.VIP and transactions:
+                vip_order_transaction = transactions[0]
+                is_partial_vip_enabled = True
+        if is_partial_vip_enabled and transactions and vip_order_transaction and parent_product_id:
+            pgdata['refOrderId'] = str(vip_order_transaction.order_id)
+            pgdata['refOrderNo'] = str(vip_order_transaction.order_no)
+            pgdata['parentProductId'] = str(parent_product_id)
+
     secret_key, client_key = get_pg_secret_client_key(order)
     filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}
     pgdata.clear()
@@ -743,7 +761,8 @@ def payment_details(request, order):
 
     args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    if settings.SAVE_LOGS:
+        save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     # print(pgdata)
     return pgdata, payment_required
 

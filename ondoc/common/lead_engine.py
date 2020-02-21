@@ -58,7 +58,8 @@ class AbstractLead(ABC):
         return status_code, resp_data
 
     def log_responses(self, request_data: dict, response_data: dict, *args, **kwargs):
-        save_matrix_logs.apply_async((self.obj.id, self.obj_type, request_data, response_data), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((self.obj.id, self.obj_type, request_data, response_data), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
     def process_lead(self, *args, **kwargs) -> bool:
         try:
@@ -106,6 +107,7 @@ class DropOff(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),
@@ -147,6 +149,7 @@ class Medicine(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "PaymentStatus": 0,
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "IPDIsInsured": 1 if user and user.active_insurance and user.active_insurance.is_valid() else 0,
@@ -183,6 +186,7 @@ class LabAds(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),
@@ -224,6 +228,7 @@ class DocAds(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),

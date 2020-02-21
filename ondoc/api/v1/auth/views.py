@@ -26,7 +26,7 @@ from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, 
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
-from ondoc.plus.models import PlusAppointmentMapping, PlusUser, PlusPlans, PlusDummyData
+from ondoc.plus.models import PlusAppointmentMapping, PlusUser, PlusPlans, PlusDummyData, PlusMembers
 from ondoc.plus.usage_criteria import get_price_reference, get_class_reference
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
@@ -369,7 +369,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         qs = self.get_queryset()
 
         serializer = [serializers.UserProfileSerializer(q, context= {'request':request}).data for q in qs]
-        return Response(data=serializer)
+        result = list()
+        result.extend(list(filter(lambda x: (x['is_default_user'] and x['is_vip_gold_member']) or x['is_default_user'], serializer)))
+        result.extend(list(filter(lambda x: x['is_vip_gold_member'] and not x['is_default_user'], serializer)))
+        result.extend(list(filter(lambda x: not x['is_default_user'] and not x['is_vip_gold_member'], serializer)))
+
+        return Response(data=result)
 
     def create(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -382,6 +387,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data['whatsapp_optin'] = request.data.get('whatsapp_optin')
         data['user'] = request.user.id
         first_profile = False
+        add_to_gold_members = request.data.get('add_to_gold')
 
         if not queryset.exists():
             data.update({
@@ -410,6 +416,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
+
+        if add_to_gold_members:
+            default_profile = request.user.get_default_profile()
+            if default_profile.email and not data.get('email'):
+                data['email'] = default_profile.email
+
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
         serializer.validated_data
@@ -420,7 +432,14 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             #                        }
             # }, status=status.HTTP_400_BAD_REQUEST)
             return Response(serializer.data)
+
+
         serializer.save()
+
+        if add_to_gold_members:
+            saved_profile = request.user.profiles.filter().order_by('-created_at').first()
+            request.user.active_plus_user.add_user_profile_to_members(saved_profile)
+
         # for new profile credit referral amount if any refrral code is used
         if first_profile and request.data.get('referral_code'):
             try:
@@ -440,6 +459,24 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
+
+        add_to_gold_members = data.get('add_to_gold')
+        if add_to_gold_members:
+            default_profile = request.user.get_default_profile()
+            if default_profile.email and not data.get('email'):
+                data['email'] = default_profile.email
+
+        plus_user_obj = request.user.active_plus_user
+        associated_plus_member = None
+        if plus_user_obj:
+            associated_plus_member = PlusMembers.objects.filter(plus_user=plus_user_obj, profile=obj).first()
+
+        if associated_plus_member and data.get('name') and data.get('name') != obj.name:
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Profile covered in the gold cannot edit their name."
+                                   }
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
             return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
@@ -503,6 +540,11 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                        }
                 }, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
+
+        if add_to_gold_members:
+            saved_profile = request.user.profiles.filter().order_by('-updated_at').first()
+            request.user.active_plus_user.add_user_profile_to_members(saved_profile)
+
         return Response(serializer.data)
 
     def upload(self, request, *args, **kwargs):
@@ -1427,9 +1469,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
             args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code, 'source': response.get("source")}
             status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
             # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-            save_pg_response.apply_async(
-                (mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')),
-                eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            if settings.SAVE_LOGS:
+                save_pg_response.apply_async(
+                    (mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')),
+                    eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
         except Exception as e:
             logger.error("Cannot log pg response - " + str(e))
@@ -1465,7 +1508,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
                             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
                             log_created_at = str(datetime.datetime.now())
-                            save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                            if settings.SAVE_LOGS:
+                                save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                         return CHAT_REDIRECT_URL
                     else:
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
@@ -1599,9 +1643,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         if order_obj.product_id == Order.CHAT_PRODUCT_ID:
             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
             log_created_at = str(datetime.datetime.now())
-            save_pg_response.apply_async(
-                (mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
-                eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            if settings.SAVE_LOGS:
+                save_pg_response.apply_async(
+                    (mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
+                    eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             return CHAT_REDIRECT_URL
         return REDIRECT_URL
 
@@ -1654,7 +1699,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
                     # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                    save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, order_id, None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                    if settings.SAVE_LOGS:
+                        save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, order_id, None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                     save_payment_status.apply_async((status_type, args), eta=timezone.localtime(),)
                 except Exception as e:
                     logger.error("Cannot log pg response - " + str(e))

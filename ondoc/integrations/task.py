@@ -156,7 +156,8 @@ def push_appointment_to_spo(self, data):
 
             countdown_time = (2 ** self.request.retries) * 60 * 10
             self.retry([data], countdown=countdown_time)
-            SalesPointLog.create_spo_logs(appointment, request_data, response)
+            if settings.SAVE_LOGS:
+                SalesPointLog.create_spo_logs(appointment, request_data, response)
         else:
             resp_data = response.json()
             resp_data = resp_data['data']
@@ -172,7 +173,8 @@ def push_appointment_to_spo(self, data):
                     if qs:
                         qs.update(spo_lead_id=int(lead_id))
 
-            SalesPointLog.create_spo_logs(appointment, request_data, resp_data)
+            if settings.SAVE_LOGS:
+                SalesPointLog.create_spo_logs(appointment, request_data, resp_data)
         # logger.error("[NO_SUCCESS-SPO] Lead ID")
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))
