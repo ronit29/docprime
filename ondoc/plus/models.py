@@ -1150,7 +1150,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             care_obj.is_active = False
             care_obj.save()
 
-        self.action_refund()
+        if not self.plan.is_corporate:
+            self.action_refund()
 
         # Cancel all the appointments which are created using the plus membership.
 
