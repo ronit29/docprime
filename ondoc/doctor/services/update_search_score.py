@@ -196,7 +196,7 @@ class DoctorSearchScore:
 
     def get_doctor_ratings_count(self, doctor):
         ratings_count = self.scoring_data.get('ratings_count')
-        if doctor.rating_data and doctor.rating_data.get('rating_count'):
+        if ratings_count and doctor.rating_data and doctor.rating_data.get('rating_count'):
             for score in ratings_count:
                 if doctor.rating_data.get('rating_count') >= 15 and not score.get('max'):
                     return {'ratings_count': score.get('score')}
@@ -259,7 +259,7 @@ class DoctorSearchScore:
         final_score = kwargs['years_of_experience_score'] * final_score_list['years_of_experience'] + \
                       kwargs['doctors_in_clinic_score'] * final_score_list['doctors_in_clinic'] +\
                       kwargs['avg_ratings_score'] * final_score_list['avg_rating'] + \
-                      kwargs['ratings_count_score'] * final_score_list['ratings_count'] + \
+                      kwargs['ratings_count_score'] * final_score_list['rating_count'] + \
                         kwargs['discount'] * final_score_list['discount'] + kwargs['partner_app_activity_score'] * final_score_list['partner_app_activity']
 
         if doctor.priority_score:
