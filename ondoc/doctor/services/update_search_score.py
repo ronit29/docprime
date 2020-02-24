@@ -190,7 +190,7 @@ class DoctorSearchScore:
                     if doctor.avg_rating and doctor.avg_rating >= 4 and not score.get('max'):
                         return {'avg_ratings_score': score.get('score')}
 
-                    elif google_rating >= score.get('min') and google_rating < score.get('max'):
+                    elif score.get('min') and score.get('max') and google_rating >= score.get('min') and google_rating < score.get('max'):
                         return {'avg_ratings_score': score.get('score')}
             return {'avg_ratings_score': 0}
 
