@@ -1536,6 +1536,7 @@ def create_prescription_lead_to_matrix(self, data):
         logger.error("Error in Celery. Failed pushing Appointment Prescription lead to matrix- " + str(e))
 
 
+@task(bind=True, max_retries=1)
 def send_report_review_data_to_chat(self, data):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.notification.tasks import save_matrix_logs
@@ -1584,9 +1585,9 @@ def send_report_review_data_to_chat(self, data):
                 "profile_image": None,
                 "age": 54,
                 "user": appointment.user.id,
-                "dob": profile.dob,
+                "dob": str(profile.dob),
                 "is_insured": False,
-                "updated_at": profile.updated_at,
+                "updated_at": str(profile.updated_at),
                 "whatsapp_optin": profile.whatsapp_optin,
                 "whatsapp_is_declined": profile.whatsapp_is_declined,
                 "insurance_status": 0,
@@ -1608,7 +1609,7 @@ def send_report_review_data_to_chat(self, data):
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info(json.dumps(request_data))
             logger.info("[ERROR] Chat Report Review Data Push Failed")
-            logger.info("[ERROR] %s", response.reason)
+            logger.info("[ERROR] %s", response)
 
             countdown_time = (2 ** self.request.retries) * 60 * 10
             logger.error("Chat Report Review Data Push Failed  - " + str(response))
@@ -1618,8 +1619,8 @@ def send_report_review_data_to_chat(self, data):
         resp_data = response.json()
         print(resp_data)
 
-        if not resp_data.get('Id', None):
-            return
+        if resp_data.get('message', '') == 'Success':
+            print('Data Pushed to Chat.')
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment Prescription lead to matrix- " + str(e))
