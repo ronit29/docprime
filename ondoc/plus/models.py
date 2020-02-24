@@ -151,12 +151,14 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     corporate_upper_limit_criteria = models.CharField(max_length=100, null=True, blank=True, choices=PriceCriteria.as_choices())
     corporate_doctor_upper_limit = models.PositiveIntegerField(null=True, blank=True)
     corporate_lab_upper_limit = models.PositiveIntegerField(null=True, blank=True)
+    is_prescription_required = models.NullBooleanField()
+    priority = models.PositiveIntegerField(default=0)
 
     # Some plans are only applicable when utm params are passed. Like some plans are to be targeted with media
     # campaigns, emails or adwords etc.
     @classmethod
     def get_active_plans_via_utm(cls, utm):
-        qs = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True)
+        qs = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True).order_by('priority')
         if not qs:
             return []
 
