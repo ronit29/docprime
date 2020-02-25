@@ -47,7 +47,10 @@ class AbstractCriteria(object):
         cost = floor(cost)
         return cost
 
-    def discounted_cost(self, discount, cost):
+    def discounted_cost(self, discount, cost, max_discount):
+        normal_discount_amount = (cost / 100) * discount
+        if max_discount and max_discount > 0 and normal_discount_amount > max_discount:
+            return max_discount
         return (cost / 100) * discount
 
 
@@ -176,8 +179,9 @@ class DoctorCountDiscount(AbstractCriteria):
             return resp
 
         doctor_discount = vip_utilization.get('doctor_discount')
+        max_discount = vip_utilization.get('doctor_max_discounted_amount')
 
-        discounted_cost = self.discounted_cost(doctor_discount, cost)
+        discounted_cost = self.discounted_cost(doctor_discount, cost, max_discount)
         after_discounted_cost = cost - discounted_cost
         vip_amount_deducted = discounted_cost
         amount_to_be_paid = after_discounted_cost
@@ -209,8 +213,9 @@ class DoctorAmountDiscount(AbstractCriteria):
             return resp
 
         doctor_discount = vip_utilization.get('doctor_discount')
+        max_discount = vip_utilization.get('doctor_max_discounted_amount')
 
-        discounted_cost = self.discounted_cost(doctor_discount, cost)
+        discounted_cost = self.discounted_cost(doctor_discount, cost, max_discount)
         after_discounted_cost = cost - discounted_cost
 
         if discounted_cost <= available_amount:
@@ -327,9 +332,10 @@ class LabtestCountDiscount(AbstractCriteria):
 
         available_labtest_count = vip_utilization.get('available_labtest_count')
         lab_test_discount = vip_utilization.get('lab_discount')
+        max_discount = vip_utilization.get('lab_max_discounted_amount')
 
         if available_labtest_count > 0:
-            discounted_cost = self.discounted_cost(lab_test_discount, cost)
+            discounted_cost = self.discounted_cost(lab_test_discount, cost, max_discount)
             vip_amount_deducted = discounted_cost
             amount_to_be_paid = cost - discounted_cost
             is_covered = True
@@ -358,8 +364,9 @@ class LabtestAmountDiscount(AbstractCriteria):
             return resp
 
         lab_test_discount = vip_utilization.get('lab_discount')
+        max_discount = vip_utilization.get('lab_max_discounted_amount')
 
-        discounted_cost = self.discounted_cost(lab_test_discount, cost)
+        discounted_cost = self.discounted_cost(lab_test_discount, cost, max_discount)
         after_discounted_cost =cost - discounted_cost
 
         if discounted_cost <= available_amount:
@@ -485,6 +492,7 @@ class PackageCountDiscount(AbstractCriteria):
         available_package_discount = vip_utilization.get('package_discount')
         available_package_count = vip_utilization.get('available_package_count')
         allowed_package_ids = vip_utilization.get('allowed_package_ids')
+        max_discount = vip_utilization.get('package_max_discounted_amount')
 
         if not available_package_count or not available_package_discount:
             return resp
@@ -492,7 +500,7 @@ class PackageCountDiscount(AbstractCriteria):
         if available_package_count > 0:
             if allowed_package_ids:
                 if id in allowed_package_ids:
-                    discounted_cost = self.discounted_cost(available_package_discount, cost)
+                    discounted_cost = self.discounted_cost(available_package_discount, cost, max_discount)
                     vip_amount_deducted = discounted_cost
                     amount_to_be_paid = cost - discounted_cost
                     is_covered = True
@@ -500,7 +508,7 @@ class PackageCountDiscount(AbstractCriteria):
                 else:
                     return resp
             else:
-                discounted_cost = self.discounted_cost(available_package_discount, cost)
+                discounted_cost = self.discounted_cost(available_package_discount, cost, max_discount)
                 vip_amount_deducted = discounted_cost
                 amount_to_be_paid = cost - discounted_cost
                 is_covered = True
@@ -529,8 +537,9 @@ class PackageAmountDiscount(AbstractCriteria):
             return resp
 
         package_discount = vip_utilization.get('package_discount')
+        max_discount = vip_utilization.get('package_max_discounted_amount')
 
-        discounted_cost = self.discounted_cost(package_discount, cost)
+        discounted_cost = self.discounted_cost(package_discount, cost, max_discount)
         after_discounted_cost = cost - discounted_cost
 
         if discounted_cost <= available_amount:
@@ -761,8 +770,9 @@ class PackageTotalWorthWithDiscount(AbstractCriteria):
             return resp
 
         package_discount = vip_utilization.get('package_discount')
+        max_discount = vip_utilization.get('package_max_discounted_amount')
 
-        discounted_cost = self.discounted_cost(package_discount, cost)
+        discounted_cost = self.discounted_cost(package_discount, cost, max_discount)
         after_discounted_cost = cost - discounted_cost
 
         if allowed_package_ids:
@@ -823,8 +833,9 @@ class DoctorTotalWorthWithDiscount(AbstractCriteria):
             return resp
 
         doctor_discount = vip_utilization.get('doctor_discount')
+        max_discount = vip_utilization.get('doctor_max_discounted_amount')
 
-        discounted_cost = self.discounted_cost(doctor_discount, cost)
+        discounted_cost = self.discounted_cost(doctor_discount, cost, max_discount)
         after_discounted_cost = cost - discounted_cost
 
         if plan.is_corporate:
@@ -901,8 +912,9 @@ class LabtestTotalWorthWithDiscount(AbstractCriteria):
             return resp
 
         lab_test_discount = vip_utilization.get('lab_discount')
+        max_discount = vip_utilization.get('lab_max_discounted_amount')
 
-        discounted_cost = self.discounted_cost(lab_test_discount, cost)
+        discounted_cost = self.discounted_cost(lab_test_discount, cost, max_discount)
         after_discounted_cost = cost - discounted_cost
 
         if discounted_cost <= available_amount:

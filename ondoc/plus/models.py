@@ -603,7 +603,10 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                                                                                PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT,
                                                                                PlanParametersEnum.DOCTOR_CONSULT_COUNT,
                                                                                PlanParametersEnum.TOTAL_WORTH,
-                                                                               PlanParametersEnum.PACKAGES_COVERED])
+                                                                               PlanParametersEnum.PACKAGES_COVERED,
+                                                                               PlanParametersEnum.DOCTOR_MAX_DISCOUNTED_AMOUNT,
+                                                                               PlanParametersEnum.LAB_MAX_DISCOUNTED_AMOUNT,
+                                                                               PlanParametersEnum.PACKAGE_MAX_DISCOUNTED_AMOUNT])
 
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
@@ -635,6 +638,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         resp['total_worth_utilized'] = self.get_total_worth_utilized()
         resp['available_total_worth'] = int(resp['total_worth']) - int(resp['total_worth_utilized'])
         resp['is_package_cover'] = True if data.get('packages_covered') and data.get('packages_covered').__class__.__name__ == 'str' else False
+        resp['doctor_max_discounted_amount'] = data.get('doctor_max_discounted_amount') if data.get('doctor_max_discounted_amount') and data.get('doctor_max_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['lab_max_discounted_amount'] = data.get('lab_max_discounted_amount') if data.get('lab_max_discounted_amount') and data.get('lab_max_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['package_max_discounted_amount'] = data.get('package_max_discounted_amount') if data.get('package_max_discounted_amount') and data.get('package_max_discounted_amount').__class__.__name__ == 'str' else 0
 
         return resp
 
