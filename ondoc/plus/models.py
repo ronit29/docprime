@@ -152,7 +152,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     corporate_doctor_upper_limit = models.PositiveIntegerField(null=True, blank=True)
     corporate_lab_upper_limit = models.PositiveIntegerField(null=True, blank=True)
     is_prescription_required = models.NullBooleanField()
-    priority = models.PositiveIntegerField(default=0)
+    priority = models.PositiveIntegerField(default=0, null=True, blank=True)
 
     # Some plans are only applicable when utm params are passed. Like some plans are to be targeted with media
     # campaigns, emails or adwords etc.
