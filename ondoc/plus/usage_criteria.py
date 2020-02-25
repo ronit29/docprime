@@ -563,10 +563,11 @@ class PackageTotalWorth(AbstractCriteria):
         amount_to_be_paid = cost
         vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
 
-        available_package_amount = vip_utilization.get('available_package_amount')
+        available_package_amount = vip_utilization.get('available_total_worth')
         allowed_package_ids = vip_utilization.get('allowed_package_ids')
+        is_package_cover = vip_utilization.get('is_package_cover')
 
-        if not available_package_amount or available_package_amount <= 0:
+        if (not available_package_amount or available_package_amount <= 0) and not is_package_cover:
             return resp
 
         if allowed_package_ids:

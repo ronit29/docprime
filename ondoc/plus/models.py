@@ -602,7 +602,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                                                                                PlanParametersEnum.LABTEST_COUNT,
                                                                                PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT,
                                                                                PlanParametersEnum.DOCTOR_CONSULT_COUNT,
-                                                                               PlanParametersEnum.TOTAL_WORTH])
+                                                                               PlanParametersEnum.TOTAL_WORTH,
+                                                                               PlanParametersEnum.PACKAGES_COVERED])
 
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
@@ -633,6 +634,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         resp['total_worth'] = int(data['total_worth']) if data.get('total_worth') and data.get('total_worth').__class__.__name__ == 'str'  else 0
         resp['total_worth_utilized'] = self.get_total_worth_utilized()
         resp['available_total_worth'] = int(resp['total_worth']) - int(resp['total_worth_utilized'])
+        resp['is_package_cover'] = True if data.get('packages_covered') and data.get('packages_covered').__class__.__name__ == 'str' else False
 
         return resp
 
