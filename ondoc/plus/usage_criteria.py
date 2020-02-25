@@ -554,7 +554,8 @@ class PackageTotalWorth(AbstractCriteria):
         super().__init__(plus_obj)
 
     def _update_utilization(self, utilization, deducted_amount):
-        utilization['available_package_amount'] = utilization['available_package_amount'] - deducted_amount
+        # utilization['available_package_amount'] = utilization['available_package_amount'] - deducted_amount
+        utilization['available_total_worth'] = int(utilization['available_total_worth']) - int(deducted_amount)
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
@@ -737,24 +738,246 @@ class LabtestTotalWorth(AbstractCriteria):
         return resp
 
 
+class PackageTotalWorthWithDiscount(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _update_utilization(self, utilization, deducted_amount):
+        # utilization['available_package_amount'] = utilization['available_package_amount'] - deducted_amount
+        utilization['available_total_worth'] = int(utilization['available_total_worth']) - int(deducted_amount)
+
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
+        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
+        is_covered = False
+        vip_amount_deducted = 0
+        amount_to_be_paid = cost
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
+
+        available_amount = vip_utilization.get('available_total_worth')
+        allowed_package_ids = vip_utilization.get('allowed_package_ids')
+        is_package_cover = vip_utilization.get('is_package_cover')
+
+        if not available_amount or available_amount <= 0 or not is_package_cover:
+            return resp
+
+        package_discount = vip_utilization.get('package_discount')
+
+        discounted_cost = self.discounted_cost(package_discount, cost)
+        after_discounted_cost = cost - discounted_cost
+
+        if allowed_package_ids:
+            if id in allowed_package_ids:
+                if discounted_cost <= available_amount:
+                    vip_amount_deducted = discounted_cost
+                    amount_to_be_paid = after_discounted_cost
+                    is_covered = True
+                elif 0 < available_amount < discounted_cost:
+                    vip_amount_deducted = available_amount
+                    amount_to_be_paid = cost - available_amount
+                    is_covered = True
+            else:
+                return resp
+        else:
+            if discounted_cost <= available_amount:
+                vip_amount_deducted = discounted_cost
+                amount_to_be_paid = after_discounted_cost
+                is_covered = True
+            elif 0 < available_amount < discounted_cost:
+                vip_amount_deducted = available_amount
+                amount_to_be_paid = cost - available_amount
+                is_covered = True
+        resp['vip_amount_deducted'] = int(vip_amount_deducted)
+        resp['amount_to_be_paid'] = int(amount_to_be_paid)
+        resp['is_covered'] = is_covered
+
+        return resp
+
+
+class DoctorTotalWorthWithDiscount(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _update_utilization(self, utilization, deducted_amount):
+
+        utilization['available_total_worth'] = int(utilization['available_total_worth']) - int(deducted_amount)
+
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
+        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost, 'convenience_charge': 0}
+        is_covered = False
+        vip_amount_deducted = 0
+        amount_to_be_paid = cost
+
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
+        available_amount = vip_utilization.get('available_total_worth', 0)
+        mrp = kwargs.get('mrp', 0)
+        plan = self.plus_obj.plan
+        deal_price = int(kwargs.get('deal_price', 0))
+        price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
+        convenience_charge = kwargs.get('calculated_convenience_amount', 0) if kwargs.get(
+            'calculated_convenience_amount') else 0
+        total_cost = cost + convenience_charge
+        if plan.is_gold and total_cost >= deal_price:
+            return resp
+
+        if not available_amount or available_amount <= 0:
+            return resp
+
+        doctor_discount = vip_utilization.get('doctor_discount')
+
+        discounted_cost = self.discounted_cost(doctor_discount, cost)
+        after_discounted_cost = cost - discounted_cost
+
+        if plan.is_corporate:
+            corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "DOCTOR")
+            if not corporate_cost_engine:
+                return resp
+            cost = corporate_cost_engine.get_price(price_data)
+            upper_limit = int(plan.corporate_doctor_upper_limit)
+            if upper_limit < cost:
+                return resp
+            if discounted_cost <= available_amount:
+                vip_amount_deducted = discounted_cost
+                amount_to_be_paid = after_discounted_cost
+                is_covered = True
+            elif 0 < available_amount < discounted_cost:
+                vip_amount_deducted = available_amount
+                amount_to_be_paid = cost - available_amount
+                is_covered = True
+        else:
+            if not plan.is_gold:
+                if discounted_cost <= available_amount:
+                    vip_amount_deducted = discounted_cost
+                    amount_to_be_paid = after_discounted_cost
+                    is_covered = True
+                elif 0 < available_amount < discounted_cost:
+                    vip_amount_deducted = available_amount
+                    amount_to_be_paid = cost - available_amount
+                    is_covered = True
+            else:
+                difference_amount = int(mrp - cost)
+                if available_amount >= difference_amount:
+                    vip_amount_deducted = difference_amount
+                    amount_to_be_paid = cost
+                    is_covered = True
+                else:
+                    vip_amount_deducted = int(available_amount)
+                    amount_to_be_paid = cost + (int(difference_amount) - int(available_amount))
+                    is_covered = True
+
+        resp['vip_amount_deducted'] = vip_amount_deducted
+        resp['amount_to_be_paid'] = amount_to_be_paid
+        resp['is_covered'] = is_covered
+        resp['convenience_charge'] = convenience_charge
+        return resp
+
+
+class LabtestTotalWorthWithDiscount(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _update_utilization(self, utilization, deducted_amount):
+
+        utilization['available_total_worth'] = utilization['available_total_worth'] - deducted_amount
+
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
+        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
+        vip_amount_deducted = 0
+        cost = int(cost)
+        amount_to_be_paid = cost
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
+        available_amount = vip_utilization.get('available_total_worth')
+        mrp = kwargs.get('mrp', 0)
+        is_covered = False
+        plan = self.plus_obj.plan
+        deal_price = int(kwargs.get('deal_price', 0))
+        price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
+        convenience_charge = kwargs.get('calculated_convenience_amount', 0) if kwargs.get(
+            'calculated_convenience_amount') else 0
+        total_cost = cost + convenience_charge
+        if plan.is_gold and total_cost >= deal_price:
+            return resp
+
+        if not available_amount or available_amount <= 0:
+            return resp
+
+        lab_test_discount = vip_utilization.get('lab_discount')
+
+        discounted_cost = self.discounted_cost(lab_test_discount, cost)
+        after_discounted_cost = cost - discounted_cost
+
+        if discounted_cost <= available_amount:
+            vip_amount_deducted = discounted_cost
+            amount_to_be_paid = after_discounted_cost
+            is_covered = True
+        elif 0 < available_amount < discounted_cost:
+            vip_amount_deducted = available_amount
+            amount_to_be_paid = cost - available_amount
+            is_covered = True
+
+        is_covered = True
+        if plan.is_corporate:
+            corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "LABTEST")
+            if not corporate_cost_engine:
+                return resp
+            cost = corporate_cost_engine.get_price(price_data)
+            upper_limit = int(plan.corporate_lab_upper_limit)
+            if upper_limit < cost:
+                return resp
+            if discounted_cost <= available_amount:
+                vip_amount_deducted = discounted_cost
+                amount_to_be_paid = after_discounted_cost
+                is_covered = True
+            elif 0 < available_amount < discounted_cost:
+                vip_amount_deducted = available_amount
+                amount_to_be_paid = cost - available_amount
+                is_covered = True
+        else:
+            if not plan.is_gold:
+                if discounted_cost <= available_amount:
+                    vip_amount_deducted = discounted_cost
+                    amount_to_be_paid = after_discounted_cost
+                    is_covered = True
+                elif 0 < available_amount < discounted_cost:
+                    vip_amount_deducted = available_amount
+                    amount_to_be_paid = cost - available_amount
+                    is_covered = True
+            else:
+                difference_amount = mrp - cost
+                if difference_amount <= available_amount:
+                    vip_amount_deducted = difference_amount
+                    amount_to_be_paid = cost
+                elif 0 < available_amount < difference_amount:
+                    vip_amount_deducted = available_amount
+                    amount_to_be_paid = cost + (difference_amount - available_amount)
+
+        resp['vip_amount_deducted'] = int(vip_amount_deducted)
+        resp['amount_to_be_paid'] = int(amount_to_be_paid)
+        resp['is_covered'] = is_covered
+        resp['convenience_charge'] = convenience_charge
+        return resp
+
+
 usage_criteria_class_mapping = {
     'DOCTOR': {
         'AMOUNT_COUNT': DoctorAmountCount,
         'COUNT_DISCOUNT': DoctorCountDiscount,
         'AMOUNT_DISCOUNT': DoctorAmountDiscount,
-        'TOTAL_WORTH': DoctorTotalWorth
+        'TOTAL_WORTH': DoctorTotalWorth,
+        'TOTAL_WORTH_WITH_DISCOUNT': DoctorTotalWorthWithDiscount
     },
     'LABTEST': {
         'AMOUNT_COUNT': LabtestAmountCount,
         'COUNT_DISCOUNT': LabtestCountDiscount,
         'AMOUNT_DISCOUNT': LabtestAmountDiscount,
-        'TOTAL_WORTH': LabtestTotalWorth
+        'TOTAL_WORTH': LabtestTotalWorth,
+        'TOTAL_WORTH_WITH_DISCOUNT': LabtestTotalWorthWithDiscount
     },
     'PACKAGE': {
         'AMOUNT_COUNT': PackageAmountCount,
         'COUNT_DISCOUNT': PackageCountDiscount,
         'AMOUNT_DISCOUNT': PackageAmountDiscount,
-        'TOTAL_WORTH': PackageTotalWorth
+        'TOTAL_WORTH': PackageTotalWorth,
+        'TOTAL_WORTH_WITH_DISCOUNT': PackageTotalWorthWithDiscount
     }
 }
 
