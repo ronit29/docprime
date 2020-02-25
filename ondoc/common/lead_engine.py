@@ -58,7 +58,8 @@ class AbstractLead(ABC):
         return status_code, resp_data
 
     def log_responses(self, request_data: dict, response_data: dict, *args, **kwargs):
-        save_matrix_logs.apply_async((self.obj.id, self.obj_type, request_data, response_data), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((self.obj.id, self.obj_type, request_data, response_data), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
     def process_lead(self, *args, **kwargs) -> bool:
         try:
@@ -106,6 +107,7 @@ class DropOff(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),
@@ -147,6 +149,7 @@ class Medicine(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "PaymentStatus": 0,
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "IPDIsInsured": 1 if user and user.active_insurance and user.active_insurance.is_valid() else 0,
@@ -183,6 +186,7 @@ class LabAds(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),
@@ -224,6 +228,7 @@ class DocAds(AbstractLead):
 
         data = {
             "SubProductId": 0,
+            "AmountDiscount": request_data.get('amount_discount', 0),
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),
@@ -279,12 +284,49 @@ class CancelDropOffLeadViaAppointment(AbstractLead):
         return data
 
 
+class CorporateGold(AbstractLead):
+
+    def __init__(self, obj):
+        super(CorporateGold, self).__init__(obj, None)
+
+    def update_matrix_lead_id(self, response, *args, **kwargs):
+        from ondoc.common.models import GeneralMatrixLeads
+        lead_id = response.get('Id')
+        if not lead_id:
+            raise Exception('Id not received from matrix')
+
+        GeneralMatrixLeads.objects.filter(id=self.obj.id).update(matrix_lead_id=lead_id)
+
+    def prepare_lead_data(self, *args, **kwargs) -> Dict:
+        obj = self.obj
+        request_data = obj.request_body
+        user = obj.user if obj.user else None
+
+        data = {
+            "SubProductId": 0,
+            "LeadSource": request_data.get('lead_source'),
+            "ProductId": 15,
+            "UtmTerm": request_data.get('source', {}).get('utm_term', ''),
+            "PrimaryNo": request_data.get('phone_number') if not user else str(user.phone_number),
+            "UtmCampaign": request_data.get('source', {}).get('utm_campaign', ''),
+            "UTMMedium": request_data.get('source', {}).get('utm_medium', ''),
+            "Name": request_data.get('company_name', 'none'),
+            "SpocPerson": request_data.get('contact_person_name', 'none'),
+            "UtmSource": request_data.get('source', {}).get('utm_source', ''),
+            "EmailID": request_data.get('email', ''),
+            "NumberofDoctor": str(request_data.get('number_of_employees', '0'))
+        }
+
+        return data
+
+
 lead_class_mapping = {
     'MEDICINE': Medicine,
     'DROPOFF': DropOff,
     'LABADS': LabAds,
     'CANCELDROPOFFLEADVIAAPPOINTMENT': CancelDropOffLeadViaAppointment,
-    'DOCADS': DocAds
+    'DOCADS': DocAds,
+    'CORPORATEGOLD': CorporateGold
 }
 
 

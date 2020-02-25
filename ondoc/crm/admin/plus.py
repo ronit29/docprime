@@ -100,8 +100,8 @@ class PlusUserAdminForm(forms.ModelForm):
         if status:
             status = int(status)
 
-        if status == PlusUser.CANCELLED and self.instance.plan.is_corporate:
-            raise forms.ValidationError('Corporate Plus User can not be Cancelled.')
+        # if status == PlusUser.CANCELLED and self.instance.plan.is_corporate:
+        #     raise forms.ValidationError('Corporate Plus User can not be Cancelled.')
 
     def clean_status(self):
         status = self.cleaned_data.get('status')

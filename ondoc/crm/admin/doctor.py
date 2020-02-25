@@ -2646,7 +2646,7 @@ class GoogleMapRecordForm(forms.ModelForm):
        ]
 
 class GoogleMapRecordsResource(resources.ModelResource):
-    tmp_storage_class = MediaStorage
+    # tmp_storage_class = MediaStorage
 
     class Meta:
         model = GoogleMapRecords
@@ -2655,9 +2655,10 @@ class GoogleMapRecordsResource(resources.ModelResource):
                   'is_potential', 'has_booking', 'monday_timing', 'address', 'is_bookable', 'hospital_id',
                   'phone_number', 'has_phlebo', 'serial_number', 'onboarded', 'phlebo_type', 'interested_in_diagnostics',
                   'interested_in_pharmacy', 'samples_per_month', 'cluster',
-                  'ready_to_use_wallet', 'digital_only_report',)
+                  'ready_to_use_wallet', 'digital_only_report', 'latitude', 'longitude', 'image',)
 
-class GoogleMapRecordsAdmin(ImportExportMixin, VersionAdmin, ActionAdmin):
+
+class GoogleMapRecordsAdmin(MediaImportMixin, VersionAdmin, ActionAdmin):
     search_fields = ('hospital_name', 'lead_rank',)
     list_display = ('id', 'hospital_name', 'lead_rank', )
     formats = (base_formats.XLS,)
