@@ -562,3 +562,5 @@ SBIG_BASE_URL=env('SBIG_BASE_URL')
 REFERRAL_CASHBACK_AMOUNT=env('REFERRAL_CASHBACK_AMOUNT')
 CORS_ALLOW_HEADERS = ['accept', 'accept-encoding', 'authorization', 'content-type', 'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with', 'app-name']
 SAVE_LOGS=env.bool('SAVE_LOGS', False)
+CHAT_LAB_REPORT_API_URL=env('CHAT_LAB_REPORT_API_URL')
+CHAT_LAB_REPORT_API_TOKEN=env('CHAT_LAB_REPORT_API_TOKEN')
