@@ -130,9 +130,12 @@ class LabModelSerializer(serializers.ModelSerializer):
         app = obj.labappointment.all().select_related('profile')
 
         query = self.context.get('rating_queryset')
-        rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-ratings', '-updated_at')
-        reviews = rating_serializer.RatingsModelSerializer(rating_queryset, many=True, context={'app': app})
-        return reviews.data[:5]
+        if query:
+            rating_queryset = query.exclude(Q(review='') | Q(review=None)).order_by('-ratings', '-updated_at')
+            reviews = rating_serializer.RatingsModelSerializer(rating_queryset, many=True, context={'app': app})
+            return reviews.data[:5]
+
+        return []
 
     def get_unrated_appointment(self, obj):
         if self.parent:
