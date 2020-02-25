@@ -567,7 +567,7 @@ class PackageTotalWorth(AbstractCriteria):
         allowed_package_ids = vip_utilization.get('allowed_package_ids')
         is_package_cover = vip_utilization.get('is_package_cover')
 
-        if (not available_package_amount or available_package_amount <= 0) and not is_package_cover:
+        if not available_package_amount or available_package_amount <= 0 or not is_package_cover:
             return resp
 
         if allowed_package_ids:
