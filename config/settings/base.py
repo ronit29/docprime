@@ -138,7 +138,9 @@ DJANGO_APPS = (
     'django.contrib.sites',
     'django.contrib.sitemaps',
     'reversion_compare',
+    'elasticapm.contrib.django',
 )
+
 THIRD_PARTY_APPS = (
 
     'rest_framework',
@@ -209,6 +211,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 ADD_REVERSION_ADMIN = True
 
 MIDDLEWARE = [
+    'elasticapm.contrib.django.middleware.TracingMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -219,7 +222,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_user_agents.middleware.UserAgentMiddleware'
+    'django_user_agents.middleware.UserAgentMiddleware',
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -345,6 +348,12 @@ GOOGLE_MAPS_API_KEY = 'AIzaSyDFxu_VGlmLojtgiwn892OYzV6IY_Inl6I'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
 SMS_AUTH_KEY = env('SMS_AUTH_KEY')
+
+ELASTIC_APM = {
+   'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
+   'SERVER_URL' : 'http://10.20.3.66:8200/',
+   'DEBUG': True,
+}
 
 RABBITMQ_CONNECTION_SETTINGS = {
     'CONNECTION_URL': env('RABBITMQ_CONNECTION_URL'),
