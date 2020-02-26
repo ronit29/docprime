@@ -638,9 +638,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         resp['total_worth_utilized'] = self.get_total_worth_utilized()
         resp['available_total_worth'] = int(resp['total_worth']) - int(resp['total_worth_utilized'])
         resp['is_package_cover'] = True if data.get('packages_covered') and data.get('packages_covered').__class__.__name__ == 'str' else False
-        resp['doctor_max_discounted_amount'] = data.get('doctor_max_discounted_amount') if data.get('doctor_max_discounted_amount') and data.get('doctor_max_discounted_amount').__class__.__name__ == 'str' else 0
-        resp['lab_max_discounted_amount'] = data.get('lab_max_discounted_amount') if data.get('lab_max_discounted_amount') and data.get('lab_max_discounted_amount').__class__.__name__ == 'str' else 0
-        resp['package_max_discounted_amount'] = data.get('package_max_discounted_amount') if data.get('package_max_discounted_amount') and data.get('package_max_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['doctor_max_discounted_amount'] = int(data.get('doctor_max_discounted_amount')) if data.get('doctor_max_discounted_amount') and data.get('doctor_max_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['lab_max_discounted_amount'] = int(data.get('lab_max_discounted_amount')) if data.get('lab_max_discounted_amount') and data.get('lab_max_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['package_max_discounted_amount'] = int(data.get('package_max_discounted_amount')) if data.get('package_max_discounted_amount') and data.get('package_max_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['doctor_min_discounted_amount'] = int(data.get('doctor_min_discounted_amount')) if data.get(
+            'doctor_min_discounted_amount') and data.get(
+            'doctor_min_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['lab_min_discounted_amount'] = int(data.get('lab_min_discounted_amount')) if data.get(
+            'lab_min_discounted_amount') and data.get('lab_min_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['package_min_discounted_amount'] = int(data.get('package_min_discounted_amount')) if data.get(
+            'package_min_discounted_amount') and data.get(
+            'package_min_discounted_amount').__class__.__name__ == 'str' else 0
 
         return resp
 
