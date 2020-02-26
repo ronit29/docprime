@@ -30,14 +30,17 @@ logger = logging.getLogger(__name__)
 
 class PlusListViewSet(viewsets.GenericViewSet):
 
+    # Get default queryset.
     def get_queryset(self):
         return PlusProposer.objects.filter(is_live=True)
 
+    # Get plan queryset.
     def get_plan_queryset(self, utm_source):
         plans = PlusPlans.objects.filter(is_live=True, utm_source__contains={'utm_source': utm_source})
         # plans_with_utm = plans.filter()
         return plans
 
+    # get list of plans with proposer.
     @use_slave
     def list(self, request):
         resp = {}
@@ -64,10 +67,12 @@ class PlusListViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
+# Plus leads viewset.
 class PlusOrderLeadViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     # permission_classes = (IsAuthenticated,)
 
+    # create plus lead from request. Request contains all the lead data.
     def create_plus_lead(self, request):
         # latitude = request.data.get('latitude', None)
         # longitude = request.data.get('longitude', None)
@@ -122,6 +127,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    # Api for policy purchase, do validation, serialization, create order, and ask for payment if required.
     @transaction.atomic
     def create_order(self, request):
         user = request.user
@@ -154,12 +160,14 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 return Response({"message": "Plus Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
             if valid_data:
                 user = request.user
+                default_profile = user.get_default_profile()
+                default_email = default_profile.email if default_profile else None
                 pre_insured_members = {}
                 plus_members = []
 
                 for member in members:
                     pre_insured_members['dob'] = member['dob']
-                    pre_insured_members['title'] = member['title']
+                    pre_insured_members['title'] = member.get('title')
                     pre_insured_members['first_name'] = member['first_name']
                     pre_insured_members['last_name'] = member.get('last_name') if member.get('last_name') else ''
                     # pre_insured_members['address'] = member['address']
@@ -172,8 +180,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['pincode'] = member.get('pincode', None)
                     pre_insured_members['city'] = member.get('city', None)
                     pre_insured_members['city_code'] = member.get('city_code', None)
-                    pre_insured_members['email'] = member.get('email', None)
+                    pre_insured_members['email'] = member.get('email', None) if member.get('email') else default_email
                     pre_insured_members['relation'] = member.get('relation', None)
+                    pre_insured_members['gender'] = member.get('gender', None)
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
                         'profile') is not None else None
                     pre_insured_members['is_primary_user'] = True
@@ -196,11 +205,15 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                         user_profile = {"name": member.get('first_name') + " " + last_name, "email":
                             member.get('email'), "dob": member.get('dob'), "gender": member.get('gender')}
 
+            if not user_profile['dob']:
+                return Response({"message": "DOB for primary user is not updated"}, status=status.HTTP_400_BAD_REQUEST)
+
             utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
             utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
             utm_campaign = request.data.get('utm_spo_tags', {}).get('utm_campaign', None)
             utm_medium = request.data.get('utm_spo_tags', {}).get('utm_medium', None)
             is_utm_agent = request.data.get('utm_spo_tags', {}).get('is_agent', None)
+            utm_sbi_tags = request.data.get('utm_sbi_tags', {})
             utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent, 'utm_term': utm_term, 'utm_campaign': utm_campaign, 'utm_medium': utm_medium}
             plus_plan = PlusPlans.objects.filter(id=plus_plan_id, is_live=True).first()
             if not plus_plan:
@@ -223,7 +236,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                               'random_coupon_list': price_data.get('random_coupon_list')}
 
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
-                              "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter}
+                              "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter, "utm_sbi_tags": utm_sbi_tags}
 
             # consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
             # consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
@@ -265,8 +278,19 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 payment_status=account_models.Order.PAYMENT_PENDING,
                 # visitor_info=visitor_info
             )
-            resp["status"] = 1
-            resp['data'], resp["payment_required"] = payment_details(request, order)
+            if payable_amount > 0:
+                resp["status"] = 1
+                resp['data'], resp["payment_required"] = payment_details(request, order)
+            else:
+                plus_object, wallet_amount, cashback_amount = order.process_order()
+                resp["status"] = 1
+                resp["payment_required"] = False
+                resp["data"] = {'id': plus_object.id}
+                resp["data"] = {
+                    "orderId": order.id,
+                    "type": "plus_membership",
+                    "id": plus_object.id if plus_object else None
+                }
             # else:
             #     wallet_amount = amount
             #
@@ -295,6 +319,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
 
+    # After policy purchase add members to the policy.
     @transaction.atomic
     def add_members(self, request):
         user = request.user
@@ -346,6 +371,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, )
 
+    # After policy purchase below function gives the stats of the policy.
     def dashboard(self, request):
         resp = {}
         if request.query_params.get('is_dashboard'):
@@ -368,10 +394,16 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         #     resp['is_member_allowed'] = False
         # else:
         #     resp['is_member_allowed'] = True
-        if len(plus_members) == int(total_member_allowed):
+        if len(plus_members) >= int(total_member_allowed):
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
+
+        plus_via_sbi = False
+        if plus_user.order and plus_user.order.action_data and plus_user.order.action_data.get('utm_sbi_tags', None):
+            plus_via_sbi = True
+        resp['plus_via_sbi'] = plus_via_sbi
+
         plus_plan_queryset = PlusPlans.objects.filter(id=plus_user.plan.id)
         plan_body_serializer = serializers.PlusPlansSerializer(plus_plan_queryset, context={'request': request}, many=True)
         resp['plan'] = plan_body_serializer.data
@@ -412,6 +444,7 @@ class PlusDataViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    # In journey of gold purchase, interim data is pushed by below api.
     def push_dummy_data(self, request):
         from ondoc.api.v1.doctor.views import DoctorAppointmentsViewSet
         from ondoc.api.v1.diagnostic.views import LabAppointmentView
@@ -434,6 +467,7 @@ class PlusDataViewSet(viewsets.GenericViewSet):
 
         return Response(data=resp, status=status.HTTP_200_OK)
 
+    # Get the interim data in the journey of policy purchase.
     def show_dummy_data(self, request):
         user = request.user
         data_type = request.query_params.get('dummy_data_type')
@@ -454,6 +488,7 @@ class PlusDataViewSet(viewsets.GenericViewSet):
 
 class PlusIntegrationViewSet(viewsets.GenericViewSet):
 
+    # Push vip integration lead.
     def push_vip_integration_leads(self, request):
         resp = {}
         request_data = request.data
@@ -461,34 +496,6 @@ class PlusIntegrationViewSet(viewsets.GenericViewSet):
         if utm_source:
             resp = PlusIntegration.get_response(request_data)
             return Response(data=resp, status=status.HTTP_200_OK)
-            # utm_param_dict = PlusIntegration.get_response(request_data)
-            # try:
-            #     if utm_param_dict:
-            #         url = utm_param_dict.get('url', "")
-            #         request_data = utm_param_dict.get('request_data', {})
-            #         auth_token = utm_param_dict.get('auth_token', "")
-            #
-            #         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
-            #                                                                               'Content-Type': 'application/json'})
-            #
-            #         if response.status_code != status.HTTP_200_OK:
-            #             logger.error(json.dumps(request_data))
-            #             logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
-            #             resp['error'] = "Error while saving data!!"
-            #             return Response(data=resp, status=status.HTTP_200_OK)
-            #         elif response.status_code == status.HTTP_200_OK and response.get('data', None) and \
-            #                 response.get('data, None').get('error', False):
-            #             resp['data'] = response.get('data', None).get('errorDetails', [])
-            #             return Response(data=resp, status=status.HTTP_200_OK)
-            #         else:
-            #             resp['data'] = "successfully save!!"
-            #             return Response(data=resp, status=status.HTTP_200_OK)
-            #     else:
-            #         resp['error'] = "Not able to find Utm params"
-            #         return Response(data=resp, status=status.HTTP_200_OK)
-            # except Exception as e:
-            #     logger.error(json.dumps(request_data))
-            #     logger.info("[ERROR] {}".format(e))
         else:
             resp['error'] = "UTM source required!!"
             return Response(data=resp, status=status.HTTP_200_OK)

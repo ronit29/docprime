@@ -53,7 +53,7 @@ class Coupon(auth_model.TimeStampedModel):
     step_count = models.PositiveIntegerField(verbose_name="Valid only at multiples of this appointment number", default=1, validators=[MinValueValidator(1)], blank=True, null=True)
     description = models.CharField(max_length=500, default="")
     heading = models.CharField(max_length=500, default="")
-    tnc = models.CharField(max_length=2000, default="")
+    tnc = models.TextField(default="", null=True, blank=True)
     lab_network = models.ForeignKey("diagnostic.LabNetwork", on_delete=models.CASCADE, blank=True, null=True)
     lab = models.ForeignKey("diagnostic.Lab", on_delete=models.CASCADE, blank=True, null=True)
     test = models.ManyToManyField("diagnostic.LabTest", blank=True)
@@ -526,14 +526,14 @@ class CouponRecommender():
                                    .exclude(status__in=[PlusUser.CANCELLED]),
                                    to_attr='user_plus_purchased')
 
-        all_coupons = Coupon.objects.filter(type__in=types)
-
         if coupon_code:
             all_coupons = RandomGeneratedCoupon.get_coupons([coupon_code])
+            all_coupons = all_coupons.filter(type__in=types)
         else:
-            all_coupons = all_coupons.filter(is_visible=True)
+            all_coupons = Coupon.objects.filter(type__in=types, is_visible=True)
 
-        all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
+        all_coupons = all_coupons.select_related('payment_option') \
+                                 .prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
                                                    'hospitals_exclude', 'doctors', 'doctors_exclude', 'specializations',
                                                    'procedures', 'lab', 'test', 'procedure_categories',
                                                    'users_vip_gold_plans', 'vip_gold_plans', user_opd_booked,

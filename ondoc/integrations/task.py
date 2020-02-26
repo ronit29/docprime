@@ -11,6 +11,7 @@ from ondoc.salespoint.mongo_models import SalesPointLog
 logger = logging.getLogger(__name__)
 
 
+# This method is use to create an order at integrator end - For Lab appointments.
 @task(bind=True, max_retries=3)
 def push_lab_appointment_to_integrator(self, data):
     from django.contrib.contenttypes.models import ContentType
@@ -85,6 +86,7 @@ def push_lab_appointment_to_integrator(self, data):
         logger.error(str(e))
 
 
+# This method is use to get order summary from integrator - Not in use for now.
 @task(bind=True, max_retries=3)
 def get_integrator_order_status(self, *args, **kwargs):
     from ondoc.diagnostic.models import LabAppointment
@@ -124,6 +126,7 @@ def get_integrator_order_status(self, *args, **kwargs):
         self.retry(**kwargs, countdown=countdown_time)
 
 
+# This method creates an appointment to Salespoint end.
 @task(bind=True, max_retries=2)
 def push_appointment_to_spo(self, data):
     from ondoc.diagnostic.models import LabAppointment
@@ -153,7 +156,8 @@ def push_appointment_to_spo(self, data):
 
             countdown_time = (2 ** self.request.retries) * 60 * 10
             self.retry([data], countdown=countdown_time)
-            SalesPointLog.create_spo_logs(appointment, request_data, response)
+            if settings.SAVE_LOGS:
+                SalesPointLog.create_spo_logs(appointment, request_data, response)
         else:
             resp_data = response.json()
             resp_data = resp_data['data']
@@ -169,12 +173,14 @@ def push_appointment_to_spo(self, data):
                     if qs:
                         qs.update(spo_lead_id=int(lead_id))
 
-            SalesPointLog.create_spo_logs(appointment, request_data, resp_data)
+            if settings.SAVE_LOGS:
+                SalesPointLog.create_spo_logs(appointment, request_data, resp_data)
         # logger.error("[NO_SUCCESS-SPO] Lead ID")
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))
 
 
+# This method is use to create an order at integrator end - For Opd appointments.
 @task(bind=True, max_retries=3)
 def push_opd_appointment_to_integrator(self, data):
     from ondoc.diagnostic.models import OpdAppointment
@@ -238,4 +244,3 @@ def push_opd_appointment_to_integrator(self, data):
 
     except Exception as e:
         logger.error(str(e))
-

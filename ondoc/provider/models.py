@@ -157,7 +157,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel, Tr
 
     def send_sms_link(self, patient, patient_number):
         from ondoc.authentication.backends import JWTAuthentication
-        from ondoc.communications.models import  SMSNotification, NotificationAction
+        from ondoc.communications.models import SMSNotification, NotificationAction
 
         link = None
 
@@ -322,6 +322,7 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
     lab_alerts = models.ManyToManyField(TestSamplesLabAlerts)
     status = models.SmallIntegerField(choices=STATUS_CHOICES)
     extras = JSONField(default={})
+    cancellation_comments = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return str(self.offline_patient.name) + '-' + str(self.hospital.name)

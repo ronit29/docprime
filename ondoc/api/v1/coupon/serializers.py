@@ -37,11 +37,14 @@ class ProductIDSerializer(serializers.Serializer):
         doctor = attrs.get("doctor_id")
         test_ids = attrs.get("test_ids")
         procedures_ids = attrs.get("procedures_ids")
+        plus_plan = attrs.get('plan_id')
         if product_id:
-            if product_id == Order.DOCTOR_PRODUCT_ID and lab:
+            if not product_id == Order.LAB_PRODUCT_ID and lab:
                 raise serializers.ValidationError("Invalid product id for lab")
-            if product_id == Order.LAB_PRODUCT_ID and doctor:
+            if not product_id == Order.DOCTOR_PRODUCT_ID and doctor:
                 raise serializers.ValidationError("Invalid product id for doctor")
+            if product_id not in [Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID] and plus_plan:
+                raise serializers.ValidationError("Invalid product id for plus plans")
         if test_ids:
             attrs["tests"] = LabTest.objects.filter(id__in=test_ids)
         if procedures_ids:

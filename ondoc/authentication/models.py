@@ -348,7 +348,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     @cached_property
     def get_temp_plus_user(self):
         from ondoc.plus.models import TempPlusUser
-        temp_plus_user = TempPlusUser.objects.filter(user_id=self.id, deleted=0).first()
+        temp_plus_user = TempPlusUser.objects.filter(user_id=self.id, deleted=0).order_by('-id').first()
         return temp_plus_user if temp_plus_user else None
 
     @cached_property
@@ -358,7 +358,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return inactive_plus_user if inactive_plus_user else None
 
     @classmethod
-    def get_external_login_data(cls, data):
+    def get_external_login_data(cls, data, request=None):
         from ondoc.authentication.backends import JWTAuthentication
         profile_data = {}
         source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
@@ -418,7 +418,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             profile_data.pop('hospital', None)
             UserProfile.objects.create(**profile_data)
 
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
         result = dict()
         result['token'] = token_object
         result['user_id'] = user.id
@@ -667,7 +667,7 @@ class UserProfile(TimeStampedModel):
         return None
 
     def verify_profile(self):
-        if self.dob and self.email and self.name:
+        if self.dob and self.name:
             return True
         else:
             return False
@@ -690,6 +690,12 @@ class UserProfile(TimeStampedModel):
             today = date.today()
             user_age = today.year - self.dob.year - ((today.month, today.day) < (self.dob.month, self.dob.day))
         return user_age
+
+    @cached_property
+    def is_gold_profile(self):
+        plus_member_profile = self.plus_member.filter().order_by('-id').first()
+        response = True if plus_member_profile and plus_member_profile.plus_user.is_valid() else False
+        return response
 
     def save(self, *args, **kwargs):
         if not self.has_image_changed():
@@ -1454,8 +1460,12 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
         ).distinct('user')
         admin_users = []
         for admin in admins:
-            if admin.user:
-                admin_users.append(admin.user)
+            try:
+                if admin.user:
+                    admin_users.append(admin.user)
+            except Exception as e:
+                continue
+                # pass
         return admin_users
 
     @staticmethod
@@ -2407,3 +2417,12 @@ class GenericQuestionAnswer(TimeStampedModel):
 
     class Meta:
         db_table = "generic_question_answer"
+
+
+class WhiteListedLoginTokens(TimeStampedModel):
+
+    token = models.CharField(max_length=180)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'whitelisted_login_tokens'

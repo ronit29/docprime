@@ -162,6 +162,14 @@ class NotificationAction:
 
     IPDIntimateEmailNotification = 301
 
+    # Not for Medanta and Artimis Hospitals
+    PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT = 321
+    PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC = 322
+    PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT = 323
+    PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC = 324
+    REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS = 341
+    PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT = 331
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -864,8 +872,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, email):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_booking_url(cls, token, email, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         short_url = generate_short_url(booking_url)
         html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         email_subject = "Booking Url"
@@ -884,8 +893,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
-    def send_insurance_booking_url(cls, token, email):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_insurance_booking_url(cls, token, email, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
@@ -926,8 +936,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
-    def send_endorsement_request_url(cls, token, email):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_endorsement_request_url(cls, token, email, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id )
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
         short_url = generate_short_url(booking_url)
         html_body = "Your Endorsement Request url is - {} . Please confirm to process".format(short_url)
@@ -1032,8 +1043,10 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         if recipient_obj and recipient_obj.to:
             obj = None
             content_type = None
-            if kwargs.get('ipd_email_obj'):
-                obj = kwargs.get('ipd_email_obj')
+            # if kwargs.get('ipd_email_obj'):
+            #     obj = kwargs.get('ipd_email_obj')
+            if kwargs.get('email_obj'):
+                obj = kwargs.get('email_obj')
                 content_type = ContentType.objects.get_for_model(obj)
 
             if kwargs.get('is_preview', False):
@@ -1050,6 +1063,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
 
             email_noti = {
                 "email": recipient_obj.to,
+                "cc": recipient_obj.cc,
+                "bcc": recipient_obj.bcc,
                 "content": html_body,
                 "email_subject": email_subject
             }
@@ -1188,8 +1203,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, phone_number, name):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_booking_url(cls, token, phone_number, name, user):
+        user_id = user.id if user  else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         short_url = generate_short_url(booking_url)
         html_body = "Dear {}, \n" \
                     "Please click on the link to review your appointment details and make an online payment.\n" \
@@ -1210,8 +1226,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_insurance_booking_url(cls, token, phone_number):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_insurance_booking_url(cls, token, phone_number, user):
+        user_id = user.id if user  else None
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance purchase url is - {} . Please pay to confirm".format(short_url)
@@ -1231,7 +1248,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     @classmethod
     def send_vip_booking_url(cls, token, phone_number, *args, **kwargs):
         utm_source = kwargs.get('utm_source', '')
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, kwargs.get('user_id'))
         if utm_source:
             booking_url = booking_url + "&callbackurl=vip-club-member-details&utm_source={utm_source}&is_agent=false".format(utm_source=utm_source)
         else:
@@ -1258,7 +1275,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     def send_single_purchase_booking_url(cls, token, phone_number, *args, **kwargs):
         utm_source = kwargs.get('utm_source', '')
         landing_url = kwargs.get('landing_url', '')
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = "{}/agent/booking?token={}&user_id={}".format(settings.CONSUMER_APP_DOMAIN, token, kwargs.get('user_id'))
         if utm_source:
             booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
                 landing_url=landing_url, utm_source=utm_source)
@@ -1284,8 +1301,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_endorsement_request_url(cls, token, phone_number):
-        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+    def send_endorsement_request_url(cls, token, phone_number, user):
+        user_id = user.id if user else None
+        booking_url = "{}/agent/booking?token={}&user-id={}".format(settings.CONSUMER_APP_DOMAIN, token, user_id)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance Endorsement request url is - {} . Please confirm to process".format(short_url)
@@ -1303,10 +1321,11 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_cart_url(cls, token, phone_number, utm):
+    def send_cart_url(cls, token, phone_number, utm, user):
+        user_id = user.id if user else None
         callback_url = "cart"
-        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}&{}".format(settings.CONSUMER_APP_DOMAIN,
-                                                                                         token, callback_url, utm)
+        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}&{}&user_id={}".format(settings.CONSUMER_APP_DOMAIN,
+                                                                                         token, callback_url, utm, user_id)
         short_url = generate_short_url(payment_page_url)
         html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         if phone_number:
@@ -1358,9 +1377,37 @@ class WhtsappNotification(TimeStampedModel):
     viewed_at = models.DateTimeField(blank=True, null=True, default=None)
     read_at = models.DateTimeField(blank=True, null=True, default=None)
     template_name = models.CharField(max_length=100, null=False, blank=False)
-    notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
+    notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES, null=True)
     payload = JSONField(null=False, blank=False, default={})
     extras = JSONField(null=False, blank=False, default={})
+
+    @classmethod
+    def send_whatsapp(cls, phone_number, template_name, payload, notification_type):
+
+        whatsapp_message = {"media": {},
+                            "message": "",
+                            "template": {
+                                "name": template_name,
+                                "params": payload
+                            },
+                            "message_type": "HSM",
+                            "phone_number": phone_number
+                            }
+
+        whatsapp_noti = WhtsappNotification.objects.create(
+            phone_number=phone_number,
+            notification_type=notification_type if notification_type else None,
+            template_name=template_name,
+            payload=whatsapp_message,
+            extras={}
+        )
+
+        whatsapp_payload = {
+            "data": whatsapp_noti.payload,
+            "type": "social_message"
+        }
+
+        publish_message(json.dumps(whatsapp_payload))
 
     @classmethod
     def send_login_otp(cls, phone_number, request_source, **kwargs):
@@ -1541,6 +1588,7 @@ class DynamicTemplates(TimeStampedModel):
 
     def send_notification(self, context, recipient_obj, notification_type, *args, **kwargs):
         rendered_content = self.render_template(context)
+
         if rendered_content is None:
             logger.error("Could not generate content. Dynamic temlplate id %s" % str(self.id))
             return None
@@ -1551,8 +1599,9 @@ class DynamicTemplates(TimeStampedModel):
 
             recipient_obj.add_cc(self.get_cc())
             recipient_obj.add_bcc(self.get_bcc())
+            rendered_subject = self.render_template_subject(context)
 
-            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type, *args, **kwargs)
+            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, rendered_subject, notification_type, *args, **kwargs)
         elif self.template_type == self.TemplateType.SMS:
             SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type, *args, **kwargs)
 
@@ -1563,6 +1612,19 @@ class DynamicTemplates(TimeStampedModel):
 
         try:
             file_content = self.content
+            t = Template(file_content)
+            c = Context(context)
+            rendered_data = t.render(c)
+        except Exception as e:
+            logger.error(str(e))
+
+        return rendered_data
+
+    def render_template_subject(self, context):
+        rendered_data = None
+
+        try:
+            file_content = self.subject
             t = Template(file_content)
             c = Context(context)
             rendered_data = t.render(c)
@@ -1727,7 +1789,9 @@ class IPDIntimateEmailNotification(TimeStampedModel):
                 email_notification = EMAILNotification(notification_type=NotificationAction.IPDIntimateEmailNotification,
                                                        context={'doctor_name': data.doctor.name, 'dob': data.dob,
                                                                 'Mobile': data.phone_number, 'date_time': str(data.preferred_date) + " " + str(data.time_slot),                                                                         'Hospital_Name': data.hospital.name , 'Patient_name': data.profile.name})
+
+                kwargs['email_obj'] = data
                 kwargs['ipd_email_obj'] = data
-                email_notification.send(receivers, *args, **kwargs)
+                # email_notification.send(receivers, *args, **kwargs)
                 IPDIntimateEmailNotification.objects.filter(user=data.user).update(is_sent=True)
-                print("ipd_obj: " + data.id)
+                print("ipd_obj: " + str(data.id))

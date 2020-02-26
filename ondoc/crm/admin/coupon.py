@@ -241,7 +241,7 @@ class VipGoldPlanAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if not self.request.user.is_authenticated:
             return PlusPlans.objects.none()
-        queryset = PlusPlans.objects.all()
+        queryset = PlusPlans.objects.order_by('id')
 
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)
@@ -250,7 +250,13 @@ class VipGoldPlanAutocomplete(autocomplete.Select2QuerySetView):
 
 
 class CouponForm(forms.ModelForm):
+    tnc = forms.CharField(widget=forms.Textarea, required=True)
     create_random_coupon = forms.BooleanField(required=False)
+
+    class Media:
+        extend = True
+        js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'coupon/js/init.js')
+        css = {'all': ('coupon/css/style.css',)}
 
     class Meta:
         model = Coupon

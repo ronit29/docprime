@@ -118,7 +118,7 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         model = PlusPlans
         fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected',
                   'tenure', 'total_allowed_members', 'default_single_booking', 'content', 'enabled_hospital_networks',
-                  'utilize', 'is_gold', 'show_consultation_text')
+                  'utilize', 'is_gold', 'show_consultation_text', 'is_corporate')
 
 
 class PlusProposerSerializer(serializers.ModelSerializer):
@@ -195,7 +195,7 @@ class PlusMembersDocumentSerializer(serializers.Serializer):
 
 class PlusMemberListSerializer(serializers.Serializer):
     id = serializers.IntegerField(allow_null=True, required=False)
-    title = serializers.ChoiceField(choices=PlusMembers.TITLE_TYPE_CHOICES, required=False)
+    title = serializers.ChoiceField(choices=PlusMembers.TITLE_TYPE_CHOICES, required=False, allow_blank=True, allow_null=True)
     first_name = serializers.CharField(max_length=50)
     last_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
     dob = serializers.DateField()
@@ -208,8 +208,8 @@ class PlusMemberListSerializer(serializers.Serializer):
     relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices(), required=False, allow_null=True, allow_blank=True)
     document_ids = serializers.ListField(required=False, allow_null=True, child=PlusMembersDocumentSerializer())
     is_primary_user = serializers.BooleanField(required=False, default=False)
-    # plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.all_active_plans(), allow_null=False, allow_empty=False)
-
+    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False, allow_null=True, allow_blank=True)
+    phone_number = serializers.CharField(max_length=10, required=False, allow_blank=True, allow_null=True)
 
 class PlusMembersSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=PlusMemberListSerializer())
@@ -289,6 +289,7 @@ class PlusUserSerializer(serializers.Serializer):
     expire_date = serializers.DateTimeField()
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    random_coupon_list = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
 
 class PlusUserModelSerializer(serializers.ModelSerializer):

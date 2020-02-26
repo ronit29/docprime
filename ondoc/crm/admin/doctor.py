@@ -133,6 +133,7 @@ class DoctorQualificationInline(ReadOnlyInline):
 
 class DoctorClinicTimingForm(forms.ModelForm):
 
+
     def __init__(self, data=None, files=None, auto_id='id_%s', prefix=None, initial=None, error_class=ErrorList,
                  label_suffix=None, empty_permitted=False, instance=None, use_required_attribute=None):
         super().__init__(data, files, auto_id, prefix, initial, error_class, label_suffix, empty_permitted, instance,
@@ -1496,6 +1497,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
             raise forms.ValidationError("Please select Appointment type for Follow up Appointment!!")
 
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
+            if self.request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+                raise forms.ValidationError("You cannot change appointment date time.")
+            else:
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
                 time_slot_start = make_aware(dt_field)
@@ -1880,6 +1884,9 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
 
         if obj and obj.status is not OpdAppointment.CREATED:
             read_only = read_only + ('status_change_comments',)
+
+        if request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+            read_only = read_only + ['status', 'status_change_comments']
 
         return read_only
         # else:
@@ -2635,9 +2642,24 @@ class GoogleMapRecordForm(forms.ModelForm):
    class Meta:
        model = GoogleMapRecords
        fields = [
-         "location","text",
+         "location", "text",
        ]
 
+class GoogleMapRecordsResource(resources.ModelResource):
+    # tmp_storage_class = MediaStorage
 
-class RecordAdmin(VersionAdmin, ActionAdmin):
-    form = GoogleMapRecordForm
+    class Meta:
+        model = GoogleMapRecords
+        fields = ('id', 'text', 'label', 'reason', 'hospital_name', 'place_id',
+                  'multi_speciality', 'has_phone', 'lead_rank', 'combined_rating', 'combined_rating_count',
+                  'is_potential', 'has_booking', 'monday_timing', 'address', 'is_bookable', 'hospital_id',
+                  'phone_number', 'has_phlebo', 'serial_number', 'onboarded', 'phlebo_type', 'interested_in_diagnostics',
+                  'interested_in_pharmacy', 'samples_per_month', 'cluster',
+                  'ready_to_use_wallet', 'digital_only_report', 'latitude', 'longitude', 'image',)
+
+
+class GoogleMapRecordsAdmin(MediaImportMixin, VersionAdmin, ActionAdmin):
+    search_fields = ('hospital_name', 'lead_rank',)
+    list_display = ('id', 'hospital_name', 'lead_rank', )
+    formats = (base_formats.XLS,)
+    resource_class = GoogleMapRecordsResource

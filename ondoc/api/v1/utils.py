@@ -341,9 +341,9 @@ def plan_subscription_reverse_transform(subscription_data):
     subscription_data['profile_detail']['dob'] = \
         datetime.datetime.strptime(subscription_data['profile_detail']['dob'],
                                    "%Y-%m-%d")
-    insured_members = subscription_data['plus_user']['plus_members']
-    for member in insured_members:
-        member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
+    plus_members = subscription_data['plus_user']['plus_members']
+    for member in plus_members:
+        member['dob'] = datetime.datetime.strptime(str(member['dob']), "%Y-%m-%d").date()
     return subscription_data
 
 
@@ -477,13 +477,24 @@ def single_booking_payment_details(request, orders):
 
     payment_required = True
     user = request.user
+    is_sbig = False
     if user.email:
         uemail = user.email
     else:
         uemail = "dummyemail@docprime.com"
-    base_url = "https://{}".format(request.get_host())
-    surl = base_url + '/api/v1/user/transaction/save'
-    furl = base_url + '/api/v1/user/transaction/save'
+
+    if request.data and request.data.get('utm_sbi_tags') and request.data.get('utm_sbi_tags').get('utm_source') == 'sbi_utm':
+        is_sbig = True
+
+    if is_sbig:
+        base_url = settings.SBIG_BASE_URL
+        surl = base_url + '/api/v1/user/transaction/save?sbig=true'
+        furl = base_url + '/api/v1/user/transaction/save?sbig=true'
+    else:
+        base_url = "https://{}".format(request.get_host())
+        surl = base_url + '/api/v1/user/transaction/save'
+        furl = base_url + '/api/v1/user/transaction/save'
+
     profile = user.get_default_profile()
     profile_name = ""
     paytmMsg = ''
@@ -532,6 +543,9 @@ def single_booking_payment_details(request, orders):
             "discountedAmnt": discountedAmnt
             }
 
+        if not order_dict['insurerCode']:
+            del order_dict['insurerCode']
+
         if Decimal(txAmount) > Decimal(0):
             orders_list.append(order_dict)
 
@@ -569,7 +583,8 @@ def single_booking_payment_details(request, orders):
     order_ids = list(map(lambda x: x['orderId'], orders_list))
     args = {'user_id': user.id, 'order_ids': order_ids, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    if settings.SAVE_LOGS:
+        save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     pgdata['items'] = orders_list
     return pgdata, payment_required
 
@@ -584,14 +599,24 @@ def payment_details(request, order):
 
     payment_required = True
     user = request.user
+    is_sbig = False
     if user.email:
         uemail = user.email
     else:
         uemail = "dummyemail@docprime.com"
-    base_url = "https://{}".format(request.get_host())
-    # base_url = 'https://webhook.site/0f0c0af8-d155-440d-b5c4-ce486574e14d'
-    surl = base_url + '/api/v1/user/transaction/save'
-    furl = base_url + '/api/v1/user/transaction/save'
+
+    if request.data and request.data.get('utm_sbi_tags') and request.data.get('utm_sbi_tags').get('utm_tags') and request.data.get('utm_sbi_tags').get('utm_tags').get('utm_source') == 'sbi_utm':
+        is_sbig = True
+
+    if is_sbig:
+        base_url = settings.SBIG_BASE_URL
+        surl = base_url + '/api/v1/user/transaction/save?sbig=true'
+        furl = base_url + '/api/v1/user/transaction/save?sbig=true'
+    else:
+        base_url = "https://{}".format(request.get_host())
+        surl = base_url + '/api/v1/user/transaction/save'
+        furl = base_url + '/api/v1/user/transaction/save'
+
     isPreAuth = '1'
     profile = user.get_default_profile()
     profile_name = ""
@@ -661,6 +686,8 @@ def payment_details(request, order):
                 if first_slot > parse_datetime(ord_slot):
                     first_slot = parse_datetime(ord_slot)
 
+        else:
+            isPreAuth = '0'
         if first_slot:
             if first_slot < (timezone.now() + timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))):
                 paytmMsg = 'Your payment will be deducted from Paytm wallet on appointment completion.'
@@ -709,6 +736,23 @@ def payment_details(request, order):
     if plus_merchant_code:
         pgdata['insurerCode'] = plus_merchant_code
 
+    plus_user = user.active_plus_user
+    is_partial_vip_enabled = False
+    vip_order_transaction = None
+    parent_product_id = None
+    if plus_user and plus_user.order:
+        transactions = plus_user.order.getTransactions()
+        parent_product_id = order.CORP_VIP_PRODUCT_ID if plus_user.plan.is_corporate else order.VIP_PRODUCT_ID
+        for ord in order.orders.all():
+            from ondoc.doctor.models import OpdAppointment
+            if ord.action_data and ord.action_data.get('payment_type') == OpdAppointment.VIP and transactions:
+                vip_order_transaction = transactions[0]
+                is_partial_vip_enabled = True
+        if is_partial_vip_enabled and transactions and vip_order_transaction and parent_product_id:
+            pgdata['refOrderId'] = str(vip_order_transaction.order_id)
+            pgdata['refOrderNo'] = str(vip_order_transaction.order_no)
+            pgdata['parentProductId'] = str(parent_product_id)
+
     secret_key, client_key = get_pg_secret_client_key(order)
     filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}
     pgdata.clear()
@@ -717,7 +761,8 @@ def payment_details(request, order):
 
     args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    if settings.SAVE_LOGS:
+        save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     # print(pgdata)
     return pgdata, payment_required
 
@@ -736,7 +781,7 @@ def get_pg_secret_client_key(order):
     from ondoc.account.models import Order
     secret_key = client_key = ""
 
-    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID,  Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID]:
+    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID,  Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID, Order.CORP_VIP_PRODUCT_ID]:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:

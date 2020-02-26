@@ -287,6 +287,16 @@ class DoctorSearchHelper:
             )
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
+        if self.query_params.get('is_gold'):
+            filtering_params.append(
+                "h.enabled_for_gold"
+            )
+
+        if self.query_params.get('is_vip'):
+            filtering_params.append(
+                "h.enabled_for_plus_plans"
+            )
+
         result = {}
         if not filtering_params and not spec_filter_str:
             result['string'] = "1=1"
@@ -646,7 +656,9 @@ class DoctorSearchHelper:
                               "fees": int(min_price.get('fees', 0))}
                 if request and request.user and not request.user.is_anonymous and request.user.active_plus_user:
                     plan = request.user.active_plus_user.plan
-                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
+
+                doctor_clinic_timing = doctor_clinic.availability.first()
+                vip_convenience_amount = doctor_clinic_timing.calculate_convenience_charge(plan) if doctor_clinic_timing else PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
 
                 vip_remaining_amount = int(vip_utilization.get('vip_remaining_amount', 0))
                 vip_amount = 0
@@ -694,7 +706,7 @@ class DoctorSearchHelper:
                         price = price_engine.get_price(price_data)
                     # vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
                     plus_membership_plan = request.user.active_plus_user.plan if request.user.active_plus_user else None
-                    vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_membership_plan)
+                    vip_convenience_amount = doctor_clinic_timing.calculate_convenience_charge(plus_membership_plan) if doctor_clinic_timing else PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_membership_plan)
                     engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
                     is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
                     if engine:
