@@ -48,6 +48,7 @@ class AbstractCriteria(object):
         return cost
 
     def discounted_cost(self, discount, cost, max_discount):
+        max_discount = int(max_discount)
         normal_discount_amount = (cost / 100) * discount
         if max_discount and max_discount > 0 and normal_discount_amount > max_discount:
             return max_discount
