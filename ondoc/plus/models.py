@@ -1260,7 +1260,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
     class Meta:
         db_table = 'plus_users'
-        unique_together = (('user', 'plan'),)
+        # unique_together = (('user', 'plan'),)
 
 
 
