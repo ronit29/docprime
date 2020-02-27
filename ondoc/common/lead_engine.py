@@ -284,17 +284,10 @@ class CancelDropOffLeadViaAppointment(AbstractLead):
         return data
 
 
-<<<<<<< HEAD
 class PrescriptionsLabtestPrescription(AbstractLead):
 
     def __init__(self, obj):
         super(PrescriptionsLabtestPrescription, self).__init__(obj, None)
-=======
-class CorporateGold(AbstractLead):
-
-    def __init__(self, obj):
-        super(CorporateGold, self).__init__(obj, None)
->>>>>>> master
 
     def update_matrix_lead_id(self, response, *args, **kwargs):
         from ondoc.common.models import GeneralMatrixLeads
@@ -311,7 +304,6 @@ class CorporateGold(AbstractLead):
 
         data = {
             "SubProductId": 0,
-<<<<<<< HEAD
             "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),
@@ -321,26 +313,50 @@ class CorporateGold(AbstractLead):
             "DoctorSpec": request_data.get('specialty', ''),
             "IPDHospitalName": request_data.get('hospital_name', ''),
             "ProductId": 11,
-=======
-            "LeadSource": request_data.get('lead_source'),
-            "ProductId": 15,
->>>>>>> master
             "UtmTerm": request_data.get('source', {}).get('utm_term', ''),
             "PrimaryNo": request_data.get('phone_number') if not user else str(user.phone_number),
             "UtmCampaign": request_data.get('source', {}).get('utm_campaign', ''),
             "UTMMedium": request_data.get('source', {}).get('utm_medium', ''),
-<<<<<<< HEAD
-            "Name": user.full_name if user else 'none',
+            "Name": user.full_name if user.full_name and user else 'none',
             "UtmSource": request_data.get('source', {}).get('utm_source', ''),
             "Gender": request_data.get('gender', None),
             "ExitPointUrl": request_data.get('exitpoint_url', '')
-=======
+        }
+
+        return data
+
+
+class CorporateGold(AbstractLead):
+
+    def __init__(self, obj):
+        super(CorporateGold, self).__init__(obj, None)
+
+    def update_matrix_lead_id(self, response, *args, **kwargs):
+        from ondoc.common.models import GeneralMatrixLeads
+        lead_id = response.get('Id')
+        if not lead_id:
+            raise Exception('Id not received from matrix')
+
+        GeneralMatrixLeads.objects.filter(id=self.obj.id).update(matrix_lead_id=lead_id)
+
+    def prepare_lead_data(self, *args, **kwargs) -> Dict:
+        obj = self.obj
+        request_data = obj.request_body
+        user = obj.user if obj.user else None
+
+        data = {
+            "SubProductId": 0,
+            "LeadSource": request_data.get('lead_source'),
+            "ProductId": 15,
+            "UtmTerm": request_data.get('source', {}).get('utm_term', ''),
+            "PrimaryNo": request_data.get('phone_number') if not user else str(user.phone_number),
+            "UtmCampaign": request_data.get('source', {}).get('utm_campaign', ''),
+            "UTMMedium": request_data.get('source', {}).get('utm_medium', ''),
             "Name": request_data.get('company_name', 'none'),
             "SpocPerson": request_data.get('contact_person_name', 'none'),
             "UtmSource": request_data.get('source', {}).get('utm_source', ''),
             "EmailID": request_data.get('email', ''),
             "NumberofDoctor": str(request_data.get('number_of_employees', '0'))
->>>>>>> master
         }
 
         return data
@@ -352,11 +368,8 @@ lead_class_mapping = {
     'LABADS': LabAds,
     'CANCELDROPOFFLEADVIAAPPOINTMENT': CancelDropOffLeadViaAppointment,
     'DOCADS': DocAds,
-<<<<<<< HEAD
-    'PRESCRIPTIONS': PrescriptionsLabtestPrescription
-=======
+    'PRESCRIPTIONS': PrescriptionsLabtestPrescription,
     'CORPORATEGOLD': CorporateGold
->>>>>>> master
 }
 
 
