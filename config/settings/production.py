@@ -45,6 +45,7 @@ X_FRAME_OPTIONS = 'DENY'
 INSTALLED_APPS += ('gunicorn',)
 
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -62,6 +63,10 @@ LOGGING = {
         },
     },
     'handlers': {
+        'elasticapm': {
+            'level': 'INFO',
+            'class': 'elasticapm.contrib.django.handlers.LoggingHandler',
+        },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -70,22 +75,23 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console', ],
+            'handlers': ['console', 'elasticapm', ],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.db.backends': {
             'level': 'ERROR',
-            'handlers': ['console', ],
+            'handlers': ['console', 'elasticapm', ],
             'propagate': False,
         },
         'django.security.DisallowedHost': {
             'level': 'ERROR',
-            'handlers': ['console', ],
+            'handlers': ['console', 'elasticapm', ],
             'propagate': False,
         },
     },
 }
+
 SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
 if env.bool('ENABLE_SENTRY', default=False):
