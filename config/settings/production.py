@@ -42,23 +42,10 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = 'DENY'
 
-if env.bool('ENABLE_DATADOG', default=False):
-    INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS
-    if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
-        from ddtrace import tracer
-
-        try:
-            tracer.configure(
-                hostname='datadog-agent',
-                port=8126,
-            )
-        except Exception as e:
-            logger = logging.getLogger(__name__)
-            logger.error("Error Configuring DDtracer " + str(e))
-
 INSTALLED_APPS += ('gunicorn',)
 
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -76,6 +63,10 @@ LOGGING = {
         },
     },
     'handlers': {
+        'elasticapm': {
+            'level': 'INFO',
+            'class': 'elasticapm.contrib.django.handlers.LoggingHandler',
+        },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -84,22 +75,23 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console', ],
+            'handlers': ['console', 'elasticapm', ],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.db.backends': {
             'level': 'ERROR',
-            'handlers': ['console', ],
+            'handlers': ['console', 'elasticapm', ],
             'propagate': False,
         },
         'django.security.DisallowedHost': {
             'level': 'ERROR',
-            'handlers': ['console', ],
+            'handlers': ['console', 'elasticapm', ],
             'propagate': False,
         },
     },
 }
+
 SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
 if env.bool('ENABLE_SENTRY', default=False):

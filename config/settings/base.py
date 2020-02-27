@@ -138,7 +138,9 @@ DJANGO_APPS = (
     'django.contrib.sites',
     'django.contrib.sitemaps',
     'reversion_compare',
+    'elasticapm.contrib.django',
 )
+
 THIRD_PARTY_APPS = (
 
     'rest_framework',
@@ -209,6 +211,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 ADD_REVERSION_ADMIN = True
 
 MIDDLEWARE = [
+    'elasticapm.contrib.django.middleware.TracingMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -219,7 +222,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_user_agents.middleware.UserAgentMiddleware'
+    'django_user_agents.middleware.UserAgentMiddleware',
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -345,6 +348,12 @@ GOOGLE_MAPS_API_KEY = 'AIzaSyDFxu_VGlmLojtgiwn892OYzV6IY_Inl6I'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
 SMS_AUTH_KEY = env('SMS_AUTH_KEY')
+
+ELASTIC_APM = {
+   'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
+   'SERVER_URL': env('ELASTIC_APM_SERVICE_URL'),
+   'DEBUG': True,
+}
 
 RABBITMQ_CONNECTION_SETTINGS = {
     'CONNECTION_URL': env('RABBITMQ_CONNECTION_URL'),
@@ -558,7 +567,10 @@ RABBITMQ_TRACKING_QUEUE=env('RABBITMQ_TRACKING_QUEUE')
 SBIG_AUTH_TOKEN=env('SBIG_AUTH_TOKEN')
 GOLD_MERCHANT_CODE=env('GOLD_MERCHANT_CODE')
 VIP_MERCHANT_CODE=env('VIP_MERCHANT_CODE')
+PG_AUTH_TOKEN=env('PG_AUTH_TOKEN')
 SBIG_BASE_URL=env('SBIG_BASE_URL')
 REFERRAL_CASHBACK_AMOUNT=env('REFERRAL_CASHBACK_AMOUNT')
 CORS_ALLOW_HEADERS = ['accept', 'accept-encoding', 'authorization', 'content-type', 'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with', 'app-name']
 SAVE_LOGS=env.bool('SAVE_LOGS', False)
+CHAT_LAB_REPORT_API_URL=env('CHAT_LAB_REPORT_API_URL')
+CHAT_LAB_REPORT_API_TOKEN=env('CHAT_LAB_REPORT_API_TOKEN')

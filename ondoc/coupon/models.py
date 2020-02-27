@@ -444,7 +444,6 @@ class RandomGeneratedCoupon(auth_model.TimeStampedModel):
         if random_coupons:
             c_list = ','.join(["'" + str(c) + "'" for c in coupon_codes])
             coupon_obj = Coupon.objects\
-                .prefetch_related('random_generated_coupon')\
                 .annotate(is_random=models.Value(True, models.BooleanField()),
                           random_count=models.Value(1, models.IntegerField()))\
                 .filter(id__in=random_coupons.values_list('coupon', flat=True)) \
@@ -452,7 +451,6 @@ class RandomGeneratedCoupon(auth_model.TimeStampedModel):
 
         if not coupon_obj:
             coupon_obj = Coupon.objects \
-                .prefetch_related('random_generated_coupon')\
                 .annotate(is_random=models.Value(False, models.BooleanField()),
                           random_count=models.Value(0, models.IntegerField()),
                           random_coupon_code=models.Value("", models.CharField()))\
