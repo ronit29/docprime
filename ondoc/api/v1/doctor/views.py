@@ -28,7 +28,8 @@ from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
     HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, \
-    SpecializationDepartmentMapping, DoctorPracticeSpecialization, DoctorClinicTiming, GoogleMapRecords
+    SpecializationDepartmentMapping, DoctorPracticeSpecialization, DoctorClinicTiming, GoogleMapRecords, \
+    HospitalPlaceDetails
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -1889,6 +1890,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
+        hospital_place_details = Prefetch('doctor_clinics__hospital__hospital_place_details',
+                                          queryset=HospitalPlaceDetails.objects.all().only('hospital_id', 'reviews'))
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
                                                 "doctor_clinics__hospital",
@@ -1896,8 +1899,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "images",
                                                 "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping",
                                                 "qualifications__qualification","qualifications__college",
-                                                "qualifications__specialization",
-                                                "doctor_clinics__hospital__hospital_place_details", "rating"
+                                                "qualifications__specialization", hospital_place_details, "rating"
                                                 ).order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request,
