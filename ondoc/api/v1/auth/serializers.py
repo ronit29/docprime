@@ -7,7 +7,7 @@ from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers, UserInsurance
 from ondoc.diagnostic.models import AvailableLabTest
-from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
+from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction, ConsumerRefund, PgTransaction
 import datetime, calendar, pytz
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
@@ -223,7 +223,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
         plus_membership = obj.get_plus_membership
         if not plus_membership:
             return resp
+        resp['is_member_allowed'] = False
+        plus_members_count = plus_membership.get_members.count()
         resp['expiry_date'] = plus_membership.expire_date.date()
+        resp['total_members_allowed'] = plus_membership.plan.total_allowed_members
+        if resp['total_members_allowed'] and resp['total_members_allowed'] > 0 and plus_members_count >=0 and \
+                (resp['total_members_allowed'] - plus_members_count > 0) and not plus_membership.plan.is_corporate:
+            resp['is_member_allowed'] = True
         resp['purchase_date'] = plus_membership.purchase_date.date()
         primary_member = plus_membership.get_primary_member_profile()
         if primary_member:
@@ -237,8 +243,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance:
-            if self.instance.is_gold_profile:
-                raise serializers.ValidationError("Gold Member Profile can not be editable.")
+            # if self.instance.is_gold_profile:
+            #     raise serializers.ValidationError("Gold Member Profile can not be editable.")
             if self.instance.is_insured_profile:
                 raise serializers.ValidationError("Insured Member profile can not be editable.")
         return attrs
@@ -428,6 +434,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         token = attrs.get('token')
         reset = attrs.get('reset')
         app_name = self.context.get('app_name')
+        is_agent = self.context.get('is_agent', None)
         force_update = True if (attrs.get('force_update') and attrs['force_update']) else False
         request = self.context.get('request')
         payload, status = self.check_payload_v2(token)
@@ -436,11 +443,13 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         #     attrs['active_session_error'] = True
         #     return attrs
         #     raise serializers.ValidationError("No Last Active sesssion found!")
-        if status == 1 and not force_update:
+        if is_agent or (status == 1 and not force_update):
             '''FAke Refresh, Return the original data [As required by Rohit Dhall]'''
             attrs['token']= token
             attrs['user'] = payload.get('user_id')
             attrs['payload'] = payload
+            if payload.get('agent_id',None):
+                attrs['agent_id'] = payload.get('agent_id')
         elif (force_update or reset):
             try:
                 passphrase = hashlib.md5("hpDqwzdpoQY8ymm5".encode())
@@ -546,7 +555,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
 
     def check_payload_v2(self, token):
         user_key = None
-        user_id = JWTAuthentication.get_unverified_user(token)
+        user_id, agent_id = JWTAuthentication.get_unverified_user(token)
         if user_id:
             user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
             if user_key_object:
@@ -772,3 +781,25 @@ class MatrixUserLoginSerializer(serializers.Serializer):
 #     dob = serializers.DateField()
 #     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
 #     extra = serializers.JSONField(allow_null=True, required=False)
+
+
+class PGRefundSaveSerializer(serializers.Serializer):
+    mode = serializers.CharField(max_length=24)
+    refNo = serializers.IntegerField()
+    orderNo = serializers.CharField(required=False)
+    orderId = serializers.IntegerField()
+    bankRefNum = serializers.IntegerField(allow_null=True)
+    refundDate = serializers.DateTimeField()
+    refundId = serializers.IntegerField()
+    txnAmount = serializers.FloatField()
+    gateway = serializers.CharField(allow_null=True)
+    bank_arn = serializers.CharField(allow_null=True)
+    refundAmount = serializers.FloatField()
+
+    def validate(self, attrs):
+        refund_obj = ConsumerRefund.objects.select_related('pg_transaction').filter(id=attrs['refNo']).first()
+        if refund_obj and refund_obj.refund_state == ConsumerRefund.COMPLETED and refund_obj.pg_transaction.order.id == attrs['orderId']:
+            attrs['refund_obj'] = refund_obj
+        else:
+            raise serializers.ValidationError('Invalid Refund!')
+        return attrs

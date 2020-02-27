@@ -10,7 +10,7 @@ import json
 import logging
 import datetime
 from ondoc.authentication.models import Address, SPOCDetails, QCModel
-from ondoc.api.v1.utils import log_requests_on
+from ondoc.api.v1.utils import log_requests_on, generate_short_url
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids, constants
 
@@ -378,7 +378,8 @@ def push_appointment_to_matrix(self, data):
         appointment_user = appointment.user
         if appointment_user:
             last_24_time = datetime.datetime.now() - datetime.timedelta(days=1)
-            if GeneralMatrixLeads.objects.filter(created_at__gte=last_24_time, phone_number=int(appointment_user.phone_number), lead_type__in=['DROPOFF', 'LABADS']).exists():
+            if GeneralMatrixLeads.objects.filter(created_at__gte=last_24_time, phone_number=int(appointment_user.phone_number),
+                                                 lead_type__in=['DROPOFF', 'LABADS'], matrix_lead_id__isnull=False).exists():
 
                 lead_engine_obj = lead_class_referance("CANCELDROPOFFLEADVIAAPPOINTMENT", appointment)
                 success = lead_engine_obj.process_lead()
@@ -401,7 +402,8 @@ def push_appointment_to_matrix(self, data):
             qs = LabAppointment.objects.filter(id=appointment.id)
             obj_type = 'lab_appointment'
 
-        save_matrix_logs.apply_async((qs.first().id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((qs.first().id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1493,21 +1495,27 @@ def create_prescription_lead_to_matrix(self, data):
             phone_number = appointment.profile.phone_number
         else:
             phone_number = appointment.user.phone_number
+        feedback_url = "%s/chat-ratings?&appointment_id=%s" \
+                         % (settings.BASE_URL, appointment.id)
+        tiny_feedback_url = generate_short_url(feedback_url)
 
         request_data = {
             "Name": appointment.profile.name if appointment.profile else "",
             "ProductId": 14,
             "PrimaryNo": phone_number,
             "LeadSource": "Prescriptions",
-            "ExitPointUrl": booking_url
+            "ExitPointUrl": booking_url,
+            "VIPPlanName": None,
+            "IPDBookingId": appointment.id,
+            "URL": tiny_feedback_url
         }
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
-
-        save_matrix_logs.apply_async((appointment.id, 'lab_appointment', request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((appointment.id, 'lab_appointment', request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info(json.dumps(request_data))
             logger.info("[ERROR] Appointment Prescription could not be published to the matrix system")
@@ -1523,6 +1531,96 @@ def create_prescription_lead_to_matrix(self, data):
 
         if not resp_data.get('Id', None):
             return
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Appointment Prescription lead to matrix- " + str(e))
+
+
+@task(bind=True, max_retries=1)
+def send_report_review_data_to_chat(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.notification.tasks import save_matrix_logs
+    try:
+        appointment_id = data.get('appointment_id', None)
+        if not appointment_id:
+            raise Exception("Appointment id not found, could not push prescription lead to Matrix")
+
+        appointment = LabAppointment.objects.filter(id=appointment_id).first()
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        profile = appointment.profile
+        lab_tests = appointment.tests.all()
+        test_data = []
+        for test in lab_tests:
+            test_details = {
+                "test_id": test.id,
+                "mrp": "00.00",
+                "test": {
+                    "id": test.id,
+                    "name": test.name,
+                    "pre_test_info": test.pre_test_info,
+                    "why": test.why,
+                    "show_details": test.show_details,
+                    "url": test.url
+                },
+                "agreed_price": 0.0,
+                "deal_price": 0.0,
+                "test_type": test.test_type,
+                "is_home_collection_enabled": False
+            }
+
+            test_data.append(test_details)
+
+        request_data = {
+            "id": appointment.id,
+            "profile": {
+                "id": profile.id,
+                "name": profile.name,
+                "email": profile.email,
+                "gender": profile.gender,
+                "phone_number": profile.phone_number,
+                "is_otp_verified": profile.is_otp_verified,
+                "is_default_user": profile.is_default_user,
+                "profile_image": None,
+                "age": 54,
+                "user": appointment.user.id,
+                "dob": str(profile.dob),
+                "is_insured": False,
+                "updated_at": str(profile.updated_at),
+                "whatsapp_optin": profile.whatsapp_optin,
+                "whatsapp_is_declined": profile.whatsapp_is_declined,
+                "insurance_status": 0,
+                "is_vip_member": False,
+                "is_vip_gold_member": False
+            },
+            "lab_test": test_data,
+            "reports": appointment.get_report_urls(),
+            "report_files": appointment.get_report_type()
+        }
+
+        url = settings.CHAT_LAB_REPORT_API_URL
+        chat_lab_report_api_token = settings.CHAT_LAB_REPORT_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': chat_lab_report_api_token,
+                                                                              'Content-Type': 'application/json'})
+        if settings.SAVE_LOGS:
+            save_matrix_logs.apply_async((appointment.id, 'lab_appointment', request_data, response.json()),
+                                         countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info(json.dumps(request_data))
+            logger.info("[ERROR] Chat Report Review Data Push Failed")
+            logger.info("[ERROR] %s", response)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logger.error("Chat Report Review Data Push Failed  - " + str(response))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+        resp_data = response.json()
+        print(resp_data)
+
+        if resp_data.get('message', '') == 'Success':
+            print('Data Pushed to Chat.')
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment Prescription lead to matrix- " + str(e))

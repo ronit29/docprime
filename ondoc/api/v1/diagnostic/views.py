@@ -28,7 +28,9 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
                                      LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds,
-                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead, LabTestPrecsriptions)
+                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead,
+                                     LabTestPrecsriptions, LabAppointmentFeedback)
+
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -105,25 +107,23 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         package_queryset = CommonPackage.get_packages(count)
-        recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
-                                                                                                          show_on_recommended_screen=True,
-                                                                                                          recommended_lab_tests__searchable=True,
-                                                                                                          recommended_lab_tests__enable_for_retail=True).order_by('-priority').distinct()[:count]
+        # recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
+        #                                                                                                   show_on_recommended_screen=True,
+        #                                                                                                   recommended_lab_tests__searchable=True,
+        #                                                                                                   recommended_lab_tests__enable_for_retail=True).order_by('-priority').distinct()[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
         coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
         package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender':coupon_recommender})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
-        recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True, context={'request': request})
+        # recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True, context={'request': request})
         temp_data = dict()
-        user_config = UserConfig.objects.filter(key='package_adviser_filters').first()
-        advisor_filter = []
-        if user_config:
-            advisor_filter = user_config.data
+        # user_config = UserConfig.objects.filter(key='package_adviser_filters').first()
+        # advisor_filter = []
+        # if user_config:
+        #     advisor_filter = user_config.data
         temp_data['common_tests'] = test_serializer.data
-        temp_data['recommended_package'] = {'result': recommended_package.data,
-                                            'information': {'screening': 'Screening text', 'physical': 'Physical Text'},
-                                            'filters': advisor_filter}
+        temp_data['recommended_package'] = {}
         if request.user and request.user.is_authenticated and request.user.active_insurance and not hasattr(request, 'agent'):
             temp_data['common_package'] = []
         else:
@@ -2080,6 +2080,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing = None
         lab_timing_data = list()
         distance_related_charges = None
+        rating_queryset = None
 
         distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
         if lab_obj.always_open:
@@ -2097,11 +2098,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                                    entity_type__iexact='Lab')
         # if entity.exists():
         #     entity = entity.first()
-        rating_queryset = lab_obj.rating.filter(is_live=True)
+
         if lab_obj.network:
-            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment')\
+            rating_queryset = rating_models.RatingsReview.objects.prefetch_related('compliment', 'user__profiles')\
                                                                  .filter(is_live=True,
                                                                          lab_ratings__network=lab_obj.network)
+        else:
+            rating_queryset = lab_obj.rating.filter(is_live=True).prefetch_related('user__profiles')
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request,
                                                                                     "entity": entity,
                                                                                     "rating_queryset": rating_queryset})
@@ -4268,4 +4271,25 @@ class LabTestPrecriptionViewSet(viewsets.GenericViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+class MatrixViewSet(viewsets.GenericViewSet):
+
+    def send_feedback_to_matrix(self, request):
+        appointment_id = self.request.query_params.get('appointment_id')
+        if not appointment_id:
+            return Response({'result': 'appointment id not present'})
+        data = self.request.data
+        comment = data.get('comment') if data.get('comment') else None
+        ratings = data.get('ratings') if data.get('ratings') else None
+
+        if appointment_id and ratings:
+            app_feedback = LabAppointmentFeedback.objects.filter(appointment_id=appointment_id)
+            if not app_feedback:
+                LabAppointmentFeedback.objects.create(appointment_id= appointment_id, comment=comment, ratings=ratings)
+            else:
+                return Response({'result': 'feedback already exists'})
+        else:
+            return Response({'result': 'either appointment id or rating not present'})
+
+        return Response(status=status.HTTP_200_OK)
 

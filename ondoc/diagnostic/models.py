@@ -3937,3 +3937,13 @@ class LabTestPrecsriptions(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'lab_test_prescriptions'
+
+
+class LabAppointmentFeedback(auth_model.TimeStampedModel):
+    appointment = models.ForeignKey(LabAppointment, on_delete=models.DO_NOTHING, null=True)
+    ratings = models.PositiveIntegerField(max_length=10)
+    comment = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'lab_appointment_feedback'
+

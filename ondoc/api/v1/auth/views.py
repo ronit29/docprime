@@ -26,7 +26,7 @@ from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, 
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
-from ondoc.plus.models import PlusAppointmentMapping, PlusUser, PlusPlans, PlusDummyData
+from ondoc.plus.models import PlusAppointmentMapping, PlusUser, PlusPlans, PlusDummyData, PlusMembers
 from ondoc.plus.usage_criteria import get_price_reference, get_class_reference
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
@@ -35,7 +35,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate,
                                          WhiteListedLoginTokens)
-from ondoc.notification.models import SmsNotification, EmailNotification
+from ondoc.notification.models import SmsNotification, EmailNotification, WhtsappNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs, PaymentProcessStatus
 from ondoc.account.mongo_models import PgLogs as mongo_pglogs
@@ -369,7 +369,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         qs = self.get_queryset()
 
         serializer = [serializers.UserProfileSerializer(q, context= {'request':request}).data for q in qs]
-        return Response(data=serializer)
+        result = list()
+        result.extend(list(filter(lambda x: (x['is_default_user'] and x['is_vip_gold_member']) or x['is_default_user'], serializer)))
+        result.extend(list(filter(lambda x: x['is_vip_gold_member'] and not x['is_default_user'], serializer)))
+        result.extend(list(filter(lambda x: not x['is_default_user'] and not x['is_vip_gold_member'], serializer)))
+
+        return Response(data=result)
 
     def create(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -382,6 +387,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data['whatsapp_optin'] = request.data.get('whatsapp_optin')
         data['user'] = request.user.id
         first_profile = False
+        add_to_gold_members = request.data.get('add_to_gold')
 
         if not queryset.exists():
             data.update({
@@ -410,6 +416,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
+
+        if add_to_gold_members:
+            default_profile = request.user.get_default_profile()
+            if default_profile.email and not data.get('email'):
+                data['email'] = default_profile.email
+
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
         serializer.validated_data
@@ -420,7 +432,14 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             #                        }
             # }, status=status.HTTP_400_BAD_REQUEST)
             return Response(serializer.data)
+
+
         serializer.save()
+
+        if add_to_gold_members:
+            saved_profile = request.user.profiles.filter().order_by('-created_at').first()
+            request.user.active_plus_user.add_user_profile_to_members(saved_profile)
+
         # for new profile credit referral amount if any refrral code is used
         if first_profile and request.data.get('referral_code'):
             try:
@@ -440,6 +459,24 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
+
+        add_to_gold_members = data.get('add_to_gold')
+        if add_to_gold_members:
+            default_profile = request.user.get_default_profile()
+            if default_profile.email and not data.get('email'):
+                data['email'] = default_profile.email
+
+        plus_user_obj = request.user.active_plus_user
+        associated_plus_member = None
+        if plus_user_obj:
+            associated_plus_member = PlusMembers.objects.filter(plus_user=plus_user_obj, profile=obj).first()
+
+        if associated_plus_member and data.get('name') and data.get('name') != obj.name:
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Profile covered in the gold cannot edit their name."
+                                   }
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
             return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
@@ -503,6 +540,11 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                        }
                 }, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
+
+        if add_to_gold_members:
+            saved_profile = request.user.profiles.filter().order_by('-updated_at').first()
+            request.user.active_plus_user.add_user_profile_to_members(saved_profile)
+
         return Response(serializer.data)
 
     def upload(self, request, *args, **kwargs):
@@ -1427,9 +1469,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
             args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code, 'source': response.get("source")}
             status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
             # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-            save_pg_response.apply_async(
-                (mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')),
-                eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            if settings.SAVE_LOGS:
+                save_pg_response.apply_async(
+                    (mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')),
+                    eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
         except Exception as e:
             logger.error("Cannot log pg response - " + str(e))
@@ -1465,7 +1508,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
                             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
                             log_created_at = str(datetime.datetime.now())
-                            save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                            if settings.SAVE_LOGS:
+                                save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                         return CHAT_REDIRECT_URL
                     else:
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
@@ -1599,9 +1643,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         if order_obj.product_id == Order.CHAT_PRODUCT_ID:
             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
             log_created_at = str(datetime.datetime.now())
-            save_pg_response.apply_async(
-                (mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
-                eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            if settings.SAVE_LOGS:
+                save_pg_response.apply_async(
+                    (mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
+                    eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             return CHAT_REDIRECT_URL
         return REDIRECT_URL
 
@@ -1654,7 +1699,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
                     # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                    save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, order_id, None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                    if settings.SAVE_LOGS:
+                        save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, order_id, None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                     save_payment_status.apply_async((status_type, args), eta=timezone.localtime(),)
                 except Exception as e:
                     logger.error("Cannot log pg response - " + str(e))
@@ -2368,21 +2414,24 @@ class RefreshJSONWebToken(GenericViewSet):
 
     def refresh(self, request):
         data = {}
-        if hasattr(request, 'agent') and request.agent is not None:
-            return Response({})
         app_name = True if (request.META.get("HTTP_APP_NAME") and
                             (request.META.get("HTTP_APP_NAME") == 'docprime_consumer_app' or request.META.get("HTTP_APP_NAME") == 'd_web'))\
                         else None
-        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request, 'app_name': app_name})
+        is_agent = False
+        if hasattr(request, 'agent') and request.agent is not None:
+            is_agent = True
+        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request, 'app_name': app_name, 'is_agent':is_agent})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
+
         # if 'active_session_error' in valid_data and valid_data['active_session_error']:
         #     return Response({'error': 'No Last Acctive Session Found'}, status=status.HTTP_401_UNAUTHORIZED)
         # if not serializer.is_valid():
         #     return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_400_BAD_REQUEST)
         data['token'] = valid_data.get('token', '')
         data['user'] = valid_data.get('user', '')
-        data['payload'] = valid_data.get('payload','')
+        data['payload'] = valid_data.get('payload', '')
+        data['is_agent'] = is_agent
         return Response(data)
 
 
@@ -2436,8 +2485,9 @@ class SendBookingUrlViewSet(GenericViewSet):
         utm_tags = request.data.get('utm_spo_tags', {})
         if not utm_tags:
             utm_tags = {}
-        utm_source = utm_tags.get('utm_source', '')
-        landing_url = request.data.get('landing_url')
+        utm_source = utm_tags.get('utm_source', {})
+        landing_url = request.data.get('landing_url', '')
+        message_medium = request.data.get('message_medium', None)
 
         # agent_token = AgentToken.objects.create_token(user=request.user)
         user_token = JWTAuthentication.generate_token(request.user, request)
@@ -2450,26 +2500,48 @@ class SendBookingUrlViewSet(GenericViewSet):
         if purchase_type == PlusDummyData.DataType.SINGLE_PURCHASE:
             if not landing_url:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'No Landing url found.'})
-            SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url)
+            SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url, user_id=request.user.id)
+            if message_medium == 'WHATSAPP':
+                self.send_whatsapp(request, token, utm_source, landing_url)
             return Response({"status": 1})
 
         if purchase_type == 'vip_purchase':
-            SmsNotification.send_vip_booking_url(token, str(request.user.phone_number), utm_source=utm_source)
+            SmsNotification.send_vip_booking_url(token, str(request.user.phone_number), utm_source=utm_source, user_id=request.user.id)
+            if message_medium == 'WHATSAPP':
+                self.send_whatsapp(request, token, utm_source, "vip-club-member-details")
             return Response({"status": 1})
 
         if not user_profile:
             return Response({"status": 1})
         if purchase_type == 'insurance':
-            SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number))
-            EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email)
+            SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number), user=user_profile.user)
+            EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email, user=user_profile.user)
         elif purchase_type == 'endorsement':
-            SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
-            EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)
+            SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number), user=user_profile.user)
+            EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email, user=user_profile.user)
         else:
-            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name)
-            EmailNotification.send_booking_url(token=token, email=user_profile.email)
+            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name,  user=user_profile.user)
+            EmailNotification.send_booking_url(token=token, email=user_profile.email, user=user_profile.user)
+
+        if message_medium == 'WHATSAPP':
+            self.send_whatsapp(request, token, utm_source, landing_url)
 
         return Response({"status": 1})
+
+    def send_whatsapp(self, request, token, utm_source, landing_url):
+        whatsapp_template = 'gold_payment_template'
+        utm_source = utm_source.get('utm_source', {})
+        booking_url = "{}/agent/booking?user_id={}&token={}".format(settings.CONSUMER_APP_DOMAIN, request.user.id,
+                                                                    token)
+        if utm_source:
+            booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
+                landing_url=landing_url, utm_source=utm_source)
+        else:
+            booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false".format(
+                landing_url=landing_url)
+        short_url = generate_short_url(booking_url)
+        whatsapp_payload = [short_url]
+        WhtsappNotification.send_whatsapp(request.user.phone_number, whatsapp_template, whatsapp_payload, None)
 
 
 class SendCartUrlViewSet(GenericViewSet):
@@ -2506,7 +2578,7 @@ class SendCartUrlViewSet(GenericViewSet):
         if not user_profile:
             return Response({"status": 1})
 
-        SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number), utm=utm_parameters)
+        SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number), utm=utm_parameters, user= user_profile.user)
 
         return Response({"status": 1})
 
@@ -2948,7 +3020,7 @@ class MatrixUserViewset(GenericViewSet):
         if not token:
             return JsonResponse(response, status=400)
 
-        base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token['token'].decode("utf-8"))
+        base_landing_url = settings.BASE_URL + '/sms/booking?token={}&user_id={}'.format(token['token'].decode("utf-8"), user_data.get('user_id'))
         # redirect_url = 'search' if redirect_type == 'lab' else '/'
         redirect_url = 'opd/doctor/{}/{}/bookdetails?is_matrix=true'.format(doctor.id, hospital.id)
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
@@ -2985,7 +3057,7 @@ class ExternalLoginViewSet(GenericViewSet):
         if ext_type == 1:
             base_url = settings.SBIG_BASE_URL
 
-        base_landing_url = base_url + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        base_landing_url = base_url + '/sms/booking?token={}&user_id={}'.format(token_object['token'].decode("utf-8"), user_data.get('user_id'))
         redirect_url = 'lab' if redirect_type == 'lab' else 'opd'
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
         docprime_login_url = generate_short_url(callback_url)
@@ -3017,26 +3089,33 @@ class SbiGUserViewset(GenericViewSet):
         return response
 
 
-class PGRefundViewset(viewsets.GenericViewSet):
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, IsDoctor)
+class PGRefundViewSet(viewsets.GenericViewSet):
 
+    permission_classes = (utils.IsPGRequest, )
     @transaction.atomic()
     def save_pg_refund(self, request):
-        from django.http import JsonResponse
-        response = {'login': 0}
+        response = {'status': 0}
         if request.method != 'POST':
-            return JsonResponse(response, status=405)
-        serializer = serializers.CloudLabUserLoginSerializer(data=request.data)
+            return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        serializer = serializers.PGRefundSaveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        refund_obj = data['refund_obj']
         try:
-            user_data = User.get_external_login_data(data, request)
+            refund_obj.pg_transaction.amount = data.get('txnAmount')
+            refund_obj.pg_transaction.pb_gateway_name = data.get('gateway')
+            refund_obj.pg_transaction.payment_mode = data.get('mode')
+            refund_obj.refund_amount = data.get('refundAmount')
+
+            refund_obj.bank_arn = data.get('bank_arn')
+            refund_obj.bankRefNum = data.get('bankRefNum')
+            refund_obj.refundDate = utils.aware_time_zone(data.get('refundDate'))
+            refund_obj.refundId = data.get('refundId')
+            refund_obj.pg_transaction.save()
+            refund_obj.save()
         except Exception as e:
             logger.error(str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        token = user_data.get('token')
-        if not token:
-            return JsonResponse(response, status=400)
 
-        return Response(response, status=status.HTTP_200_OK)
+        return Response({'status':1}, status=status.HTTP_200_OK)
+

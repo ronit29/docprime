@@ -5343,16 +5343,38 @@ class RecordAPIView(viewsets.GenericViewSet):
         lat = params.get('lat', 28.450367)
         long = params.get('long', 77.071848)
         radius = int(params.get('radius')) if params.get('radius') else 2000
+        rank = params.get('rank', [])
+        phlebo = params.get('phlebo', [])
+        onboarded = params.get('onboarded', [])
+        interested_in_diagnostics = params.get('interested_in_diagnostics', [])
+        interested_in_pharmacy = params.get('interested_in_pharmacy', [])
+        ready_to_use_wallet = params.get('ready_to_use_wallet', [])
+        digital_only_report = params.get('digital_only_report', [])
+
         response = dict()
 
         queryset = GoogleMapRecords.objects.all()
+        if rank:
+            queryset = queryset.filter(label__in=rank)
+        if phlebo:
+            queryset = queryset.filter(has_phlebo__in=phlebo.split(','))
+        if onboarded:
+            queryset = queryset.filter(onboarded__in=onboarded.split(','))
+        if interested_in_diagnostics:
+            queryset = queryset.filter(interested_in_diagnostics__in=interested_in_diagnostics.split(','))
+        if interested_in_pharmacy:
+            queryset = queryset.filter(interested_in_pharmacy__in=interested_in_pharmacy.split(','))
+        if ready_to_use_wallet:
+            queryset = queryset.filter(ready_to_use_wallet__in=ready_to_use_wallet.split(','))
+        if digital_only_report:
+            queryset = queryset.filter(digital_only_report__in=digital_only_report.split(','))
         if lat and long and radius:
             point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
             queryset = queryset.filter(location__distance_lte=(pnt, radius))
 
         serializer = serializers.RecordSerializer(queryset, many=True,
-                                                              context={"request": request})
+                                                  context={"request": request})
         serialized_data = serializer.data
         response['map_data'] = serialized_data
         response['labels'] = list(queryset.values('label').distinct())

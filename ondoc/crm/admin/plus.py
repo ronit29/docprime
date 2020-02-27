@@ -100,8 +100,8 @@ class PlusUserAdminForm(forms.ModelForm):
         if status:
             status = int(status)
 
-        if status == PlusUser.CANCELLED and self.instance.plan.is_corporate:
-            raise forms.ValidationError('Corporate Plus User can not be Cancelled.')
+        # if status == PlusUser.CANCELLED and self.instance.plan.is_corporate:
+        #     raise forms.ValidationError('Corporate Plus User can not be Cancelled.')
 
     def clean_status(self):
         status = self.cleaned_data.get('status')
@@ -151,6 +151,7 @@ class PlusUserAdmin(admin.ModelAdmin):
     fields = ("user", "plan", "purchase_date", "expire_date", "status", "matrix_lead_id")
     readonly_fields = ("user", "plan", "purchase_date", "matrix_lead_id")
     list_display = ('user', 'purchase_date')
+    search_fields = ("user__phone_number",)
 
 
 class PlusMemberAdmin(admin.ModelAdmin):
@@ -161,6 +162,7 @@ class PlusMemberAdmin(admin.ModelAdmin):
     readonly_fields = ("relation", "phone_number", "profile", "city", "district", "state", "state_code", "plus_user",
                        "city_code", "district_code", "is_primary_user")
     list_display = ("first_name", "last_name", "plus_user", "is_primary_user")
+    search_fields = ("phone_number", )
 
 
 class PlusUserUploadAdmin(admin.ModelAdmin):
