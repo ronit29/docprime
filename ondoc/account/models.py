@@ -122,6 +122,8 @@ class Order(TimeStampedModel):
 
     def is_vip_appointment(self):
         appt = self.getAppointment()
+        if appt.__class__.__name__ not in ['LabAppointment', 'OpdAppointment']:
+            return False
         if appt.plus_plan and appt.plus_plan.plan and not appt.plus_plan.plan.is_gold:
             return True
         return False
