@@ -1561,61 +1561,63 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             'applicable': False,
             'coupon': {}
         }
-        insurance_applicable = False
-        request = self.context.get("request")
-        profile = self.context.get("profile")
-        user = request.user
-        hospital = self.context.get('hospital_id')
-        resp = Doctor.get_insurance_details(user)
-        doctor_clinic_timing = None
-        doctor_clinic = obj.doctor_clinics.filter(hospital=hospital).first()
+        # Commented as not being used
+        if False:
+            insurance_applicable = False
+            request = self.context.get("request")
+            profile = self.context.get("profile")
+            user = request.user
+            hospital = self.context.get('hospital_id')
+            resp = Doctor.get_insurance_details(user)
+            doctor_clinic_timing = None
+            doctor_clinic = obj.doctor_clinics.filter(hospital=hospital).first()
 
-        if doctor_clinic:
-            hospital = doctor_clinic.hospital
-            doctor_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic=doctor_clinic,
-                                                                     doctor_clinic__enabled=True,
-                                                                     doctor_clinic__hospital__is_live=True).select_related(
-                "doctor_clinic__doctor", "doctor_clinic__hospital").first()
+            if doctor_clinic:
+                hospital = doctor_clinic.hospital
+                doctor_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic=doctor_clinic,
+                                                                         doctor_clinic__enabled=True,
+                                                                         doctor_clinic__hospital__is_live=True).select_related(
+                    "doctor_clinic__doctor", "doctor_clinic__hospital").first()
 
-            enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and obj.enabled_for_online_booking and \
-                                         obj.is_doctor_specialization_insured() and hospital.enabled_for_online_booking
+                enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and obj.enabled_for_online_booking and \
+                                             obj.is_doctor_specialization_insured() and hospital.enabled_for_online_booking
 
-            if doctor_clinic_timing:
-                if hospital.enabled_for_prepaid and hospital.enabled_for_insurance and doctor_clinic_timing.mrp is not None and resp[
-                    'insurance_threshold_amount'] is not None and doctor_clinic_timing.mrp <= resp[
-                    'insurance_threshold_amount'] and enabled_for_online_booking and \
-                        not (request.query_params.get('procedure_ids') or request.query_params.get(
-                            'procedure_category_ids')) and obj.is_enabled_for_insurance:
-                        is_insurance_covered = True
+                if doctor_clinic_timing:
+                    if hospital.enabled_for_prepaid and hospital.enabled_for_insurance and doctor_clinic_timing.mrp is not None and resp[
+                        'insurance_threshold_amount'] is not None and doctor_clinic_timing.mrp <= resp[
+                        'insurance_threshold_amount'] and enabled_for_online_booking and \
+                            not (request.query_params.get('procedure_ids') or request.query_params.get(
+                                'procedure_category_ids')) and obj.is_enabled_for_insurance:
+                            is_insurance_covered = True
 
-                if is_insurance_covered and user and user.is_authenticated and profile:
-                    insurance_applicable = user.active_insurance and profile.is_insured_profile
+                    if is_insurance_covered and user and user.is_authenticated and profile:
+                        insurance_applicable = user.active_insurance and profile.is_insured_profile
 
-                if not insurance_applicable:
-                    coupon_code = Coupon.objects.filter(is_lensfit=True).order_by('-created_at').first()
-                    product_id = Order.DOCTOR_PRODUCT_ID
+                    if not insurance_applicable:
+                        coupon_code = Coupon.objects.filter(is_lensfit=True).order_by('-created_at').first()
+                        product_id = Order.DOCTOR_PRODUCT_ID
 
-                    # doctor_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic=doctor_clinic,
-                    #                                          doctor_clinic__enabled=True,
-                    #                                          doctor_clinic__hospital__is_live=True).select_related(
-                    #     "doctor_clinic__doctor", "doctor_clinic__hospital").first()
+                        # doctor_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic=doctor_clinic,
+                        #                                          doctor_clinic__enabled=True,
+                        #                                          doctor_clinic__hospital__is_live=True).select_related(
+                        #     "doctor_clinic__doctor", "doctor_clinic__hospital").first()
 
-                    deal_price = doctor_clinic_timing.deal_price
-                    filters = dict()
-                    filters['deal_price'] = deal_price
-                    filters['doctor_id'] = obj.id
-                    filters['hospital'] = hospital
+                        deal_price = doctor_clinic_timing.deal_price
+                        filters = dict()
+                        filters['deal_price'] = deal_price
+                        filters['doctor_id'] = obj.id
+                        filters['hospital'] = hospital
 
-                    coupon_recommender = CouponRecommender(user, profile, 'doctor', product_id, coupon_code, None)
-                    applicable_coupons = coupon_recommender.applicable_coupons(**filters)
+                        coupon_recommender = CouponRecommender(user, profile, 'doctor', product_id, coupon_code, None)
+                        applicable_coupons = coupon_recommender.applicable_coupons(**filters)
 
-                    lensfit_coupons = list(filter(lambda x: x.is_lensfit is True, applicable_coupons))
-                    if lensfit_coupons:
-                        offer['applicable'] = True
-                        coupon_properties = coupon_recommender.get_coupon_properties(str(lensfit_coupons[0]))
-                        serializer = CouponSerializer(lensfit_coupons[0],
-                                                      context={'coupon_properties': coupon_properties})
-                        offer['coupon'] = serializer.data
+                        lensfit_coupons = list(filter(lambda x: x.is_lensfit is True, applicable_coupons))
+                        if lensfit_coupons:
+                            offer['applicable'] = True
+                            coupon_properties = coupon_recommender.get_coupon_properties(str(lensfit_coupons[0]))
+                            serializer = CouponSerializer(lensfit_coupons[0],
+                                                          context={'coupon_properties': coupon_properties})
+                            offer['coupon'] = serializer.data
 
         return offer
 
