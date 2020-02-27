@@ -1271,7 +1271,7 @@ class PlusUserUtilization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'plus_user_utilization'
-        unique_together = (('plus_user', 'plan'),)
+        # unique_together = (('plus_user', 'plan'),)
 
     # Create utilization of individual user.
     @classmethod
