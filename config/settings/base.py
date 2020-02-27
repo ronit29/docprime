@@ -567,6 +567,7 @@ RABBITMQ_TRACKING_QUEUE=env('RABBITMQ_TRACKING_QUEUE')
 SBIG_AUTH_TOKEN=env('SBIG_AUTH_TOKEN')
 GOLD_MERCHANT_CODE=env('GOLD_MERCHANT_CODE')
 VIP_MERCHANT_CODE=env('VIP_MERCHANT_CODE')
+PG_AUTH_TOKEN=env('PG_AUTH_TOKEN')
 SBIG_BASE_URL=env('SBIG_BASE_URL')
 REFERRAL_CASHBACK_AMOUNT=env('REFERRAL_CASHBACK_AMOUNT')
 CORS_ALLOW_HEADERS = ['accept', 'accept-encoding', 'authorization', 'content-type', 'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with', 'app-name']
