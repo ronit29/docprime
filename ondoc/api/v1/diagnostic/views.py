@@ -4248,10 +4248,11 @@ class LabTestPrecriptionViewSet(viewsets.GenericViewSet):
         resp = {}
         user = request.user
         primary_number = user.phone_number
+        '''as per Requirement , no process for insured customers'''
         if user.active_insurance:
             return Response({'error': 'For insured customers, prescription is required at the time of booking'},
                              status=status.HTTP_400_BAD_REQUEST)
-        serialize_data = serializers.LabTestPrescriptionSerializer(data=request.data, context={'request':request})
+        serialize_data = serializers.LabTestPrescriptionSerializer(data=request.data, context={'request': request})
         serialize_data.is_valid(raise_exception=True)
         validated_data = serialize_data.validated_data
         try:
