@@ -336,6 +336,54 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return None
 
 
+class ProviderUserProfileSerializer(serializers.ModelSerializer):
+    GENDER_CHOICES = UserProfile.GENDER_CHOICES
+    name = serializers.CharField(max_length=100)
+    age = serializers.SerializerMethodField()
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES, allow_null=True, allow_blank=True, required=False)
+    email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
+    profile_image = serializers.SerializerMethodField()
+    dob = serializers.DateField(allow_null=True, required=False)
+    is_default_user = serializers.BooleanField(required=False)
+    profile_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
+                  , "age", "user", "dob", "updated_at")
+
+    def get_age(self, obj):
+        from datetime import date
+        age = None
+        birth_date = None
+        if hasattr(obj, 'dob'):
+            birth_date = obj.dob
+        elif isinstance(obj, dict):
+            birth_date = obj.get('dob')
+        if birth_date:
+            today = date.today()
+            age = today.year - birth_date.year
+            full_year_passed = (today.month, today.day) >= (birth_date.month, birth_date.day)
+            if not full_year_passed:
+                age -= 1
+        return age
+
+    def get_profile_image(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return None
+        profile_image = None
+        if hasattr(obj, 'profile_image'):
+            profile_image = obj.profile_image
+        elif isinstance(obj, dict):
+            profile_image = obj.get('profile_image')
+        if profile_image:
+            photo_url = profile_image.url
+            return request.build_absolute_uri(photo_url)
+        else:
+            return None
+
+
 class UploadProfilePictureSerializer(serializers.ModelSerializer):
 
     class Meta:
