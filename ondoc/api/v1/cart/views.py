@@ -86,7 +86,7 @@ class CartViewSet(viewsets.GenericViewSet):
         valid_data['data']['amount_to_be_paid'] = vip_data_dict.get('vip_amount')
         valid_data['data']['is_gold_member'] = vip_data_dict.get('is_gold_member')
         valid_data['data']['vip_convenience_amount'] = vip_data_dict.get('vip_convenience_amount')
-        valid_data['data']['payment_type'] = vip_data_dict.get('payment_type')
+        valid_data['data']['payment_type'] = vip_data_dict.get('payment_type', OpdAppointment.PREPAID)
 
         if plus_user and plus_user.plan and not plus_user.plan.is_gold:
             cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
@@ -99,7 +99,7 @@ class CartViewSet(viewsets.GenericViewSet):
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
         if serialized_data.get('cart_item'):
             old_cart_obj = Cart.objects.filter(id=serialized_data.get('cart_item').id).first()
-            payment_type = old_cart_obj.data.get('payment_type')
+            payment_type = old_cart_obj.data.get('payment_type', OpdAppointment.PREPAID)
             if payment_type == OpdAppointment.INSURANCE and valid_data['data']['is_appointment_insured'] == False:
                 valid_data['data']['payment_type'] = OpdAppointment.PREPAID
 

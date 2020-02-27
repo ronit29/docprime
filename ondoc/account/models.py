@@ -2143,6 +2143,12 @@ class ConsumerRefund(TimeStampedModel):
     refund_state = models.PositiveSmallIntegerField(choices=state_type, default=PENDING)
     refund_initiated_at = models.DateTimeField(blank=True, null=True)
 
+    #FIELDs AS DIRECTED IN DOCNEW-1865
+    bank_arn = models.CharField(null=True, blank=True, max_length=64)
+    bankRefNum = models.CharField(null=True, blank=True, max_length=64)
+    refundDate = models.DateTimeField(null=True, blank=True)
+    refundId = models.IntegerField(null=True, blank=True)
+
     def save(self, *args, **kwargs):
         database_instance = ConsumerRefund.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
