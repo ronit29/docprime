@@ -1090,6 +1090,7 @@ def send_lab_reports(appointment_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.communications.models import LabNotification
     from ondoc.matrix.tasks import create_prescription_lead_to_matrix
+    from ondoc.matrix.tasks import send_report_review_data_to_chat
     try:
         instance = LabAppointment.objects.filter(id=appointment_id).first()
         if not instance:
@@ -1101,6 +1102,12 @@ def send_lab_reports(appointment_id):
             create_prescription_lead_to_matrix.apply_async(({'appointment_id': instance.id},), countdown=1)
         except Exception as e:
             logger.error(str(e))
+
+        try:
+            send_report_review_data_to_chat.apply_async(({'appointment_id': instance.id},), countdown=5)
+        except Exception as e:
+            logger.error(str(e))
+            
     except Exception as e:
         logger.error(str(e))
 
