@@ -1540,6 +1540,7 @@ def create_prescription_lead_to_matrix(self, data):
 def send_report_review_data_to_chat(self, data):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.notification.tasks import save_matrix_logs
+
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
@@ -1549,7 +1550,9 @@ def send_report_review_data_to_chat(self, data):
         if not appointment:
             raise Exception("Appointment could not found against id - " + str(appointment_id))
 
+        booking_url = '%s/admin/diagnostic/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
         profile = appointment.profile
+        age = appointment.calculate_age()
         lab_tests = appointment.tests.all()
         test_data = []
         for test in lab_tests:
@@ -1583,7 +1586,7 @@ def send_report_review_data_to_chat(self, data):
                 "is_otp_verified": profile.is_otp_verified,
                 "is_default_user": profile.is_default_user,
                 "profile_image": None,
-                "age": 54,
+                "age": age,
                 "user": appointment.user.id,
                 "dob": str(profile.dob),
                 "is_insured": False,
@@ -1596,7 +1599,8 @@ def send_report_review_data_to_chat(self, data):
             },
             "lab_test": test_data,
             "reports": appointment.get_report_urls(),
-            "report_files": appointment.get_report_type()
+            "report_files": appointment.get_report_type(),
+            "ExitPointUrl": booking_url
         }
 
         url = settings.CHAT_LAB_REPORT_API_URL
