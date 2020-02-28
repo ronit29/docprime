@@ -9,8 +9,8 @@ DEBUG=False
 EMAIL_WHITELIST = env.list('EMAIL_WHITELIST')
 NUMBER_WHITELIST = env.list('NUMBER_WHITELIST')
 
-INSTALLED_APPS += ('elasticapm.contrib.django',)
-MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
+# INSTALLED_APPS += ('elasticapm.contrib.django',)
+# MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
 
 CLOUDFRONT_DOMAIN = "qacdn.docprime.com"
 #CLOUDFRONT_ID = "your cloud front id"
@@ -23,8 +23,8 @@ LAL_PATH_NETWORK_ID = 729
 DATABASES['default']['CONN_MAX_AGE'] = 0
 PRODUCTION = False
 
-ELASTIC_APM = {
-   'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
-   'SERVER_URL': env('ELASTIC_APM_SERVICE_URL'),
-   'DEBUG': True,
-}
+# ELASTIC_APM = {
+#    'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
+#    'SERVER_URL': env('ELASTIC_APM_SERVICE_URL'),
+#    'DEBUG': True,
+# }

@@ -42,20 +42,6 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = 'DENY'
 
-if env.bool('ENABLE_DATADOG', default=False):
-    INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS
-    if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
-        from ddtrace import tracer
-
-        try:
-            tracer.configure(
-                hostname='datadog-agent',
-                port=8126,
-            )
-        except Exception as e:
-            logger = logging.getLogger(__name__)
-            logger.error("Error Configuring DDtracer " + str(e))
-
 INSTALLED_APPS += ('gunicorn', 'elasticapm.contrib.django',)
 MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
 
