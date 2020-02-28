@@ -544,6 +544,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def can_book_for_free(self, user):
         return models.OpdAppointment.objects.filter(user=user, deal_price=0)\
                    .exclude(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).count() < models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED
+
+
     def update(self, request, pk=None):
         user = request.user
         source = request.query_params.get('source', '')
@@ -3084,7 +3086,6 @@ class SimilarSpecializationGroupAutocomplete(autocomplete.Select2QuerySetView):
         return qs
 
 
-
 class CreateAdminViewSet(viewsets.GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
@@ -4313,13 +4314,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             if valid_data.get('appointment_id') and not lab_data:
                 return Response({"status": 0, "error": "data not found"}, status=status.HTTP_404_NOT_FOUND)
             return Response(lab_data)
-
+        '''Fetching Docprime App Appointments'''
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment) \
             .exclude(status=models.OpdAppointment.CREATED)\
             .select_related('profile', 'merchant_payout')\
             .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number',
-                              'profile__insurance', 'profile__insurance__user_insurance', 'eprescription').distinct('id', 'time_slot_start')
-
+                               'eprescription').distinct('id', 'time_slot_start')
+        '''Fetching Provider App Appointments'''
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
                 .prefetch_related('user__patient_mobiles', 'eprescription', 'offline_prescription', 'partners_app_invoice').distinct('id')
@@ -4351,6 +4352,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             else:
                 final_data = offline_queryset.filter(id=appointment_id)
                 online_queryset = None
+        '''Merging Both Querysets'''
         if online_queryset and offline_queryset:
             final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
 
@@ -4418,7 +4420,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                     mask_data = mask_number[0].build_data()
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
                 # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
-                patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
+                patient_profile = auth_serializers.ProviderUserProfileSerializer(app.profile, context={'request': request}).data
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
                 patient_thumbnail = patient_profile['profile_image']
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
@@ -4454,7 +4456,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['utr_number'] = utr_number
             ret_obj['profile'] = patient_profile
             ret_obj['permission_type'] = app.pem_type
-            ret_obj['hospital'] = HospitalModelSerializer(app.hospital).data
+            ret_obj['hospital'] = serializers.ProviderHospitalModelSerializer(app.hospital).data
             ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(app.doctor).data
             ret_obj['is_docprime'] = is_docprime
             ret_obj['patient_thumbnail'] = patient_thumbnail
