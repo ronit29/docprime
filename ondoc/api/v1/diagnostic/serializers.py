@@ -2442,3 +2442,8 @@ class CompareLabPackagesSerializer(serializers.Serializer):
     title = serializers.CharField(required=False, max_length=500)
     category = serializers.PrimaryKeyRelatedField(queryset=LabTestCategory.objects.all(), required=False,
                                                   allow_null=True)
+
+
+class LabTestPrescriptionSerializer(serializers.Serializer):
+    file = serializers.FileField()
+

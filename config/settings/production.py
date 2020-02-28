@@ -42,7 +42,8 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = 'DENY'
 
-INSTALLED_APPS += ('gunicorn',)
+INSTALLED_APPS += ('gunicorn', 'elasticapm.contrib.django',)
+MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
 
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
 
@@ -178,3 +179,10 @@ warnings.filterwarnings(
     'ignore', r"DateTimeField .* received a naive datetime",
      RuntimeWarning, r'django\.db\.models\.fields',
 )
+
+
+ELASTIC_APM = {
+   'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
+   'SERVER_URL': env('ELASTIC_APM_SERVICE_URL'),
+   'DEBUG': True,
+}

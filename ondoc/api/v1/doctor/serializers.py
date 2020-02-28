@@ -924,6 +924,57 @@ class HospitalModelSerializer(serializers.ModelSerializer):
                   'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', 'logo', 'url')
 
 
+class ProviderHospitalModelSerializer(serializers.ModelSerializer):
+    lat = serializers.SerializerMethodField()
+    long = serializers.SerializerMethodField()
+    hospital_thumbnail = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
+    logo = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
+
+    def get_address(self, obj):
+        return obj.get_hos_address() if obj.get_hos_address() else None
+
+    def get_lat(self, obj):
+        loc = obj.location
+        if loc:
+            return loc.y
+        return None
+
+    def get_long(self, obj):
+        loc = obj.location
+        if loc:
+            return loc.x
+        return None
+
+    def get_hospital_thumbnail(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return obj.get_thumbnail()
+        return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail() else None
+
+    def get_logo(self, obj):
+        request = self.context.get('request')
+        if request:
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
+            if obj.network:
+                for document in obj.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
+        return None
+
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        return entity_url.get(obj.id)
+
+    class Meta:
+        model = Hospital
+        fields = ('id', 'name', 'operational_since', 'lat', 'long', 'address', 'registration_number',
+                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'logo', 'url')
+
+
 class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
     # hospital = HospitalModelSerializer()
     day = serializers.SerializerMethodField()
