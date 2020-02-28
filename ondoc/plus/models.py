@@ -88,7 +88,7 @@ class PlusProposer(auth_model.TimeStampedModel):
     # Get the active plans associated with the object of plus proposer.
     @property
     def get_active_plans(self):
-        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')
+        return self.plus_plans.prefetch_related('plan_parameters', 'plan_parameters__parameter', 'plan_content').filter(is_live=True, is_retail=True).order_by('id')
         # index = 0
         # for plan in plans:
         #     if plan.plan_utmsources.all().exists():
