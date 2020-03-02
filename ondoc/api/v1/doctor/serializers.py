@@ -680,6 +680,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             hosp_is_gold = search_criteria.search_value
         plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
         plan = plus_user.plan if plus_user else None
+        if not plan:
+            plan = default_plan_query
         calculated_convenience_charge = obj.calculate_convenience_charge(plan)
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
                 "vip_convenience_amount": calculated_convenience_charge,
