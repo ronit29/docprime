@@ -2,7 +2,7 @@ import openpyxl
 from dateutil.relativedelta import relativedelta
 from django.db import models
 import functools
-
+import requests
 from ondoc.api.v1.utils import CouponsMixin, plus_subscription_transform
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
@@ -1150,13 +1150,29 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
     def activate_chat_plans(self):
         plan = self.plan
-        resp = {}
+        request_data = {}
         if not plan:
             raise Exception('Chat plan - Not able to find Plan')
         if plan.is_chat_included:
-            resp['phone_number'] = self.user.phone_number
-            resp['plan'] = PlusPlans.NORMAL_CHAT_PLAN if not self.plan.chat_plans else self.plan.chat_plans
-            # url =
+            request_data['phone_number'] = self.user.phone_number
+            request_data['plan'] = PlusPlans.NORMAL_CHAT_PLAN if not self.plan.chat_plans else self.plan.chat_plans
+            url = settings.CHAT_API_URL + "/addPriorityNumbers"
+            auth_token = settings.CHAT_AUTH_TOKEN
+            response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
+                                                                              'Content-Type': 'application/json'})
+
+    def disable_chat_plans(self):
+        plan = self.plan
+        request_data = {}
+        if not plan:
+            raise Exception('Chat plan - Not able to find Plan')
+        if plan.is_chat_included:
+            request_data['phone_number'] = self.user.phone_number
+            request_data['plan'] = PlusPlans.NORMAL_CHAT_PLAN if not self.plan.chat_plans else self.plan.chat_plans
+            url = settings.CHAT_API_URL + "/removePriorityNumbers"
+            auth_token = settings.CHAT_AUTH_TOKEN
+            response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
+                                                                                  'Content-Type': 'application/json'})
 
     # Process policy cancellation.
     def process_cancellation(self):
