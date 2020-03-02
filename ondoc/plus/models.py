@@ -125,6 +125,11 @@ class PlusProposer(auth_model.TimeStampedModel):
 # All the Gold plans of all the proposers.
 @reversion.register()
 class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
+    NORMAL_CHAT_PLAN = 1
+    PREMIUM_CHAT_PLAN = 2
+
+    CHAT_PLAN_CHOICES = [(NORMAL_CHAT_PLAN, 'Normal Chat Plan'), (PREMIUM_CHAT_PLAN, 'Premium Chat Plan'),]
+
     plan_name = models.CharField(max_length=300)
     proposer = models.ForeignKey(PlusProposer, related_name='plus_plans', on_delete=models.DO_NOTHING)
     internal_name = models.CharField(max_length=200, null=True)
@@ -151,6 +156,9 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     corporate_upper_limit_criteria = models.CharField(max_length=100, null=True, blank=True, choices=PriceCriteria.as_choices())
     corporate_doctor_upper_limit = models.PositiveIntegerField(null=True, blank=True)
     corporate_lab_upper_limit = models.PositiveIntegerField(null=True, blank=True)
+    is_chat_included = models.NullBooleanField()
+    chat_plans = models.PositiveIntegerField(choices=CHAT_PLAN_CHOICES, null=True, blank=True)
+
 
     # Some plans are only applicable when utm params are passed. Like some plans are to be targeted with media
     # campaigns, emails or adwords etc.
@@ -1138,6 +1146,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             PlusIntegration.create_vip_lead_after_purchase(self)
             PlusIntegration.assign_coupons_to_user_after_purchase(self)
             UserReferred.credit_after_completion(self.user, self, Order.GOLD_PRODUCT_ID)
+            PlusUser.activate_chat_plans(self)
+
+    def activate_chat_plans(self):
+        plan = self.plan
+        resp = {}
+        if not plan:
+            raise Exception('Chat plan - Not able to find Plan')
+        if plan.is_chat_included:
+            resp['phone_number'] = self.user.phone_number
+            resp['plan'] = PlusPlans.NORMAL_CHAT_PLAN if not self.plan.chat_plans else self.plan.chat_plans
+            # url =
 
     # Process policy cancellation.
     def process_cancellation(self):
