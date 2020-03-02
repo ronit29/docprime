@@ -42,8 +42,11 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = 'DENY'
 
-INSTALLED_APPS += ('gunicorn', 'elasticapm.contrib.django',)
-MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
+INSTALLED_APPS += ('gunicorn',)
+
+if env('DJANGO_SETTINGS_MODULE') == 'config.settings.production':
+    MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
+    INSTALLED_APPS += ('elasticapm.contrib.django',)
 
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
 
@@ -133,8 +136,6 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 
 GOOGLE_ANALYTICS_PROPERTY_ID = 'UA-14845987-3'
-
-
 
 AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
 AWS_QUERYSTRING_AUTH = False
