@@ -167,8 +167,9 @@ class AppointmentPrescriptionViewSet(viewsets.GenericViewSet):
     def upload_prescription(self, request, *args, **kwargs):
         user = request.user
         insurance = user.active_insurance
-        if not insurance:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User do not have active insurance.'})
+        plus_user = user.active_plus_user
+        if not insurance or not plus_user:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User do not have active insurance/VIP Plan.'})
 
         data = dict()
         document_data = {}
