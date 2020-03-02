@@ -313,6 +313,7 @@ class PrescriptionsLabtestPrescription(AbstractLead):
             "DoctorSpec": request_data.get('specialty', ''),
             "IPDHospitalName": request_data.get('hospital_name', ''),
             "ProductId": 11,
+            "file_url": request_data.get('file_url', ''),
             "UtmTerm": request_data.get('source', {}).get('utm_term', ''),
             "PrimaryNo": request_data.get('phone_number') if not user else str(user.phone_number),
             "UtmCampaign": request_data.get('source', {}).get('utm_campaign', ''),
