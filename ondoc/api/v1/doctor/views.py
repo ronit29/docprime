@@ -1658,21 +1658,22 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         #     procedure__is_enabled=True).all().order_by("-priority")[:10]
         # common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
 
-        common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
-            ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
-        common_ipd_procedures = list(common_ipd_procedures)
-        common_ipd_procedure_ids = [t.ipd_procedure.id for t in common_ipd_procedures]
-        ipd_entity_dict = {}
-        if city:
-            ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
-                                                      sitemap_identifier='IPD_PROCEDURE_CITY',
-                                                      is_valid=True,
-                                                      locality_value__iexact=city.lower()).annotate(
-                ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
-            ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
-        common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
-                                                                        context={'entity_dict': ipd_entity_dict,
-                                                                                 'request': request})
+        ## Not using in new homepage
+        # common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
+        #     ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
+        # common_ipd_procedures = list(common_ipd_procedures)
+        # common_ipd_procedure_ids = [t.ipd_procedure.id for t in common_ipd_procedures]
+        # ipd_entity_dict = {}
+        # if city:
+        #     ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
+        #                                               sitemap_identifier='IPD_PROCEDURE_CITY',
+        #                                               is_valid=True,
+        #                                               locality_value__iexact=city.lower()).annotate(
+        #         ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
+        #     ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
+        # common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
+        #                                                                 context={'entity_dict': ipd_entity_dict,
+        #                                                                          'request': request})
 
         top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
@@ -1695,9 +1696,9 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                          "specializations": specializations_serializer.data,
                          "procedure_categories": [],
                          "procedures": [],
-                         "ipd_procedures": common_ipd_procedures_serializer.data,
+                         "ipd_procedures": [],
                          "top_hospitals": top_hospitals_data,
-                         'package_categories': common_package_category(self, request)})
+                         'package_categories': []})
 
     @transaction.non_atomic_requests
     def top_hospitals(self, request):
