@@ -168,7 +168,7 @@ class AppointmentPrescriptionViewSet(viewsets.GenericViewSet):
         user = request.user
         insurance = user.active_insurance
         plus_user = user.active_plus_user
-        if not insurance or not plus_user:
+        if not insurance and not plus_user:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User do not have active insurance/VIP Plan.'})
 
         data = dict()

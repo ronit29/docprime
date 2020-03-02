@@ -1987,10 +1987,29 @@ class PlusUserUpload(auth_model.TimeStampedModel):
     def create_order(self, plus_user_data, amount, user):
         from ondoc.account import models as account_models
         visitor_info = None
+        plan_id = plus_user_data.get('plus_plan')
+        product_id = None
+        action = None
+        if not plan_id:
+            raise Exception('Plan ID not found')
+        if plan_id:
+            plus_plan_obj = PlusPlans.objects.filter(id=plan_id).first()
+
+        if not plus_plan_obj:
+            raise Exception('Plan Object not found')
+
+        if plus_plan_obj.is_corporate and not plus_plan_obj.is_gold:
+            product_id = account_models.Order.CORP_VIP_PRODUCT_ID
+            action_id = account_models.Order.CORP_VIP_CREATE
+        elif plus_plan_obj.is_corporate and plus_plan_obj.is_gold:
+            product_id = account_models.Order.GOLD_PRODUCT_ID
+            action_id = account_models.Order.GOLD_CREATE
+        else:
+            raise Exception('Not able to find Product ID')
 
         order = account_models.Order.objects.create(
-            product_id=account_models.Order.CORP_VIP_PRODUCT_ID,
-            action=account_models.Order.CORP_VIP_CREATE,
+            product_id=product_id,
+            action=action_id,
             action_data=plus_user_data,
             amount=amount,
             cashback_amount=0,
