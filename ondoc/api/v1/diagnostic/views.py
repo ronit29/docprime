@@ -100,6 +100,12 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         profile = request.query_params.get('profile_id')
         product_id = request.query_params.get('product_id')
         count = request.query_params.get('count', 10)
+        default_plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.filter(is_gold=True).first()
+        is_gold_search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+
+
         count = int(count)
         if count <= 0:
             count = 10
@@ -113,7 +119,8 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         #                                                                                                   recommended_lab_tests__enable_for_retail=True).order_by('-priority').distinct()[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
         coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
-        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender':coupon_recommender})
+        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender':coupon_recommender, 'default_plan': default_plan,
+                                                                                                                 'is_gold_search_criteria': is_gold_search_criteria})
 
         ## Not in use on homapage
         # lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
