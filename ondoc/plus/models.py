@@ -88,7 +88,7 @@ class PlusProposer(auth_model.TimeStampedModel):
     # Get the active plans associated with the object of plus proposer.
     @property
     def get_active_plans(self):
-        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')
+        return self.plus_plans.prefetch_related('plan_parameters', 'plan_parameters__parameter', 'plan_content').filter(is_live=True, is_retail=True).order_by('id')
         # index = 0
         # for plan in plans:
         #     if plan.plan_utmsources.all().exists():
@@ -151,12 +151,14 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     corporate_upper_limit_criteria = models.CharField(max_length=100, null=True, blank=True, choices=PriceCriteria.as_choices())
     corporate_doctor_upper_limit = models.PositiveIntegerField(null=True, blank=True)
     corporate_lab_upper_limit = models.PositiveIntegerField(null=True, blank=True)
+    is_prescription_required = models.NullBooleanField()
+    priority = models.PositiveIntegerField(default=0, null=True, blank=True)
 
     # Some plans are only applicable when utm params are passed. Like some plans are to be targeted with media
     # campaigns, emails or adwords etc.
     @classmethod
     def get_active_plans_via_utm(cls, utm):
-        qs = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True)
+        qs = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True).order_by('priority')
         if not qs:
             return []
 
@@ -1307,7 +1309,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
     class Meta:
         db_table = 'plus_users'
-        unique_together = (('user', 'plan'),)
+        # unique_together = (('user', 'plan'),)
 
 
 
@@ -1318,7 +1320,7 @@ class PlusUserUtilization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'plus_user_utilization'
-        unique_together = (('plus_user', 'plan'),)
+        # unique_together = (('plus_user', 'plan'),)
 
     # Create utilization of individual user.
     @classmethod
@@ -2034,10 +2036,29 @@ class PlusUserUpload(auth_model.TimeStampedModel):
     def create_order(self, plus_user_data, amount, user):
         from ondoc.account import models as account_models
         visitor_info = None
+        plan_id = plus_user_data.get('plus_plan')
+        product_id = None
+        action = None
+        if not plan_id:
+            raise Exception('Plan ID not found')
+        if plan_id:
+            plus_plan_obj = PlusPlans.objects.filter(id=plan_id).first()
+
+        if not plus_plan_obj:
+            raise Exception('Plan Object not found')
+
+        if plus_plan_obj.is_corporate and not plus_plan_obj.is_gold:
+            product_id = account_models.Order.CORP_VIP_PRODUCT_ID
+            action_id = account_models.Order.CORP_VIP_CREATE
+        elif plus_plan_obj.is_corporate and plus_plan_obj.is_gold:
+            product_id = account_models.Order.GOLD_PRODUCT_ID
+            action_id = account_models.Order.GOLD_CREATE
+        else:
+            raise Exception('Not able to find Product ID')
 
         order = account_models.Order.objects.create(
-            product_id=account_models.Order.CORP_VIP_PRODUCT_ID,
-            action=account_models.Order.CORP_VIP_CREATE,
+            product_id=product_id,
+            action=action_id,
             action_data=plus_user_data,
             amount=amount,
             cashback_amount=0,

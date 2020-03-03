@@ -2455,6 +2455,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def create_appointment(cls, appointment_data, responsible_user=None, source=None):
         from ondoc.prescription.models import AppointmentPrescription
         insurance = appointment_data.get('insurance')
+        plus_user = appointment_data.get('plus_plan')
         appointment_status = OpdAppointment.BOOKED
 
         if insurance and insurance.is_valid():
@@ -2470,6 +2471,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             appointment_status = OpdAppointment.CREATED
             # if insurance_limit_usage_data.get('created_state'):
             #     appointment_status = OpdAppointment.CREATED
+
+        if plus_user and plus_user.plan and plus_user.plan.is_prescription_required:
+            appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
