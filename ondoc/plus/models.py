@@ -158,7 +158,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     # campaigns, emails or adwords etc.
     @classmethod
     def get_active_plans_via_utm(cls, utm):
-        qs = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True).order_by('priority')
+        qs = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True)
         if not qs:
             return []
 
