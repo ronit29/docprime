@@ -432,7 +432,7 @@ def activate_chat_plans(self, plus_user_id):
             request_data['mobileNo'] = obj.user.phone_number
             request_data['priorityType'] = PlusPlans.NORMAL_CHAT_PLAN if not obj.plan.chat_plans else obj.plan.chat_plans
             url = "http://chatapi.docprime.com/addPriorityNumbers"
-            auth_token = settings.CHAT_AUTH_TOKEN
+            auth_token = settings.CHAT_LAB_REPORT_API_TOKEN
             response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token, 'Content-Type': 'application/json'})
             res = response.json()
 
