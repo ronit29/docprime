@@ -1,3 +1,5 @@
+from operator import itemgetter
+
 from django.db.models import Q
 from rest_framework import serializers
 from collections import defaultdict
@@ -133,8 +135,9 @@ class PlusProposerSerializer(serializers.ModelSerializer):
         if request.query_params.get('is_gold'):
             return resp
 
-        plus_plans_qs = obj.get_active_plans.filter(~Q(is_gold=True))
+        plus_plans_qs = obj.get_active_plans.filter(~Q(is_gold=True)).order_by('priority')
         serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
+
         resp = serializer_obj.data
 
         return resp
@@ -145,9 +148,10 @@ class PlusProposerSerializer(serializers.ModelSerializer):
 
         if request.query_params.get('is_gold') or request.query_params.get('all'):
 
-            plus_plans_qs = obj.get_active_plans.filter(is_gold=True)
+            plus_plans_qs = obj.get_active_plans.filter(is_gold=True).order_by('priority')
 
             serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
+
             resp = serializer_obj.data
 
         return resp
@@ -180,6 +184,7 @@ class PlusProposerUTMSerializer(serializers.ModelSerializer):
             plus_plans_qs = PlusPlans.get_active_plans_via_utm(utm)
             plus_plans_qs = list(filter(lambda p: p.is_gold, plus_plans_qs))
             serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
+
             resp = serializer_obj.data
 
         return resp
