@@ -1146,7 +1146,15 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             PlusIntegration.create_vip_lead_after_purchase(self)
             PlusIntegration.assign_coupons_to_user_after_purchase(self)
             UserReferred.credit_after_completion(self.user, self, Order.GOLD_PRODUCT_ID)
-            PlusUser.activate_chat_plans(self)
+            try:
+                transaction.on_commit(
+                    # lambda: set_order_dummy_transaction.apply_async(
+                    #     (order.id, plus_user_obj.user_id,), countdown=5))
+                    lambda: PlusUser.activate_chat_plans.apply_async(
+                        (self,), countdown=5))
+            except Exception as e:
+                logger.error(str(e))
+
 
     def activate_chat_plans(self):
         plan = self.plan
