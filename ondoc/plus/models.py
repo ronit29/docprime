@@ -1156,19 +1156,21 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             except Exception as e:
                 logger.error(str(e))
 
-
     def disable_chat_plans(self):
-        plan = self.plan
-        request_data = {}
-        if not plan:
-            raise Exception('Chat plan - Not able to find Plan')
-        if plan.is_chat_included:
-            request_data['phone_number'] = self.user.phone_number
-            request_data['plan'] = PlusPlans.NORMAL_CHAT_PLAN if not self.plan.chat_plans else self.plan.chat_plans
-            url = settings.CHAT_API_URL + "/removePriorityNumbers"
-            auth_token = settings.CHAT_AUTH_TOKEN
-            response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
-                                                                                  'Content-Type': 'application/json'})
+        try:
+            plan = self.plan
+            request_data = {}
+            if not plan:
+                raise Exception('Chat plan - Not able to find Plan')
+            if plan.is_chat_included:
+                request_data['mobileNo'] = self.user.phone_number
+                request_data['priorityType'] = PlusPlans.NORMAL_CHAT_PLAN if not self.plan.chat_plans else self.plan.chat_plans
+                url = settings.CHAT_GOLD_API_URL + "removePriorityNumbers"
+                auth_token = settings.CHAT_AUTH_TOKEN
+                response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
+                                                                                      'Content-Type': 'application/json'})
+        except Exception as e:
+            logger.error("Error in Disabling Chat Plan for Gold - " + " with exception - " + str(e))
 
     # Process policy cancellation.
     def process_cancellation(self):
