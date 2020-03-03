@@ -42,8 +42,11 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = 'DENY'
 
-INSTALLED_APPS += ('gunicorn', 'elasticapm.contrib.django',)
-MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
+INSTALLED_APPS += ('gunicorn',)
+
+if env('DJANGO_SETTINGS_MODULE') == 'config.settings.production':
+    MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
+    INSTALLED_APPS += ('elasticapm.contrib.django',)
 
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
 
@@ -134,8 +137,6 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 
 GOOGLE_ANALYTICS_PROPERTY_ID = 'UA-14845987-3'
 
-
-
 AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
 AWS_QUERYSTRING_AUTH = False
 S3_USE_SIGV4 = True
@@ -180,9 +181,9 @@ warnings.filterwarnings(
      RuntimeWarning, r'django\.db\.models\.fields',
 )
 
-
-ELASTIC_APM = {
-   'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
-   'SERVER_URL': env('ELASTIC_APM_SERVICE_URL'),
-   'DEBUG': True,
-}
+if env('DJANGO_SETTINGS_MODULE') == 'config.settings.production':
+    ELASTIC_APM = {
+       'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
+       'SERVER_URL': env('ELASTIC_APM_SERVICE_URL'),
+       'DEBUG': True,
+    }
