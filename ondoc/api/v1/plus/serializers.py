@@ -35,13 +35,18 @@ class PlusPlansSerializer(serializers.ModelSerializer):
     show_consultation_text = serializers.SerializerMethodField()
 
     def get_show_consultation_text(self, obj):
-        online_chat_param = PlusPlanParameters.objects.filter(key='ONLINE_CHAT_AMOUNT').first()
-        if not online_chat_param:
-            return False
+        # online_chat_param = PlusPlanParameters.objects.filter(key='ONLINE_CHAT_AMOUNT').first()
+        # if not online_chat_param:
+        #     return False
 
-        parameter_mapping = PlusPlanParametersMapping.objects.filter(plus_plan_id=obj.id, parameter_id=online_chat_param.id).first()
-        if parameter_mapping and parameter_mapping.value:
-            return True
+        # parameter_mapping = PlusPlanParametersMapping.objects.filter(plus_plan_id=obj.id, parameter_id=online_chat_param.id).first()
+        parameter_mapping = list(
+                filter(lambda x: x.parameter and x.parameter.key == PlanParametersEnum.ONLINE_CHAT_AMOUNT,
+                       obj.plan_parameters.all()))
+        if parameter_mapping:
+            parameter_mapping = parameter_mapping[0]
+            if parameter_mapping.value:
+                return True
 
         return False
 
@@ -66,11 +71,19 @@ class PlusPlansSerializer(serializers.ModelSerializer):
 
     def get_worth(self, obj):
         data = {}
-        plan_parameters = obj.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
-                                                       PlanParametersEnum.ONLINE_CHAT_AMOUNT,
-                                                       PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
-                                                       PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
-                                                       PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE])
+        # plan_parameters = obj.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
+        #                                                PlanParametersEnum.ONLINE_CHAT_AMOUNT,
+        #                                                PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
+        #                                                PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
+        #                                                PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE])
+
+        plan_parameters = list(
+            filter(lambda x: x.parameter and x.parameter.key in [PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
+                                                                 PlanParametersEnum.ONLINE_CHAT_AMOUNT,
+                                                                 PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
+                                                                 PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
+                                                                 PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE],
+                   obj.plan_parameters.all()))
 
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
@@ -89,9 +102,12 @@ class PlusPlansSerializer(serializers.ModelSerializer):
 
     def get_you_get(self, obj):
         data = {}
-        plan_parameters = obj.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
+
+        plan_parameters = list(
+            filter(lambda x: x.parameter and x.parameter.key in [PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
                                                                          PlanParametersEnum.ONLINE_CHAT_AMOUNT,
-                                                                         PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT])
+                                                                         PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT],
+                   obj.plan_parameters.all()))
 
         effective_price = 0
         for pp in plan_parameters:

@@ -34,7 +34,6 @@ class ScreenViewSet(viewsets.GenericViewSet):
     # authentication_classes = (JWTAuthentication,)
     # permission_classes = (IsAuthenticated,)
 
-
     def home_page(self, request, *args, **kwargs):
         from django.contrib.gis.geos import GEOSGeometry
 
