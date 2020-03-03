@@ -1342,7 +1342,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters['is_user_insured'] = insurance_data_dict['is_user_insured']
         queryset_result = self.get_lab_search_list(parameters, page, request)
         count = 0
-        if len(queryset_result)>0:
+        if len(queryset_result) > 0:
             count = queryset_result[0].get("result_count", 0)
 
         #count = len(queryset_result)
@@ -1909,6 +1909,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             else:
                 row['url'] = ''
 
+        default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+
         plus_user_obj = None
         if user and user.is_authenticated and not user.is_anonymous:
             plus_user_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
@@ -1961,7 +1965,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         if plus_user_obj and plus_user_obj.plan:
                             res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user_obj.plan)
                         else:
-                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST")
+                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=default_plan)
                         coverage = False
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
