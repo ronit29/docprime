@@ -1166,7 +1166,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 request_data['mobileNo'] = self.user.phone_number
                 request_data['priorityType'] = PlusPlans.NORMAL_CHAT_PLAN if not self.plan.chat_plans else self.plan.chat_plans
                 url = settings.CHAT_GOLD_API_URL + "removePriorityNumbers"
-                auth_token = settings.CHAT_AUTH_TOKEN
+                auth_token = settings.CHAT_LAB_REPORT_API_TOKEN
                 response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
                                                                                       'Content-Type': 'application/json'})
         except Exception as e:
