@@ -181,9 +181,9 @@ warnings.filterwarnings(
      RuntimeWarning, r'django\.db\.models\.fields',
 )
 
-
-ELASTIC_APM = {
-   'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
-   'SERVER_URL': env('ELASTIC_APM_SERVICE_URL'),
-   'DEBUG': True,
-}
+if env('DJANGO_SETTINGS_MODULE') == 'config.settings.production':
+    ELASTIC_APM = {
+       'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
+       'SERVER_URL': env('ELASTIC_APM_SERVICE_URL'),
+       'DEBUG': True,
+    }

@@ -315,11 +315,13 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         resp['vip_gold_price'] = agreed_price
         resp['vip_convenience_amount'] = obj.calculate_convenience_charge(plan)
         resp['is_enable_for_vip'] = True if lab_obj and lab_obj.is_enabled_for_plus_plans() else False
+        resp['is_prescription_required'] = False
 
 
         if not plus_obj:
             return resp
         resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
+
         entity = "LABTEST" if not obj.test.is_package else "PACKAGE"
 
         price_engine = get_price_reference(plus_obj, "LABTEST")
@@ -338,7 +340,10 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp, deal_price=deal_price, price_engine_price=price)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-
+        if plus_obj and plus_obj.plan and plus_obj.plan.is_prescription_required and resp['covered_under_vip']:
+            resp['is_prescription_required'] = True
+        else:
+            resp['is_prescription_required'] = False
         return resp
 
 
