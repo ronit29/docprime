@@ -1469,9 +1469,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
             args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code, 'source': response.get("source")}
             status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
             # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-            save_pg_response.apply_async(
-                (mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')),
-                eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            if settings.SAVE_LOGS:
+                save_pg_response.apply_async(
+                    (mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')),
+                    eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
         except Exception as e:
             logger.error("Cannot log pg response - " + str(e))
@@ -1507,7 +1508,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
                             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
                             log_created_at = str(datetime.datetime.now())
-                            save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                            if settings.SAVE_LOGS:
+                                save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                         return CHAT_REDIRECT_URL
                     else:
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
@@ -1641,9 +1643,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         if order_obj.product_id == Order.CHAT_PRODUCT_ID:
             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
             log_created_at = str(datetime.datetime.now())
-            save_pg_response.apply_async(
-                (mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
-                eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            if settings.SAVE_LOGS:
+                save_pg_response.apply_async(
+                    (mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
+                    eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             return CHAT_REDIRECT_URL
         return REDIRECT_URL
 
@@ -1696,7 +1699,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
                     # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                    save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, order_id, None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                    if settings.SAVE_LOGS:
+                        save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, order_id, None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                     save_payment_status.apply_async((status_type, args), eta=timezone.localtime(),)
                 except Exception as e:
                     logger.error("Cannot log pg response - " + str(e))
@@ -3085,26 +3089,33 @@ class SbiGUserViewset(GenericViewSet):
         return response
 
 
-class PGRefundViewset(viewsets.GenericViewSet):
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, IsDoctor)
+class PGRefundViewSet(viewsets.GenericViewSet):
 
+    permission_classes = (utils.IsPGRequest, )
     @transaction.atomic()
     def save_pg_refund(self, request):
-        from django.http import JsonResponse
-        response = {'login': 0}
+        response = {'status': 0}
         if request.method != 'POST':
-            return JsonResponse(response, status=405)
-        serializer = serializers.CloudLabUserLoginSerializer(data=request.data)
+            return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        serializer = serializers.PGRefundSaveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        refund_obj = data['refund_obj']
         try:
-            user_data = User.get_external_login_data(data, request)
+            refund_obj.pg_transaction.amount = data.get('txnAmount')
+            refund_obj.pg_transaction.pb_gateway_name = data.get('gateway')
+            refund_obj.pg_transaction.payment_mode = data.get('mode')
+            refund_obj.refund_amount = data.get('refundAmount')
+
+            refund_obj.bank_arn = data.get('bank_arn')
+            refund_obj.bankRefNum = data.get('bankRefNum')
+            refund_obj.refundDate = utils.aware_time_zone(data.get('refundDate'))
+            refund_obj.refundId = data.get('refundId')
+            refund_obj.pg_transaction.save()
+            refund_obj.save()
         except Exception as e:
             logger.error(str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        token = user_data.get('token')
-        if not token:
-            return JsonResponse(response, status=400)
 
-        return Response(response, status=status.HTTP_200_OK)
+        return Response({'status':1}, status=status.HTTP_200_OK)
+

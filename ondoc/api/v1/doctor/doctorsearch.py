@@ -579,6 +579,10 @@ class DoctorSearchHelper:
         product_id = query_params.get("product_id", None)
         coupon_code = query_params.get("coupon_code", None)
 
+        default_plan = PlusPlans.objects.filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.filter(is_gold=True).first()
+
         coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code, None)
         search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
         hosp_is_gold = False
@@ -658,6 +662,9 @@ class DoctorSearchHelper:
                               "fees": int(min_price.get('fees', 0))}
                 if request and request.user and not request.user.is_anonymous and request.user.active_plus_user:
                     plan = request.user.active_plus_user.plan
+
+                if not plan:
+                    plan = default_plan
 
                 doctor_clinic_timing = doctor_clinic.availability.first()
                 vip_convenience_amount = doctor_clinic_timing.calculate_convenience_charge(plan) if doctor_clinic_timing else PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)

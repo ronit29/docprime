@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 import requests
-
+from ondoc.notification.tasks import set_order_dummy_transaction
 from ondoc.api.v1.plus.plusintegration import PlusIntegration
 from ondoc.api.v1.utils import plus_subscription_transform, payment_details
 from ondoc.authentication.backends import JWTAuthentication
@@ -260,7 +260,6 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             # if balance < amount or resp['is_agent']:
             # payable_amount = amount - balance
-
             product_id = account_models.Order.VIP_PRODUCT_ID if not plus_plan.is_gold else account_models.Order.GOLD_PRODUCT_ID
             product_create_id = account_models.Order.VIP_CREATE if not plus_plan.is_gold else account_models.Order.GOLD_CREATE
 
@@ -278,6 +277,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 payment_status=account_models.Order.PAYMENT_PENDING,
                 # visitor_info=visitor_info
             )
+
             if payable_amount > 0:
                 resp["status"] = 1
                 resp['data'], resp["payment_required"] = payment_details(request, order)
@@ -291,6 +291,13 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     "type": "plus_membership",
                     "id": plus_object.id if plus_object else None
                 }
+                if not order.getTransactions() and plus_object:
+                    try:
+                        transaction.on_commit(
+                            lambda: set_order_dummy_transaction.apply_async(
+                                (order.id, plus_object.user_id,), countdown=5))
+                    except Exception as e:
+                        logger.error(str(e))
             # else:
             #     wallet_amount = amount
             #

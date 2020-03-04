@@ -77,6 +77,7 @@ class CartViewSet(viewsets.GenericViewSet):
             "vip_convenience_amount": 0
         }
         if plus_user:
+
             vip_data_dict = plus_user.validate_cart_items(serialized_data, request)
         valid_data['data']['cover_under_vip'] = vip_data_dict.get('cover_under_vip', False)
         valid_data['data']['plus_user_id'] = vip_data_dict.get('plus_user_id', None)
@@ -85,12 +86,20 @@ class CartViewSet(viewsets.GenericViewSet):
         valid_data['data']['amount_to_be_paid'] = vip_data_dict.get('vip_amount')
         valid_data['data']['is_gold_member'] = vip_data_dict.get('is_gold_member')
         valid_data['data']['vip_convenience_amount'] = vip_data_dict.get('vip_convenience_amount')
+        valid_data['data']['payment_type'] = vip_data_dict.get('payment_type', OpdAppointment.PREPAID)
+
+        if plus_user and plus_user.plan and not plus_user.plan.is_gold:
+            cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
+            for cart in cart_items:
+                if not cart.data.get('payment_type') == valid_data['data']['payment_type']:
+                    return Response({"status": 0, "message": "Please remove other appointments from cart to add"},
+                                    status.HTTP_400_BAD_REQUEST)
 
         if valid_data['data']['is_appointment_insured']:
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
         if serialized_data.get('cart_item'):
             old_cart_obj = Cart.objects.filter(id=serialized_data.get('cart_item').id).first()
-            payment_type = old_cart_obj.data.get('payment_type')
+            payment_type = old_cart_obj.data.get('payment_type', OpdAppointment.PREPAID)
             if payment_type == OpdAppointment.INSURANCE and valid_data['data']['is_appointment_insured'] == False:
                 valid_data['data']['payment_type'] = OpdAppointment.PREPAID
 
@@ -374,6 +383,15 @@ class CartViewSet(viewsets.GenericViewSet):
 
         user = request.user
         plus_user = user.active_plus_user
+
+        if plus_user and plus_user.plan and not plus_user.plan.is_gold:
+            cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
+            import itertools
+            for item1, item2 in itertools.combinations(cart_items, 2):
+                if(item1.data.get('payment_type') != item2.data.get('payment_type')):
+                    return Response({"status": 0, "message": "Please remove other appointments from cart to add"},
+                                    status.HTTP_400_BAD_REQUEST)
+
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 

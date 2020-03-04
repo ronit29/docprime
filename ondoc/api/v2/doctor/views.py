@@ -1316,8 +1316,9 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         if user and user.is_anonymous:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
-        save_pg_response.apply_async((PgLogs.ECONSULT_ORDER_REQUEST, None, None, None, data, user.id),
-                                     eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        if settings.SAVE_LOGS:
+            save_pg_response.apply_async((PgLogs.ECONSULT_ORDER_REQUEST, None, None, None, data, user.id),
+                                         eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
         doc = consultation.doctor
         use_wallet = data.get('use_wallet', True)

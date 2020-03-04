@@ -667,7 +667,7 @@ class UserProfile(TimeStampedModel):
         return None
 
     def verify_profile(self):
-        if self.dob and self.email and self.name:
+        if self.dob and self.name:
             return True
         else:
             return False

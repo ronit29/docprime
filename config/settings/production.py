@@ -42,23 +42,14 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = 'DENY'
 
-if env.bool('ENABLE_DATADOG', default=False):
-    INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS
-    if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
-        from ddtrace import tracer
-
-        try:
-            tracer.configure(
-                hostname='datadog-agent',
-                port=8126,
-            )
-        except Exception as e:
-            logger = logging.getLogger(__name__)
-            logger.error("Error Configuring DDtracer " + str(e))
-
 INSTALLED_APPS += ('gunicorn',)
 
+if env('DJANGO_SETTINGS_MODULE') == 'config.settings.production':
+    MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
+    INSTALLED_APPS += ('elasticapm.contrib.django',)
+
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -76,6 +67,10 @@ LOGGING = {
         },
     },
     'handlers': {
+        'elasticapm': {
+            'level': 'INFO',
+            'class': 'elasticapm.contrib.django.handlers.LoggingHandler',
+        },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -84,22 +79,23 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console', ],
+            'handlers': ['console', 'elasticapm', ],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.db.backends': {
             'level': 'ERROR',
-            'handlers': ['console', ],
+            'handlers': ['console', 'elasticapm', ],
             'propagate': False,
         },
         'django.security.DisallowedHost': {
             'level': 'ERROR',
-            'handlers': ['console', ],
+            'handlers': ['console', 'elasticapm', ],
             'propagate': False,
         },
     },
 }
+
 SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
 if env.bool('ENABLE_SENTRY', default=False):
@@ -140,8 +136,6 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 
 GOOGLE_ANALYTICS_PROPERTY_ID = 'UA-14845987-3'
-
-
 
 AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
 AWS_QUERYSTRING_AUTH = False
@@ -186,3 +180,10 @@ warnings.filterwarnings(
     'ignore', r"DateTimeField .* received a naive datetime",
      RuntimeWarning, r'django\.db\.models\.fields',
 )
+
+if env('DJANGO_SETTINGS_MODULE') == 'config.settings.production':
+    ELASTIC_APM = {
+       'SERVICE_NAME': env('ELASTIC_APM_SERVICE_NAME'),
+       'SERVER_URL': env('ELASTIC_APM_SERVICE_URL'),
+       'DEBUG': True,
+    }
