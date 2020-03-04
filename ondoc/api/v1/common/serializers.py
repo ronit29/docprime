@@ -135,7 +135,7 @@ class DocumentProofUploadSerializer(serializers.ModelSerializer):
 class OpdPriceUtilitySerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
-    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True)),  required=False)
+    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True).order_by('priority')),  required=False)
     start_date = serializers.DateTimeField(allow_null=True)
     start_time = serializers.FloatField(allow_null=True)
     time_slot_start = serializers.DateTimeField(required=False, allow_null=True)
@@ -143,7 +143,7 @@ class OpdPriceUtilitySerializer(serializers.Serializer):
     def validate(self, data):
 
         if not data.get('gold_vip_plan'):
-            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True, is_retail=True)
+            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True, is_retail=True).order_by('priority')
 
         doctor_clinic = data.get('doctor').doctor_clinics.filter(hospital=data.get('hospital'), enabled=True).first()
         if not doctor_clinic:
@@ -174,11 +174,11 @@ class OpdPriceUtilitySerializer(serializers.Serializer):
 class LabPriceUtilitySerializer(serializers.Serializer):
     lab_tests = serializers.ListField(child=serializers.IntegerField(), required=True)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
-    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True)),  required=False)
+    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True).order_by('priority')),  required=False)
 
     def validate(self, data):
 
         if not data.get('gold_vip_plan'):
-            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True, is_retail=True)
+            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True, is_retail=True).order_by('priority')
 
         return data

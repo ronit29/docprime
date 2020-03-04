@@ -100,12 +100,18 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         profile = request.query_params.get('profile_id')
         product_id = request.query_params.get('product_id')
         count = request.query_params.get('count', 10)
+        default_plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.filter(is_gold=True).first()
+        is_gold_search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+
+
         count = int(count)
         if count <= 0:
             count = 10
         test_queryset = CommonTest.get_tests(count)
-        conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
-        lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
+        # conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all().order_by('-priority')[:count]
+        # lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         package_queryset = CommonPackage.get_packages(count)
         # recommended_package_qs = LabTestCategory.objects.prefetch_related('recommended_lab_tests__parameter').filter(is_live=True,
         #                                                                                                   show_on_recommended_screen=True,
@@ -113,9 +119,12 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         #                                                                                                   recommended_lab_tests__enable_for_retail=True).order_by('-priority').distinct()[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
         coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
-        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender':coupon_recommender})
-        lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
-        condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
+        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request, 'coupon_recommender':coupon_recommender, 'default_plan': default_plan,
+                                                                                                                 'is_gold_search_criteria': is_gold_search_criteria})
+
+        ## Not in use on homapage
+        # lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
+        # condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
         # recommended_package = diagnostic_serializer.RecommendedPackageCategoryList(recommended_package_qs, many=True, context={'request': request})
         temp_data = dict()
         # user_config = UserConfig.objects.filter(key='package_adviser_filters').first()
@@ -128,8 +137,8 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
             temp_data['common_package'] = []
         else:
             temp_data['common_package'] = package_serializer.data
-        temp_data['preferred_labs'] = lab_serializer.data
-        temp_data['common_conditions'] = condition_serializer.data
+        temp_data['preferred_labs'] = []
+        temp_data['common_conditions'] = []
 
         return Response(temp_data)
 
@@ -1340,7 +1349,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters['is_user_insured'] = insurance_data_dict['is_user_insured']
         queryset_result = self.get_lab_search_list(parameters, page, request)
         count = 0
-        if len(queryset_result)>0:
+        if len(queryset_result) > 0:
             count = queryset_result[0].get("result_count", 0)
 
         #count = len(queryset_result)
@@ -1907,6 +1916,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             else:
                 row['url'] = ''
 
+        default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+
         plus_user_obj = None
         if user and user.is_authenticated and not user.is_anonymous:
             plus_user_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
@@ -1959,7 +1972,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         if plus_user_obj and plus_user_obj.plan:
                             res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user_obj.plan)
                         else:
-                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST")
+                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=default_plan)
                         coverage = False
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
