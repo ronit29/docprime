@@ -822,10 +822,15 @@ class CommonPackageSerializer(serializers.ModelSerializer):
                       "cod_deal_price": deal_price,
                       "fees": agreed_price}
         resp['vip_gold_price'] = agreed_price
+
         plus_obj = None
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
         plan = plus_obj.plan if plus_obj else None
+
+        if not plan:
+            plan = self.context.get('default_plan')
+
         resp['vip_gold_price'] = agreed_price
         resp['vip_convenience_amount'] = obj._selected_test.calculate_convenience_charge(plan=plan if plan else self.context.get('plan'))
 
