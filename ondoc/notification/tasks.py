@@ -415,6 +415,32 @@ def set_order_dummy_transaction(self, order_id, user_id):
         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([order_id, user_id], countdown=300)
 
+
+@task(bind=True, max_retries=5)
+def activate_chat_plans(self, plus_user_id):
+    from ondoc.plus.models import PlusPlans
+    from ondoc.plus.models import PlusUser
+    try:
+        obj = PlusUser.objects.filter(id=plus_user_id).first()
+        if not obj:
+            raise Exception('No Plus User found with id - ' + str(plus_user_id))
+        plan = obj.plan
+        request_data = {}
+        if not plan:
+            raise Exception('Chat plan - Not able to find Plan')
+        if plan.is_chat_included:
+            request_data['mobileNo'] = obj.user.phone_number
+            request_data['priorityType'] = PlusPlans.NORMAL_CHAT_PLAN if not obj.plan.chat_plans else obj.plan.chat_plans
+            url = settings.CHAT_GOLD_API_URL + "addPriorityNumbers"
+            auth_token = settings.CHAT_LAB_REPORT_API_TOKEN
+            response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token, 'Content-Type': 'application/json'})
+            res = response.json()
+
+    except Exception as e:
+        logger.error("Error in Setting Chat Plan for Gold - " + " with exception - " + str(e))
+        self.retry(plus_user_id, countdown=300)
+
+
 # @task(bind=True, max_retries=5)
 # def set_order_dummy_transaction_for_corporate(self, order_id, user_id):
 #     from ondoc.account.models import PgTransaction

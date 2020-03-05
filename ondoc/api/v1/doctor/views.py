@@ -1321,6 +1321,11 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         response_data['potential_ipd'] = potential_ipd
         response_data['all_cities'] = all_cities
         response_data['cod_to_prepaid'] = cod_to_prepaid
+        user_config = UserConfig.objects.filter(key='lead_compare_amount').first()
+        if user_config:
+            response_data['lead_compare_amount'] = user_config.data.get('amount', 0)
+        else:
+            response_data['lead_compare_amount'] = 0
         return Response(response_data)
 
 

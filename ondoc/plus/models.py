@@ -2,7 +2,7 @@ import openpyxl
 from dateutil.relativedelta import relativedelta
 from django.db import models
 import functools
-
+import requests
 from ondoc.api.v1.utils import CouponsMixin, plus_subscription_transform
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
@@ -23,8 +23,9 @@ from ondoc.common.models import DocumentsProofs
 from ondoc.corporate_booking.models import Corporates
 from ondoc.coupon.models import Coupon
 
-from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, update_random_coupons_consumption
-    # set_order_dummy_transaction_for_corporate,
+from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, update_random_coupons_consumption, \
+    activate_chat_plans
+# set_order_dummy_transaction_for_corporate,
 
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
     get_max_convenience_reference
@@ -125,6 +126,11 @@ class PlusProposer(auth_model.TimeStampedModel):
 # All the Gold plans of all the proposers.
 @reversion.register()
 class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
+    NORMAL_CHAT_PLAN = 1
+    PREMIUM_CHAT_PLAN = 2
+
+    CHAT_PLAN_CHOICES = [(NORMAL_CHAT_PLAN, 'Normal Chat Plan'), (PREMIUM_CHAT_PLAN, 'Premium Chat Plan'),]
+
     plan_name = models.CharField(max_length=300)
     proposer = models.ForeignKey(PlusProposer, related_name='plus_plans', on_delete=models.DO_NOTHING)
     internal_name = models.CharField(max_length=200, null=True)
@@ -153,6 +159,8 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     corporate_lab_upper_limit = models.PositiveIntegerField(null=True, blank=True)
     is_prescription_required = models.NullBooleanField()
     priority = models.PositiveIntegerField(default=0, null=True, blank=True)
+    is_chat_included = models.NullBooleanField()
+    chat_plans = models.PositiveIntegerField(choices=CHAT_PLAN_CHOICES, null=True, blank=True)
 
     # Some plans are only applicable when utm params are passed. Like some plans are to be targeted with media
     # campaigns, emails or adwords etc.
@@ -1189,6 +1197,30 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             PlusIntegration.create_vip_lead_after_purchase(self)
             PlusIntegration.assign_coupons_to_user_after_purchase(self)
             UserReferred.credit_after_completion(self.user, self, Order.GOLD_PRODUCT_ID)
+            try:
+                transaction.on_commit(
+                    # lambda: set_order_dummy_transaction.apply_async(
+                    #     (order.id, plus_user_obj.user_id,), countdown=5))
+                    lambda: activate_chat_plans.apply_async(
+                        (self.id, ), countdown=5))
+            except Exception as e:
+                logger.error(str(e))
+
+    def disable_chat_plans(self):
+        try:
+            plan = self.plan
+            request_data = {}
+            if not plan:
+                raise Exception('Chat plan - Not able to find Plan')
+            if plan.is_chat_included:
+                request_data['mobileNo'] = self.user.phone_number
+                request_data['priorityType'] = PlusPlans.NORMAL_CHAT_PLAN if not self.plan.chat_plans else self.plan.chat_plans
+                url = settings.CHAT_GOLD_API_URL + "removePriorityNumbers"
+                auth_token = settings.CHAT_LAB_REPORT_API_TOKEN
+                response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
+                                                                                      'Content-Type': 'application/json'})
+        except Exception as e:
+            logger.error("Error in Disabling Chat Plan for Gold - " + " with exception - " + str(e))
 
     # Process policy cancellation.
     def process_cancellation(self):
@@ -1200,6 +1232,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             care_obj.status = UserPlanMapping.CANCELLED
             care_obj.is_active = False
             care_obj.save()
+
+        if self.plan and self.plan.is_chat_included:
+            PlusUser.disable_chat_plans(self)
 
         if not self.plan.is_corporate:
             self.action_refund()

@@ -567,3 +567,4 @@ CORS_ALLOW_HEADERS = ['accept', 'accept-encoding', 'authorization', 'content-typ
 SAVE_LOGS=env.bool('SAVE_LOGS', False)
 CHAT_LAB_REPORT_API_URL=env('CHAT_LAB_REPORT_API_URL')
 CHAT_LAB_REPORT_API_TOKEN=env('CHAT_LAB_REPORT_API_TOKEN')
+CHAT_GOLD_API_URL=env('CHAT_GOLD_API_URL')
