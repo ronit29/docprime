@@ -1757,21 +1757,20 @@ def send_release_payment_request(self, product_id, appointment_id):
 
 @task(bind=True)
 def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id, log_created_at=None, *args, **kwargs):
-    if settings.SAVE_LOGS:
-        try:
-            from ondoc.account.mongo_models import PgLogs
-            if order_id.__class__.__name__ == 'list':
-                PgLogs.save_single_pg_response(log_type, order_id, txn_id, response, request, user_id)
-            else:
-                if response:
-                    if not isinstance(response, dict):
-                        response = json.loads(response)
-                    response.pop('created_at', None)
-                PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
-        except Exception as e:
-            # todo - temporary commented to avoid error logs in sentry
-            # logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
-            pass
+    try:
+        from ondoc.account.mongo_models import PgLogs
+        if order_id.__class__.__name__ == 'list':
+            PgLogs.save_single_pg_response(log_type, order_id, txn_id, response, request, user_id)
+        else:
+            if response:
+                if not isinstance(response, dict):
+                    response = json.loads(response)
+                response.pop('created_at', None)
+            PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
+    except Exception as e:
+        # todo - temporary commented to avoid error logs in sentry
+        # logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+        pass
 
 
 @task(bind=True)
@@ -1866,35 +1865,34 @@ def send_partner_lab_notifications(order_id, notification_type=None, report_list
 
 @task(bind=True, max_retries=3)
 def save_matrix_logs(self, id, obj_type, request_data, response):
-    if settings.SAVE_LOGS:
-        try:
-            from ondoc.matrix.mongo_models import MatrixLog
-            from ondoc.diagnostic.models import LabAppointment
-            from ondoc.doctor.models import OpdAppointment
-            from ondoc.insurance.models import UserInsurance, InsuranceLead
-            from ondoc.plus.models import PlusUser, PlusLead
-            from ondoc.common.models import GeneralMatrixLeads
+    try:
+        from ondoc.matrix.mongo_models import MatrixLog
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.insurance.models import UserInsurance, InsuranceLead
+        from ondoc.plus.models import PlusUser, PlusLead
+        from ondoc.common.models import GeneralMatrixLeads
 
-            object = None
-            if obj_type == 'lab_appointment':
-                object = LabAppointment.objects.filter(id=id).first()
-            elif obj_type == 'opd_appointment':
-                object = OpdAppointment.objects.filter(id=id).first()
-            elif obj_type == 'user_insurance':
-                object = UserInsurance.objects.filter(id=id).first()
-            elif obj_type == 'plus_user':
-                object = PlusUser.objects.filter(id=id).first()
-            elif obj_type == 'plus_lead':
-                object = PlusLead.objects.filter(id=id).first()
-            elif obj_type == 'insurance_lead':
-                object = InsuranceLead.objects.filter(id=id).first()
-            elif obj_type == 'general_leads':
-                object = GeneralMatrixLeads.objects.filter(id=id).first()
+        object = None
+        if obj_type == 'lab_appointment':
+            object = LabAppointment.objects.filter(id=id).first()
+        elif obj_type == 'opd_appointment':
+            object = OpdAppointment.objects.filter(id=id).first()
+        elif obj_type == 'user_insurance':
+            object = UserInsurance.objects.filter(id=id).first()
+        elif obj_type == 'plus_user':
+            object = PlusUser.objects.filter(id=id).first()
+        elif obj_type == 'plus_lead':
+            object = PlusLead.objects.filter(id=id).first()
+        elif obj_type == 'insurance_lead':
+            object = InsuranceLead.objects.filter(id=id).first()
+        elif obj_type == 'general_leads':
+            object = GeneralMatrixLeads.objects.filter(id=id).first()
 
-            MatrixLog.create_matrix_logs(object, request_data, response)
+        MatrixLog.create_matrix_logs(object, request_data, response)
 
-        except Exception as e:
-            logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+    except Exception as e:
+        logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
 
 
 @task(bind=True, max_retries=2)
