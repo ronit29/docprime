@@ -1480,7 +1480,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
         # Check if already processes
         try:
             if response and response.get("orderNo"):
-                pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                # pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo"), order__id=int(response.get('orderId'))).first()
                 if pg_txn:
                     is_preauth = False
                     if pg_txn.is_preauth():
