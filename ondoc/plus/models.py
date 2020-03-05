@@ -1233,6 +1233,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             care_obj.is_active = False
             care_obj.save()
 
+        if self.plan and self.plan.is_chat_included:
+            PlusUser.disable_chat_plans(self)
+
         if not self.plan.is_corporate:
             self.action_refund()
 
