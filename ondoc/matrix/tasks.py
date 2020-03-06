@@ -1550,6 +1550,9 @@ def send_report_review_data_to_chat(self, data):
         if not appointment:
             raise Exception("Appointment could not found against id - " + str(appointment_id))
 
+        feedback_url = "%s/chat-ratings?&appointment_id=%s" % (settings.BASE_URL, appointment.id)
+        tiny_feedback_url = generate_short_url(feedback_url)
+
         booking_url = '%s/admin/diagnostic/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
         profile = appointment.profile
         age = appointment.calculate_age()
@@ -1600,7 +1603,8 @@ def send_report_review_data_to_chat(self, data):
             "lab_test": test_data,
             "reports": appointment.get_report_urls(),
             "report_files": appointment.get_report_type(),
-            "ExitPointUrl": booking_url
+            "ExitPointUrl": booking_url,
+            "url": tiny_feedback_url
         }
 
         url = settings.CHAT_LAB_REPORT_API_URL
