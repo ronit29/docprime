@@ -2674,7 +2674,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
     plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None, on_delete=models.DO_NOTHING)
     plus_plan_data = GenericRelation(PlusAppointmentMapping)
-    revenue_transferred = models.NullBooleanField(null=True)
+    revenue_transferred = models.NullBooleanField()
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

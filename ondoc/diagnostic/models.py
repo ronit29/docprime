@@ -1806,7 +1806,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     plus_plan_data = GenericRelation(PlusAppointmentMapping)
-    revenue_transferred = models.NullBooleanField(null=True)
+    revenue_transferred = models.NullBooleanField()
 
     # # Calculate appointment revenue
     # def get_revenue(self):
