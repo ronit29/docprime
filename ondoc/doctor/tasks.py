@@ -217,5 +217,7 @@ def invalidate_plus_users():
     qs = PlusUser.objects.filter(expire_date__lte=datetime.now())
     if qs:
         qs.update(status=PlusUser.EXPIRED)
+        for qst in qs:
+            PlusUser.disable_chat_plans(qst)
 
     return
