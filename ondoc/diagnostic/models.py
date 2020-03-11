@@ -65,7 +65,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria, Certifications
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria, Certifications, GenericPrescriptionFile
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -2478,6 +2478,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def create_appointment(cls, appointment_data, responsible_user=None, source=None):
         from ondoc.prescription.models import AppointmentPrescription
         insurance = appointment_data.get('insurance')
+        plus_user = appointment_data.get('plus_plan')
         appointment_status = OpdAppointment.BOOKED
 
         if insurance and insurance.is_valid():
@@ -2493,6 +2494,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             appointment_status = OpdAppointment.CREATED
             # if insurance_limit_usage_data.get('created_state'):
             #     appointment_status = OpdAppointment.CREATED
+
+        if plus_user and plus_user.plan and plus_user.plan.is_prescription_required:
+            appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
@@ -3931,7 +3935,6 @@ class LabTestCategoryLandingURLS(TimeStampedModel):
         db_table = "lab_test_category_landing_urls"
 
 
-
 class IPDMedicinePageLead(auth_model.TimeStampedModel):
     name = models.CharField(max_length=500)
     phone_number = models.BigIntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
@@ -3954,6 +3957,15 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
 
 
+class LabTestPrecsriptions(auth_model.TimeStampedModel):
+    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE, null=True, blank=True)
+    primary_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    file = GenericRelation(GenericPrescriptionFile, related_query_name="labtest_prescription_file", null=True, blank=True)
+
+    class Meta:
+        db_table = 'lab_test_prescriptions'
+
+
 class LabAppointmentFeedback(auth_model.TimeStampedModel):
     appointment = models.ForeignKey(LabAppointment, on_delete=models.DO_NOTHING, null=True)
     ratings = models.PositiveIntegerField(max_length=10)
@@ -3961,3 +3973,4 @@ class LabAppointmentFeedback(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'lab_appointment_feedback'
+

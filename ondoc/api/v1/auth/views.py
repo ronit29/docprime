@@ -1480,7 +1480,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
         # Check if already processes
         try:
             if response and response.get("orderNo"):
-                pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                # pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo"), order__id=int(response.get('orderId'))).first()
                 if pg_txn:
                     is_preauth = False
                     if pg_txn.is_preauth():
@@ -3089,26 +3090,33 @@ class SbiGUserViewset(GenericViewSet):
         return response
 
 
-class PGRefundViewset(viewsets.GenericViewSet):
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, IsDoctor)
+class PGRefundViewSet(viewsets.GenericViewSet):
 
+    permission_classes = (utils.IsPGRequest, )
     @transaction.atomic()
     def save_pg_refund(self, request):
-        from django.http import JsonResponse
-        response = {'login': 0}
+        response = {'status': 0}
         if request.method != 'POST':
-            return JsonResponse(response, status=405)
-        serializer = serializers.CloudLabUserLoginSerializer(data=request.data)
+            return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        serializer = serializers.PGRefundSaveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        refund_obj = data['refund_obj']
         try:
-            user_data = User.get_external_login_data(data, request)
+            refund_obj.pg_transaction.amount = data.get('txnAmount')
+            refund_obj.pg_transaction.pb_gateway_name = data.get('gateway')
+            refund_obj.pg_transaction.payment_mode = data.get('mode')
+            refund_obj.refund_amount = data.get('refundAmount')
+
+            refund_obj.bank_arn = data.get('bank_arn')
+            refund_obj.bankRefNum = data.get('bankRefNum')
+            refund_obj.refundDate = utils.aware_time_zone(data.get('refundDate'))
+            refund_obj.refundId = data.get('refundId')
+            refund_obj.pg_transaction.save()
+            refund_obj.save()
         except Exception as e:
             logger.error(str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        token = user_data.get('token')
-        if not token:
-            return JsonResponse(response, status=400)
 
-        return Response(response, status=status.HTTP_200_OK)
+        return Response({'status':1}, status=status.HTTP_200_OK)
+

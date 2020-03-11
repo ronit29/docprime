@@ -7,7 +7,7 @@ from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers, UserInsurance
 from ondoc.diagnostic.models import AvailableLabTest
-from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
+from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction, ConsumerRefund, PgTransaction
 import datetime, calendar, pytz
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
@@ -303,6 +303,54 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return user_insurance_obj.status
         else:
             return 0
+
+    def get_age(self, obj):
+        from datetime import date
+        age = None
+        birth_date = None
+        if hasattr(obj, 'dob'):
+            birth_date = obj.dob
+        elif isinstance(obj, dict):
+            birth_date = obj.get('dob')
+        if birth_date:
+            today = date.today()
+            age = today.year - birth_date.year
+            full_year_passed = (today.month, today.day) >= (birth_date.month, birth_date.day)
+            if not full_year_passed:
+                age -= 1
+        return age
+
+    def get_profile_image(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return None
+        profile_image = None
+        if hasattr(obj, 'profile_image'):
+            profile_image = obj.profile_image
+        elif isinstance(obj, dict):
+            profile_image = obj.get('profile_image')
+        if profile_image:
+            photo_url = profile_image.url
+            return request.build_absolute_uri(photo_url)
+        else:
+            return None
+
+
+class ProviderUserProfileSerializer(serializers.ModelSerializer):
+    GENDER_CHOICES = UserProfile.GENDER_CHOICES
+    name = serializers.CharField(max_length=100)
+    age = serializers.SerializerMethodField()
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES, allow_null=True, allow_blank=True, required=False)
+    email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
+    profile_image = serializers.SerializerMethodField()
+    dob = serializers.DateField(allow_null=True, required=False)
+    is_default_user = serializers.BooleanField(required=False)
+    profile_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
+                  , "age", "user", "dob", "updated_at")
 
     def get_age(self, obj):
         from datetime import date
@@ -781,3 +829,25 @@ class MatrixUserLoginSerializer(serializers.Serializer):
 #     dob = serializers.DateField()
 #     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
 #     extra = serializers.JSONField(allow_null=True, required=False)
+
+
+class PGRefundSaveSerializer(serializers.Serializer):
+    mode = serializers.CharField(max_length=24)
+    refNo = serializers.IntegerField()
+    orderNo = serializers.CharField(required=False)
+    orderId = serializers.IntegerField()
+    bankRefNum = serializers.IntegerField(allow_null=True)
+    refundDate = serializers.DateTimeField()
+    refundId = serializers.IntegerField()
+    txnAmount = serializers.FloatField()
+    gateway = serializers.CharField(allow_null=True)
+    bank_arn = serializers.CharField(allow_null=True)
+    refundAmount = serializers.FloatField()
+
+    def validate(self, attrs):
+        refund_obj = ConsumerRefund.objects.select_related('pg_transaction').filter(id=attrs['refNo']).first()
+        if refund_obj and refund_obj.refund_state == ConsumerRefund.COMPLETED and refund_obj.pg_transaction.order.id == attrs['orderId']:
+            attrs['refund_obj'] = refund_obj
+        else:
+            raise serializers.ValidationError('Invalid Refund!')
+        return attrs

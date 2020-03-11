@@ -2,7 +2,7 @@ import openpyxl
 from dateutil.relativedelta import relativedelta
 from django.db import models
 import functools
-
+import requests
 from ondoc.api.v1.utils import CouponsMixin, plus_subscription_transform
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
@@ -23,8 +23,9 @@ from ondoc.common.models import DocumentsProofs
 from ondoc.corporate_booking.models import Corporates
 from ondoc.coupon.models import Coupon
 
-from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, update_random_coupons_consumption
-    # set_order_dummy_transaction_for_corporate,
+from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, update_random_coupons_consumption, \
+    activate_chat_plans
+# set_order_dummy_transaction_for_corporate,
 
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
     get_max_convenience_reference
@@ -88,7 +89,7 @@ class PlusProposer(auth_model.TimeStampedModel):
     # Get the active plans associated with the object of plus proposer.
     @property
     def get_active_plans(self):
-        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')
+        return self.plus_plans.prefetch_related('plan_parameters', 'plan_parameters__parameter', 'plan_content').filter(is_live=True, is_retail=True).order_by('id')
         # index = 0
         # for plan in plans:
         #     if plan.plan_utmsources.all().exists():
@@ -125,6 +126,11 @@ class PlusProposer(auth_model.TimeStampedModel):
 # All the Gold plans of all the proposers.
 @reversion.register()
 class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
+    NORMAL_CHAT_PLAN = 1
+    PREMIUM_CHAT_PLAN = 2
+
+    CHAT_PLAN_CHOICES = [(NORMAL_CHAT_PLAN, 'Normal Chat Plan'), (PREMIUM_CHAT_PLAN, 'Premium Chat Plan'),]
+
     plan_name = models.CharField(max_length=300)
     proposer = models.ForeignKey(PlusProposer, related_name='plus_plans', on_delete=models.DO_NOTHING)
     internal_name = models.CharField(max_length=200, null=True)
@@ -151,6 +157,10 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     corporate_upper_limit_criteria = models.CharField(max_length=100, null=True, blank=True, choices=PriceCriteria.as_choices())
     corporate_doctor_upper_limit = models.PositiveIntegerField(null=True, blank=True)
     corporate_lab_upper_limit = models.PositiveIntegerField(null=True, blank=True)
+    is_prescription_required = models.NullBooleanField()
+    priority = models.PositiveIntegerField(default=0, null=True, blank=True)
+    is_chat_included = models.NullBooleanField()
+    chat_plans = models.PositiveIntegerField(choices=CHAT_PLAN_CHOICES, null=True, blank=True)
 
     # Some plans are only applicable when utm params are passed. Like some plans are to be targeted with media
     # campaigns, emails or adwords etc.
@@ -601,7 +611,12 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                                                                                PlanParametersEnum.LABTEST_AMOUNT,
                                                                                PlanParametersEnum.LABTEST_COUNT,
                                                                                PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT,
-                                                                               PlanParametersEnum.DOCTOR_CONSULT_COUNT])
+                                                                               PlanParametersEnum.DOCTOR_CONSULT_COUNT,
+                                                                               PlanParametersEnum.TOTAL_WORTH,
+                                                                               PlanParametersEnum.PACKAGES_COVERED,
+                                                                               PlanParametersEnum.DOCTOR_MAX_DISCOUNTED_AMOUNT,
+                                                                               PlanParametersEnum.LAB_MAX_DISCOUNTED_AMOUNT,
+                                                                               PlanParametersEnum.PACKAGE_MAX_DISCOUNTED_AMOUNT])
 
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
@@ -629,10 +644,56 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         resp['available_labtest_count'] = resp['total_labtest_count_limit'] - int(self.get_labtest_plus_appointment_count())
         resp['total_doctor_count_limit'] = int(data['doctor_consult_count']) if data.get('doctor_consult_count') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
         resp['available_doctor_count'] = resp['total_doctor_count_limit'] - int(self.get_doctor_plus_appointment_count())
-
-        # resp['availabe_labtest_discount_count'] = resp['total_labtest_count_limit']
+        resp['total_worth'] = int(data['total_worth']) if data.get('total_worth') and data.get('total_worth').__class__.__name__ == 'str'  else 0
+        resp['total_worth_utilized'] = self.get_total_worth_utilized()
+        resp['available_total_worth'] = int(resp['total_worth']) - int(resp['total_worth_utilized'])
+        resp['is_package_cover'] = True if data.get('packages_covered') and data.get('packages_covered').__class__.__name__ == 'str' else False
+        resp['doctor_max_discounted_amount'] = int(data.get('doctor_max_discounted_amount')) if data.get('doctor_max_discounted_amount') and data.get('doctor_max_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['lab_max_discounted_amount'] = int(data.get('lab_max_discounted_amount')) if data.get('lab_max_discounted_amount') and data.get('lab_max_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['package_max_discounted_amount'] = int(data.get('package_max_discounted_amount')) if data.get('package_max_discounted_amount') and data.get('package_max_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['doctor_min_discounted_amount'] = int(data.get('doctor_min_discounted_amount')) if data.get(
+            'doctor_min_discounted_amount') and data.get(
+            'doctor_min_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['lab_min_discounted_amount'] = int(data.get('lab_min_discounted_amount')) if data.get(
+            'lab_min_discounted_amount') and data.get('lab_min_discounted_amount').__class__.__name__ == 'str' else 0
+        resp['package_min_discounted_amount'] = int(data.get('package_min_discounted_amount')) if data.get(
+            'package_min_discounted_amount') and data.get(
+            'package_min_discounted_amount').__class__.__name__ == 'str' else 0
 
         return resp
+
+    def get_total_worth_utilized(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        import functools
+        labtest_amount = 0
+        opd_amount = 0
+        lab_appointments_ids = LabAppointment.objects.filter(plus_plan=self).exclude(
+            status=LabAppointment.CANCELLED).values_list('id', flat=True)
+
+        content_type = ContentType.objects.get_for_model(LabAppointment)
+        lab_appointment_mappings = PlusAppointmentMapping.objects.filter(object_id__in=lab_appointments_ids,
+                                                                     content_type=content_type)
+        # if not appointment_mappings:
+        #     return 0
+        if lab_appointment_mappings:
+            lab_appointment_mappings_amount = list(map(lambda appointment: appointment.amount, lab_appointment_mappings))
+            labtest_amount = labtest_amount + functools.reduce(lambda a, b: a + b, lab_appointment_mappings_amount)
+
+        opd_appointments_ids = OpdAppointment.objects.filter(plus_plan=self).exclude(
+            status=OpdAppointment.CANCELLED).values_list('id', flat=True)
+
+        content_type = ContentType.objects.get_for_model(OpdAppointment)
+        opd_appointment_mappings = PlusAppointmentMapping.objects.filter(object_id__in=opd_appointments_ids,
+                                                                     content_type=content_type)
+
+        if opd_appointment_mappings:
+            opd_appointment_mappings_amount = list(map(lambda appointment: appointment.amount, opd_appointment_mappings))
+            opd_amount = opd_amount + functools.reduce(lambda a, b: a + b, opd_appointment_mappings_amount)
+
+        total_amount = labtest_amount + opd_amount
+        return total_amount
 
     # Get count of doctor appointments which have been booked via gold policy.
     def get_doctor_plus_appointment_count(self):
@@ -909,8 +970,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         labtest_amount = 0
         lab_appointments_ids = LabAppointment.objects.filter(plus_plan=self).exclude(status=LabAppointment.CANCELLED).values_list('id', flat=True)
 
-
-
         content_type = ContentType.objects.get_for_model(LabAppointment)
         appointment_mappings = PlusAppointmentMapping.objects.filter(object_id__in=lab_appointments_ids, content_type=content_type)
         if not appointment_mappings:
@@ -1138,6 +1197,30 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             PlusIntegration.create_vip_lead_after_purchase(self)
             PlusIntegration.assign_coupons_to_user_after_purchase(self)
             UserReferred.credit_after_completion(self.user, self, Order.GOLD_PRODUCT_ID)
+            try:
+                transaction.on_commit(
+                    # lambda: set_order_dummy_transaction.apply_async(
+                    #     (order.id, plus_user_obj.user_id,), countdown=5))
+                    lambda: activate_chat_plans.apply_async(
+                        (self.id, ), countdown=5))
+            except Exception as e:
+                logger.error(str(e))
+
+    def disable_chat_plans(self):
+        try:
+            plan = self.plan
+            request_data = {}
+            if not plan:
+                raise Exception('Chat plan - Not able to find Plan')
+            if plan.is_chat_included:
+                request_data['mobileNo'] = self.user.phone_number
+                request_data['priorityType'] = PlusPlans.NORMAL_CHAT_PLAN if not self.plan.chat_plans else self.plan.chat_plans
+                url = settings.CHAT_GOLD_API_URL + "removePriorityNumbers"
+                auth_token = settings.CHAT_LAB_REPORT_API_TOKEN
+                response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
+                                                                                      'Content-Type': 'application/json'})
+        except Exception as e:
+            logger.error("Error in Disabling Chat Plan for Gold - " + " with exception - " + str(e))
 
     # Process policy cancellation.
     def process_cancellation(self):
@@ -1149,6 +1232,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             care_obj.status = UserPlanMapping.CANCELLED
             care_obj.is_active = False
             care_obj.save()
+
+        if self.plan and self.plan.is_chat_included:
+            PlusUser.disable_chat_plans(self)
 
         if not self.plan.is_corporate:
             self.action_refund()
@@ -1258,7 +1344,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
     class Meta:
         db_table = 'plus_users'
-        unique_together = (('user', 'plan'),)
+        # unique_together = (('user', 'plan'),)
 
 
 
@@ -1269,7 +1355,7 @@ class PlusUserUtilization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'plus_user_utilization'
-        unique_together = (('plus_user', 'plan'),)
+        # unique_together = (('plus_user', 'plan'),)
 
     # Create utilization of individual user.
     @classmethod
@@ -1985,10 +2071,29 @@ class PlusUserUpload(auth_model.TimeStampedModel):
     def create_order(self, plus_user_data, amount, user):
         from ondoc.account import models as account_models
         visitor_info = None
+        plan_id = plus_user_data.get('plus_plan')
+        product_id = None
+        action = None
+        if not plan_id:
+            raise Exception('Plan ID not found')
+        if plan_id:
+            plus_plan_obj = PlusPlans.objects.filter(id=plan_id).first()
+
+        if not plus_plan_obj:
+            raise Exception('Plan Object not found')
+
+        if plus_plan_obj.is_corporate and not plus_plan_obj.is_gold:
+            product_id = account_models.Order.CORP_VIP_PRODUCT_ID
+            action_id = account_models.Order.CORP_VIP_CREATE
+        elif plus_plan_obj.is_corporate and plus_plan_obj.is_gold:
+            product_id = account_models.Order.GOLD_PRODUCT_ID
+            action_id = account_models.Order.GOLD_CREATE
+        else:
+            raise Exception('Not able to find Product ID')
 
         order = account_models.Order.objects.create(
-            product_id=account_models.Order.CORP_VIP_PRODUCT_ID,
-            action=account_models.Order.CORP_VIP_CREATE,
+            product_id=product_id,
+            action=action_id,
             action_data=plus_user_data,
             amount=amount,
             cashback_amount=0,

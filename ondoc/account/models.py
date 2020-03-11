@@ -122,6 +122,8 @@ class Order(TimeStampedModel):
 
     def is_vip_appointment(self):
         appt = self.getAppointment()
+        if appt.__class__.__name__ not in ['LabAppointment', 'OpdAppointment']:
+            return False
         if appt.plus_plan and appt.plus_plan.plan and not appt.plus_plan.plan.is_gold:
             return True
         return False
@@ -175,10 +177,12 @@ class Order(TimeStampedModel):
             user_insurance = UserInsurance.objects.filter(order=self).first()
             if user_insurance:
                 data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
-        elif self.product_id in [Order.CORP_VIP_PRODUCT_ID]:
+        elif self.product_id in [Order.CORP_VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID]:
             plus_user = PlusUser.objects.filter(order=self).first()
-            if plus_user:
-                data['insurerCode'] = "vipPurchase"
+            if plus_user and plus_user.plan and not plus_user.plan.is_gold:
+                data['insurerCode'] = settings.VIP_MERCHANT_CODE
+            elif plus_user and plus_user.plan and plus_user.plan.is_gold:
+                data['insurerCode'] = settings.GOLD_MERCHANT_CODE
         elif (self.product_id in (self.DOCTOR_PRODUCT_ID,self.LAB_PRODUCT_ID)):
             if not self.is_parent() and self.booked_using_insurance():
                 appt = self.getAppointment()
@@ -2140,6 +2144,12 @@ class ConsumerRefund(TimeStampedModel):
     pg_transaction = models.ForeignKey(PgTransaction, related_name='pg_refund', blank=True, null=True, on_delete=models.DO_NOTHING)
     refund_state = models.PositiveSmallIntegerField(choices=state_type, default=PENDING)
     refund_initiated_at = models.DateTimeField(blank=True, null=True)
+
+    #FIELDs AS DIRECTED IN DOCNEW-1865
+    bank_arn = models.CharField(null=True, blank=True, max_length=64)
+    bankRefNum = models.CharField(null=True, blank=True, max_length=64)
+    refundDate = models.DateTimeField(null=True, blank=True)
+    refundId = models.IntegerField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         database_instance = ConsumerRefund.objects.filter(pk=self.id).first()

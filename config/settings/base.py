@@ -139,6 +139,7 @@ DJANGO_APPS = (
     'django.contrib.sitemaps',
     'reversion_compare',
 )
+
 THIRD_PARTY_APPS = (
 
     'rest_framework',
@@ -219,7 +220,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_user_agents.middleware.UserAgentMiddleware'
+    'django_user_agents.middleware.UserAgentMiddleware',
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -345,6 +346,7 @@ GOOGLE_MAPS_API_KEY = 'AIzaSyDFxu_VGlmLojtgiwn892OYzV6IY_Inl6I'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
 SMS_AUTH_KEY = env('SMS_AUTH_KEY')
+
 
 RABBITMQ_CONNECTION_SETTINGS = {
     'CONNECTION_URL': env('RABBITMQ_CONNECTION_URL'),
@@ -558,9 +560,12 @@ RABBITMQ_TRACKING_QUEUE=env('RABBITMQ_TRACKING_QUEUE')
 SBIG_AUTH_TOKEN=env('SBIG_AUTH_TOKEN')
 GOLD_MERCHANT_CODE=env('GOLD_MERCHANT_CODE')
 VIP_MERCHANT_CODE=env('VIP_MERCHANT_CODE')
+PG_AUTH_TOKEN=env('PG_AUTH_TOKEN')
 SBIG_BASE_URL=env('SBIG_BASE_URL')
 REFERRAL_CASHBACK_AMOUNT=env('REFERRAL_CASHBACK_AMOUNT')
 CORS_ALLOW_HEADERS = ['accept', 'accept-encoding', 'authorization', 'content-type', 'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with', 'app-name']
 SAVE_LOGS=env.bool('SAVE_LOGS', False)
 DOCPRIME_CURRENT_AC_MERCHANT=env('DOCPRIME_CURRENT_AC_MERCHANT', default=None)
-
+CHAT_LAB_REPORT_API_URL=env('CHAT_LAB_REPORT_API_URL')
+CHAT_LAB_REPORT_API_TOKEN=env('CHAT_LAB_REPORT_API_TOKEN')
+CHAT_GOLD_API_URL=env('CHAT_GOLD_API_URL')
