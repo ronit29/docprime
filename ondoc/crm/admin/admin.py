@@ -23,7 +23,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
                                  CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
                                  HospitalSponsoredServices, DoctorSponsoredServices,
-                                 SponsoredServicePracticeSpecialization, GoogleMapRecords)
+                                 SponsoredServicePracticeSpecialization, GoogleMapRecords, SearchScoreParams,
+                                 ScoreWeightage)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -60,7 +61,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      OfflinePatientAdmin,
                      UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin,
                      PurchaseOrderCreationAdmin, SponsoredServicesAdmin, HospitalSponsoredServicesAdmin,
-                     DoctorSponsoredServicesAdmin, GoogleMapRecordsAdmin)
+                     DoctorSponsoredServicesAdmin, SearchScoreParamsAdmin, ScoreWeightageAdmin, GoogleMapRecordsAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
 from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin, PermissionAdmin
@@ -339,3 +340,5 @@ admin.site.register(Certifications)
 admin.site.register(GoogleMapRecords, GoogleMapRecordsAdmin)
 admin.site.register(LabtestNameMaster, LabTestNameMasterAdmin)
 admin.site.register(GoogleLatLong, GoogleLatLongAdmin)
+admin.site.register(SearchScoreParams, SearchScoreParamsAdmin)
+admin.site.register(ScoreWeightage, ScoreWeightageAdmin)

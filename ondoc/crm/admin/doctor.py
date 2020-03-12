@@ -2663,3 +2663,16 @@ class GoogleMapRecordsAdmin(MediaImportMixin, VersionAdmin, ActionAdmin):
     list_display = ('id', 'hospital_name', 'lead_rank', )
     formats = (base_formats.XLS,)
     resource_class = GoogleMapRecordsResource
+
+class RecordAdmin(VersionAdmin, ActionAdmin):
+    form = GoogleMapRecordForm
+
+
+class SearchScoreParamsAdmin(admin.ModelAdmin):
+    fields = ('param', 'score_values', 'max_score', 'is_enabled', 'is_live', 'score_weightage')
+    list_display = ('param', 'score_values', 'max_score', 'is_enabled', 'is_live', 'score_weightage')
+
+
+class ScoreWeightageAdmin(admin.ModelAdmin):
+    fields = ('param', 'weightage')
+    list_display = ('param', 'weightage')
