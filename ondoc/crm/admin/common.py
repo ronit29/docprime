@@ -570,7 +570,7 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response', 'duplicate_of', 'recreate_payout', 'remarks']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name', 'booking_type')
     search_fields = ['name', 'id', 'appointment_id']
-    list_filter = ['status', 'booking_type']
+    list_filter = ['status', 'booking_type', 'payout_type']
 
     class Media:
         js = ('js/admin/ondoc.js',)
@@ -691,6 +691,7 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
         kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
         kwargs['payout_status'] = kwargs.get('request').POST.get('payout_status')
         kwargs['booking_type'] = kwargs.get('request').POST.get('booking_type')
+        kwargs['payout_type'] = kwargs.get('request').POST.get('payout_type')
         resource_class = self.get_export_resource_class()
         data = resource_class(**self.get_export_resource_kwargs(kwargs.get('request'))).export(queryset, *args,
                                                                                                **kwargs)
