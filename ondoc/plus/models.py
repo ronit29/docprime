@@ -161,6 +161,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     priority = models.PositiveIntegerField(default=0, null=True, blank=True)
     is_chat_included = models.NullBooleanField()
     chat_plans = models.PositiveIntegerField(choices=CHAT_PLAN_CHOICES, null=True, blank=True)
+    chat_plan_description = models.CharField(max_length=25, null=True, blank=True)
 
     # Some plans are only applicable when utm params are passed. Like some plans are to be targeted with media
     # campaigns, emails or adwords etc.
