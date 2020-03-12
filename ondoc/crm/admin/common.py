@@ -492,6 +492,7 @@ class MerchantPayoutResource(resources.ModelResource):
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
         payout_status = kwargs.get('payout_status')
         booking_type = kwargs.get('booking_type')
+        payout_type = kwargs.get('payout_type')
 
         payouts = MerchantPayout.objects.filter(created_at__date__range=date_range)
         if payout_status:
@@ -501,6 +502,10 @@ class MerchantPayoutResource(resources.ModelResource):
         if booking_type:
             if [str(x[0]) for x in MerchantPayout.BookingTypeChoices]:
                 payouts = payouts.filter(booking_type=booking_type)
+
+        if payout_type:
+            if [str(x[0]) for x in MerchantPayout.PAYOUT_TYPE_CHOICES]:
+                payouts = payouts.filter(booking_type=payout_type)
 
         payouts = payouts.order_by('-updated_at')
         return payouts

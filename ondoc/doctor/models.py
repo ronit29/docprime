@@ -2672,12 +2672,34 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     documents = GenericRelation(Documents)
     fraud = GenericRelation(Fraud)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
-    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
-                                  on_delete=models.DO_NOTHING)
+    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None, on_delete=models.DO_NOTHING)
     plus_plan_data = GenericRelation(PlusAppointmentMapping)
+    revenue_transferred = models.NullBooleanField()
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
+
+    # # Calculate OPD appointment revenue
+    # def get_revenue(self):
+    #     paid_by_user = None
+    #     if self.price_data and self.price_data.get('wallet_amount'):
+    #         paid_by_user = self.price_data.get('wallet_amount')
+    #     else:
+    #         order = Order.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID).first()
+    #         if order and order.is_parent():
+    #             paid_by_pg = order.amount if order.amount else 0
+    #             paid_by_wallet = order.wallet_amount if order.wallet_amount else 0
+    #             paid_by_user = paid_by_pg + paid_by_wallet
+    #         else:
+    #             order = Order.objects.filter(id=order.parent_id).first()
+    #             if order:
+    #                 paid_by_pg = order.amount if order.amount else 0
+    #                 paid_by_wallet = order.wallet_amount if order.wallet_amount else 0
+    #                 paid_by_user = paid_by_pg + paid_by_wallet
+    #
+    #     paid_to_provider = self.fees
+    #     revenue = paid_by_user - paid_to_provider
+    #     return revenue
 
     def get_cod_amount(self):
         result = int(self.mrp)
@@ -3352,8 +3374,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
-
-
 
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:

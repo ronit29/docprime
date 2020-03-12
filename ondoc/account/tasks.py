@@ -714,3 +714,10 @@ def update_convenience_charge():
 
     engine.send("Doctor Completed", 9560488461, False)
     engine.send("Doctor Completed", 9871047545, False)
+
+
+@task()
+def add_revenue_payouts():
+    from ondoc.account.models import MerchantPayout
+    MerchantPayout.create_appointment_revenue_payout()
+    return True
