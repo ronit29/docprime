@@ -505,7 +505,7 @@ class MerchantPayoutResource(resources.ModelResource):
 
         if payout_type:
             if [str(x[0]) for x in MerchantPayout.PAYOUT_TYPE_CHOICES]:
-                payouts = payouts.filter(booking_type=payout_type)
+                payouts = payouts.filter(payout_type=payout_type)
 
         payouts = payouts.order_by('-updated_at')
         return payouts
