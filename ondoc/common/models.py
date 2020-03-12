@@ -812,6 +812,49 @@ class MerchantPayoutMixin(object):
         elif self.__class__.__name__ == 'UserInsurance':
             UserInsurance.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
 
+    def update_appointment_revenue_transferred(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        if self.__class__.__name__ == 'OpdAppointment':
+            OpdAppointment.objects.filter(id=self.id).update(revenue_transferred=True)
+        elif self.__class__.__name__ == 'LabAppointment':
+            LabAppointment.objects.filter(id=self.id).update(revenue_transferred=True)
+        else:
+            pass
+
+    def get_revenue(self):
+        from ondoc.account.models import Order
+
+        paid_by_user = None
+        if self.price_data and self.price_data.get('wallet_amount'):
+            paid_by_user = self.price_data.get('wallet_amount')
+        else:
+            if self.__class__.__name__ == 'LabAppointment':
+                order = Order.objects.filter(reference_id=self.id, product_id=Order.LAB_PRODUCT_ID).first()
+            else:
+                order = Order.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID).first()
+
+            if order and order.is_parent():
+                paid_by_pg = order.amount if order.amount else 0
+                paid_by_wallet = order.wallet_amount if order.wallet_amount else 0
+                paid_by_user = paid_by_pg + paid_by_wallet
+            else:
+                order = Order.objects.filter(id=order.parent_id).first()
+                if order:
+                    paid_by_pg = order.amount if order.amount else 0
+                    paid_by_wallet = order.wallet_amount if order.wallet_amount else 0
+                    paid_by_user = paid_by_pg + paid_by_wallet
+
+        if self.__class__.__name__ == 'LabAppointment':
+            paid_to_provider = self.agreed_price
+        else:
+            paid_to_provider = self.fees
+
+        revenue = paid_by_user - paid_to_provider
+        return revenue
+
+
 
 class Fraud(auth_model.TimeStampedModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)

@@ -1806,6 +1806,29 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     plus_plan_data = GenericRelation(PlusAppointmentMapping)
+    revenue_transferred = models.NullBooleanField()
+
+    # # Calculate appointment revenue
+    # def get_revenue(self):
+    #     paid_by_user = None
+    #     if self.price_data and self.price_data.get('wallet_amount'):
+    #         paid_by_user = self.price_data.get('wallet_amount')
+    #     else:
+    #         order = Order.objects.filter(reference_id=self.id, product_id=Order.LAB_PRODUCT_ID).first()
+    #         if order and order.is_parent():
+    #             paid_by_pg = order.amount if order.amount else 0
+    #             paid_by_wallet = order.wallet_amount if order.wallet_amount else 0
+    #             paid_by_user = paid_by_pg + paid_by_wallet
+    #         else:
+    #             order = Order.objects.filter(id=order.parent_id).first()
+    #             if order:
+    #                 paid_by_pg = order.amount if order.amount else 0
+    #                 paid_by_wallet = order.wallet_amount if order.wallet_amount else 0
+    #                 paid_by_user = paid_by_pg + paid_by_wallet
+    #
+    #     paid_to_provider = self.agreed_price
+    #     revenue = paid_by_user - paid_to_provider
+    #     return revenue
 
     # Check appointment provider is thyrocare or not
     @cached_property

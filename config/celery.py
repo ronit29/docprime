@@ -15,7 +15,7 @@ from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_searc
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
     update_flags, doctors_daily_schedule, update_rc_super_user, fetch_place_ids, calculate_percentage, invalidate_plus_users
 from ondoc.account.tasks import update_ben_status_from_pg, update_merchant_payout_pg_status, \
-    create_appointment_admins_from_spocs, update_lal_path_test_data
+    create_appointment_admins_from_spocs, update_lal_path_test_data, add_revenue_payouts
 from ondoc.insurance.tasks import push_mis, process_insurance_payouts
 from ondoc.doctor.tasks import send_ipd_email_notification
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
@@ -116,3 +116,4 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(minute="*/2"), send_ipd_email_notification.s(),name="Send IPD Email Notifications")
     sender.add_periodic_task(crontab(hour=18, minute=30), invalidate_plus_users.s(), name='Invalidate the plus users.')
     sender.add_periodic_task(crontab(hour=18, minute=45), update_convenience_charge.s(), name='Update convenience charge.')
+    sender.add_periodic_task(crontab(hour=21, minute=00), add_revenue_payouts.s(), name='Add revenue payouts.')
