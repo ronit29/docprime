@@ -709,9 +709,10 @@ def process_payout(payout_id):
             raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
 
         if not payout_data.booking_type == payout_data.InsurancePremium:
-            associated_merchant = billed_to.merchant.first()
-            if not associated_merchant.verified:
-                raise Exception("Associated Merchant not verified. " + str(payout_data))
+            if payout_data.payout_type == 1:
+                associated_merchant = billed_to.merchant.first()
+                if not associated_merchant.verified:
+                    raise Exception("Associated Merchant not verified. " + str(payout_data))
 
         # assuming 1 to 1 relation between Order and Appointment
         order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
