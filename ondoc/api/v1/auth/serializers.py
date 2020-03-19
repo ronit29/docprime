@@ -209,12 +209,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
     is_vip_member = serializers.SerializerMethodField()
     is_vip_gold_member = serializers.SerializerMethodField()
     vip_data = serializers.SerializerMethodField()
+    is_care = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
-                  "insurance_status", "is_vip_member", "is_vip_gold_member", "vip_data")
+                  "insurance_status", "is_vip_member", "is_vip_gold_member", "vip_data", "is_care")
 
     def get_vip_data(self, obj):
         resp = {}
@@ -335,6 +336,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
         else:
             return None
 
+    def get_is_care(self, obj):
+        from ondoc.subscription_plan.models import UserPlanMapping
+        resp = {}
+        if isinstance(obj, dict):
+            return resp
+        user = obj.user
+        if not user:
+            return resp
+        user_planning_obj = UserPlanMapping.objects.filter(user=user, status=UserPlanMapping.BOOKED).first()
+        if user_planning_obj:
+            return True
+        else:
+            return False
 
 class ProviderUserProfileSerializer(serializers.ModelSerializer):
     GENDER_CHOICES = UserProfile.GENDER_CHOICES

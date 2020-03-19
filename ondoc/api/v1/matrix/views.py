@@ -50,7 +50,8 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
                         if final:
                             request_data["ToNumber"] = final if final.startswith('0') else "0%s" % final
                             nb_doc_instance.to_mobile = request_data["ToNumber"]
-                            request_response_data = self.get_masked_number(request_data)
+                            # request_response_data = self.get_masked_number(request_data)
+                            request_response_data = request_data["ToNumber"]
                             if not request_response_data:
                                 return Response({'status': 0, 'message': 'No Contact Number found'},
                                                 status.HTTP_404_NOT_FOUND)
@@ -69,7 +70,8 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
 
         request_data["ToNumber"] = final if final.startswith('0') else "0%s" % final
         nb_doc_instance.to_mobile = request_data["ToNumber"]
-        request_response_data = self.get_masked_number(request_data)
+        request_response_data = request_data["ToNumber"]
+        # request_response_data = self.get_masked_number(request_data)
         if not request_response_data:
             return Response({'status': 0, 'message': 'No Contact Number found'}, status.HTTP_404_NOT_FOUND)
         nb_doc_instance.masked_mobile = request_response_data
