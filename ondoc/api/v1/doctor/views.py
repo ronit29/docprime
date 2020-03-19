@@ -5273,26 +5273,27 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
              'breadcrumb': breadcrumb})
 
     def create_lead(self, request):
-        from ondoc.procedure.models import IpdProcedureLead
-        serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        validated_data['status'] = IpdProcedureLead.NEW
-        obj_created = IpdProcedureLead(**validated_data)
-        obj_created.save()
-        return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
+        return Response({'message': 'Success'})
+        # from ondoc.procedure.models import IpdProcedureLead
+        # serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
+        # serializer.is_valid(raise_exception=True)
+        # validated_data = serializer.validated_data
+        # validated_data['status'] = IpdProcedureLead.NEW
+        # obj_created = IpdProcedureLead(**validated_data)
+        # obj_created.save()
+        # return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
 
     def update_lead(self, request):
-        serializer = serializers.IpdLeadUpdateSerializerPopUp(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        temp_id = validated_data.pop('id')
-        # IpdProcedureLead.objects.filter(id=temp_id).update(**validated_data)
-        obj = IpdProcedureLead.objects.filter(id=temp_id).first()
-        if obj:
-            for x in list(validated_data.keys()):
-                setattr(obj, x, validated_data[x])
-            obj.save()
+        # serializer = serializers.IpdLeadUpdateSerializerPopUp(data=request.data)
+        # serializer.is_valid(raise_exception=True)
+        # validated_data = serializer.validated_data
+        # temp_id = validated_data.pop('id')
+        # # IpdProcedureLead.objects.filter(id=temp_id).update(**validated_data)
+        # obj = IpdProcedureLead.objects.filter(id=temp_id).first()
+        # if obj:
+        #     for x in list(validated_data.keys()):
+        #         setattr(obj, x, validated_data[x])
+        #     obj.save()
         return Response({'message': 'Success'})
 
     @use_slave

@@ -1416,6 +1416,6 @@ class GeneralLeadViewSet(viewsets.GenericViewSet):
     # permission_classes = (IsAuthenticated,)
 
     def create_lead(self, request):
-        obj = GeneralMatrixLeads.create_lead(request)
-        return Response({'status': True if obj else False})
+        # obj = GeneralMatrixLeads.create_lead(request)
+        return Response({'status': True})
 
