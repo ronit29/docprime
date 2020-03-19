@@ -74,53 +74,58 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
 
     # create plus lead from request. Request contains all the lead data.
     def create_plus_lead(self, request):
-        # latitude = request.data.get('latitude', None)
-        # longitude = request.data.get('longitude', None)
+
+        return Response({'success': False, 'is_plus_user': False, 'lead_id': None})
+
+        # # latitude = request.data.get('latitude', None)
+        # # longitude = request.data.get('longitude', None)
+        # #
+        # # if latitude or longitude:
+        # #     city_name = InsuranceEligibleCities.get_nearest_city(latitude, longitude)
+        # #     if not city_name:
+        # #         return Response({'success': False, 'is_insured': False})
         #
-        # if latitude or longitude:
-        #     city_name = InsuranceEligibleCities.get_nearest_city(latitude, longitude)
-        #     if not city_name:
-        #         return Response({'success': False, 'is_insured': False})
 
-        phone_number = request.data.get('phone_number', None)
-        if phone_number:
-            user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
-            if not user:
-                user = request.user
-        else:
-            user = request.user
-
-        if not user.is_anonymous and user.is_authenticated:
-            # plus_lead = PlusLead.objects.filter(user=user).order_by('id').last()
-
-            if user.active_insurance:
-                return Response({'success': True, "is_plus_user": False, 'lead_id': None})
-
-            plus_user = user.active_plus_user
-
-            if plus_user and plus_user.is_valid():
-                return Response({'success': True, "is_plus_user": True, 'lead_id': None})
-
-            # if not plus_lead:
-            #     plus_lead = PlusLead(user=user)
-            # elif plus_lead and plus_user and not plus_user.is_valid():
-            #     active_plus_lead = PlusLead.objects.filter(created_at__gte=plus_user.expire_date, user=user).order_by('created_at').last()
-            #     if not active_plus_lead:
-            #         plus_lead = PlusLead(user=user)
-            #     else:
-            #         plus_lead = active_plus_lead
-            plus_lead = PlusLead(user=user, phone_number=user.phone_number)
-
-            plus_lead.extras = request.data
-            plus_lead.save()
-
-            return Response({'success': True, 'is_plus_user': False, 'lead_id': plus_lead.id})
-        else:
-            lead = PlusLead.create_lead_by_phone_number(request)
-            if not lead:
-                return Response({'success': False, 'is_plus_user': False, 'lead_id': None})
-
-            return Response({'success': True, 'is_plus_user': False, 'lead_id': lead.id})
+        # #
+        # phone_number = request.data.get('phone_number', None)
+        # if phone_number:
+        #     user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
+        #     if not user:
+        #         user = request.user
+        # else:
+        #     user = request.user
+        #
+        # if not user.is_anonymous and user.is_authenticated:
+        #     # plus_lead = PlusLead.objects.filter(user=user).order_by('id').last()
+        #
+        #     if user.active_insurance:
+        #         return Response({'success': True, "is_plus_user": False, 'lead_id': None})
+        #
+        #     plus_user = user.active_plus_user
+        #
+        #     if plus_user and plus_user.is_valid():
+        #         return Response({'success': True, "is_plus_user": True, 'lead_id': None})
+        #
+        #     # if not plus_lead:
+        #     #     plus_lead = PlusLead(user=user)
+        #     # elif plus_lead and plus_user and not plus_user.is_valid():
+        #     #     active_plus_lead = PlusLead.objects.filter(created_at__gte=plus_user.expire_date, user=user).order_by('created_at').last()
+        #     #     if not active_plus_lead:
+        #     #         plus_lead = PlusLead(user=user)
+        #     #     else:
+        #     #         plus_lead = active_plus_lead
+        #     plus_lead = PlusLead(user=user, phone_number=user.phone_number)
+        #
+        #     plus_lead.extras = request.data
+        #     plus_lead.save()
+        #
+        #     return Response({'success': True, 'is_plus_user': False, 'lead_id': plus_lead.id})
+        # else:
+        #     lead = PlusLead.create_lead_by_phone_number(request)
+        #     if not lead:
+        #         return Response({'success': False, 'is_plus_user': False, 'lead_id': None})
+        #
+        #     return Response({'success': True, 'is_plus_user': False, 'lead_id': lead.id})
 
 
 class PlusOrderViewSet(viewsets.GenericViewSet):
