@@ -2600,7 +2600,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         profile = validated_data.get('profile')
         plus_plan = validated_data.get('plus_plan', None)
-        if not profile.is_insured_profile or not profile.get_plus_membership:
+        if not profile.is_insured_profile and not profile.get_plus_membership:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "Appointment booking for new users has "
                                                                                "been temporarily suspended. "
                                                                                "Incovenience is deeply regretted."
