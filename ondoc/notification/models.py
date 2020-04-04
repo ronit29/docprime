@@ -1383,69 +1383,69 @@ class WhtsappNotification(TimeStampedModel):
 
     @classmethod
     def send_whatsapp(cls, phone_number, template_name, payload, notification_type):
+        if settings.SEND_WHATSAPP:
+            whatsapp_message = {"media": {},
+                                "message": "",
+                                "template": {
+                                    "name": template_name,
+                                    "params": payload
+                                },
+                                "message_type": "HSM",
+                                "phone_number": phone_number
+                                }
 
-        whatsapp_message = {"media": {},
-                            "message": "",
-                            "template": {
-                                "name": template_name,
-                                "params": payload
-                            },
-                            "message_type": "HSM",
-                            "phone_number": phone_number
-                            }
+            whatsapp_noti = WhtsappNotification.objects.create(
+                phone_number=phone_number,
+                notification_type=notification_type if notification_type else None,
+                template_name=template_name,
+                payload=whatsapp_message,
+                extras={}
+            )
 
-        whatsapp_noti = WhtsappNotification.objects.create(
-            phone_number=phone_number,
-            notification_type=notification_type if notification_type else None,
-            template_name=template_name,
-            payload=whatsapp_message,
-            extras={}
-        )
-
-        whatsapp_payload = {
-            "data": whatsapp_noti.payload,
-            "type": "social_message"
-        }
-
-        publish_message(json.dumps(whatsapp_payload))
-
-    @classmethod
-    def send_login_otp(cls, phone_number, request_source, **kwargs):
-
-        from ondoc.sms.backends.backend import create_otp
-        via_sms = kwargs.get('via_sms')
-        via_whatsapp = kwargs.get('via_whatsapp')
-        otp = create_otp(phone_number, "{}", call_source=request_source, return_otp=True, via_sms=via_sms, via_whatsapp=via_whatsapp)
-
-        template_name = 'docprime_otp_web'
-        if request_source == 'docprimechat':
-            template_name = 'docprime_otp_verification'
-
-        whatsapp_message = {"media": {},
-                            "message": "",
-                            "template": {
-                                "name": template_name,
-                                "params": [otp]
-                            },
-                            "message_type": "HSM",
-                            "phone_number": phone_number
-                            }
-
-        extra = {'call_source': request_source}
-        whatsapp_noti = WhtsappNotification.objects.create(
-            phone_number=phone_number,
-            notification_type=NotificationAction.LOGIN_OTP,
-            template_name='docprime_otp_verification',
-            payload=whatsapp_message,
-            extras=extra
-        )
-
-        whatsapp_payload = {
+            whatsapp_payload = {
                 "data": whatsapp_noti.payload,
                 "type": "social_message"
             }
 
-        publish_message(json.dumps(whatsapp_payload))
+            publish_message(json.dumps(whatsapp_payload))
+
+    @classmethod
+    def send_login_otp(cls, phone_number, request_source, **kwargs):
+        from ondoc.sms.backends.backend import create_otp
+        if settings.SEND_WHATSAPP:
+            via_sms = kwargs.get('via_sms')
+            via_whatsapp = kwargs.get('via_whatsapp')
+            otp = create_otp(phone_number, "{}", call_source=request_source, return_otp=True, via_sms=via_sms, via_whatsapp=via_whatsapp)
+
+            template_name = 'docprime_otp_web'
+            if request_source == 'docprimechat':
+                template_name = 'docprime_otp_verification'
+
+            whatsapp_message = {"media": {},
+                                "message": "",
+                                "template": {
+                                    "name": template_name,
+                                    "params": [otp]
+                                },
+                                "message_type": "HSM",
+                                "phone_number": phone_number
+                                }
+
+            extra = {'call_source': request_source}
+            whatsapp_noti = WhtsappNotification.objects.create(
+                phone_number=phone_number,
+                notification_type=NotificationAction.LOGIN_OTP,
+                template_name='docprime_otp_verification',
+                payload=whatsapp_message,
+                extras=extra
+            )
+
+            whatsapp_payload = {
+                    "data": whatsapp_noti.payload,
+                    "type": "social_message"
+                }
+
+            publish_message(json.dumps(whatsapp_payload))
 
     class Meta:
         db_table = "whtsapp_notification"
