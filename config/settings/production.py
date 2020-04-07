@@ -44,9 +44,9 @@ X_FRAME_OPTIONS = 'DENY'
 
 INSTALLED_APPS += ('gunicorn',)
 
-if env('DJANGO_SETTINGS_MODULE') == 'config.settings.production':
-    MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
-    INSTALLED_APPS += ('elasticapm.contrib.django',)
+#if env('DJANGO_SETTINGS_MODULE') == 'config.settings.production':
+    #MIDDLEWARE += ('elasticapm.contrib.django.middleware.TracingMiddleware',)
+    #INSTALLED_APPS += ('elasticapm.contrib.django',)
 
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
 
@@ -67,10 +67,10 @@ LOGGING = {
         },
     },
     'handlers': {
-        'elasticapm': {
-            'level': 'INFO',
-            'class': 'elasticapm.contrib.django.handlers.LoggingHandler',
-        },
+        # 'elasticapm': {
+        #     'level': 'INFO',
+        #     'class': 'elasticapm.contrib.django.handlers.LoggingHandler',
+        # },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -79,18 +79,18 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'elasticapm', ],
+            'handlers': ['console', ],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.db.backends': {
             'level': 'ERROR',
-            'handlers': ['console', 'elasticapm', ],
+            'handlers': ['console', ],
             'propagate': False,
         },
         'django.security.DisallowedHost': {
             'level': 'ERROR',
-            'handlers': ['console', 'elasticapm', ],
+            'handlers': ['console', ],
             'propagate': False,
         },
     },
